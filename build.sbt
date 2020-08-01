@@ -19,6 +19,6 @@ libraryDependencies += "org.scalactic" %% "scalactic" % "3.0.8"
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.8" % "test"
 
-libraryDependencies += "com.github.luzhuomi" %% "scalangj" % "0.1.0"  // apache license
+libraryDependencies += "com.github.luzhuomi" %% "scalangj" % "0.1.1"  // apache license
 
 scalacOptions ++= Seq("-feature", "-deprecation", "-Yresolve-term-conflict:package", "-Ypartial-unification" )
