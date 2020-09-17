@@ -320,9 +320,25 @@ object CFG {
               _ <- put(st.copy(cfg=cfg1))
             } yield ()
           } else {
-            m.pure(())
+            val max = st.currId
+            val currNodeId = internalIdent (s"${labPref}${max}")
+            val max1 = max + 1
+            val cfg0 = st.cfg
+            val preds0 = st.currPreds
+            val s = a
+            val lvars = getLHSVarsFromVarDecl(var_decl)
+            val rvars = getRHSVarsFromVarDecl(var_decl)
+            val cfgNode = Node(List(s), lvars, rvars, lvars, preds0, Nil, AssignmentNode)
+            val cfg1p   = preds0.foldLeft(cfg0) ( (g,pred) => {
+              val n:Node = g(pred)
+              val n1 = n.copy(succs = (n.succs ++ List(currNodeId)).toSet.toList)
+              g + (pred -> n1)
+            })
+            val cfg1 = cfg1p + (currNodeId -> cfgNode)
+            for {
+              _ <- put(st.copy(cfg=cfg1, currId=max1, currPreds=List(currNodeId), continuable = true))
+            } yield ()
           }
-
         } yield ()
       }
       case BlockStmt_(stmt) => ops.buildCFG(stmt)
@@ -332,6 +348,27 @@ object CFG {
 
   implicit def stmtCFGInstance:CFGClass[Stmt] = new CFGClass[Stmt] {
     override def buildCFG(a: Stmt)(implicit m:MonadError[SIState,String]): State[StateInfo, Unit] = a match {
+      case StmtBlock(blk) => ops.buildCFG(blk)
+      case IfThen(exp, stmt) => buildCFG(IfThenElse(exp,stmt,Empty))
+      case IfThenElse(exp,true_stmt,false_stmt) => 
+      /*
+      max1 = max + 1
+      CFG1 = CFG update { pred : {succ = max} |  pred <- preds } union { max : { stmts =  [ if exp { goto max1 } else { goto max2 } ], succ = [], preds = preds} }
+      CFG1, max1, {max}, false |-n trueStmt => CFG2, max2, preds1, _ 
+      CFG2, max2, {max}, false |-n falseStmt => CFG3, max3, preds2, _
+      -------------------------------------------------------------------------------------------------------------
+      CFG, max, preds, _ |- if exp { trueStmt } else { falseStmt }  => CFG3, max3, preds1 U preds2, false
+      */
+      for {
+        st <- get;
+        _  <- { 
+          val max = st.currId
+          val currNodeId = internalIdent(s"${labPref}${max}")
+          
+          m.pure(())
+        }
+        
+      } yield ()
       case _ => m.pure(()) // TODO: fixme
     }
   }
