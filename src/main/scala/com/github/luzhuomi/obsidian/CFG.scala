@@ -309,8 +309,8 @@ object CFG {
             val cfg0 = st.cfg
             val preds0 = st.currPreds
             val s = a
-            val lvars  = getLHSVarsFromVarDecl(var_decl)
-            val rvars  = getRHSVarsFromVarDecl(var_decl)
+            val lvars  = HasVarOps.getLVarsFrom(var_decl)
+            val rvars  = HasVarOps.getVarsFrom(var_decl)
             val cfg1   = preds0.foldLeft(cfg0) ( (g,pred) => {
               val n:Node = g(pred)
               val n1   = n.copy(stmts =n.stmts ++ List(s), localDecls = n.localDecls ++ lvars, lVars = n.lVars ++ lvars, rVars = n.rVars ++ rvars)
@@ -326,8 +326,8 @@ object CFG {
             val cfg0 = st.cfg
             val preds0 = st.currPreds
             val s = a
-            val lvars = getLHSVarsFromVarDecl(var_decl)
-            val rvars = getRHSVarsFromVarDecl(var_decl)
+            val lvars = HasVarOps.getLVarsFrom(var_decl)
+            val rvars = HasVarOps.getVarsFrom(var_decl)
             val cfgNode = Node(List(s), lvars, rvars, lvars, preds0, Nil, AssignmentNode)
             val cfg1p   = preds0.foldLeft(cfg0) ( (g,pred) => {
               val n:Node = g(pred)
@@ -377,37 +377,89 @@ object CFG {
   def internalIdent(s:String) :Ident = Ident(s)
   def formalArgsAsDecls(idents:List[Ident], cfg:CFG):CFG = cfg // TODO:fixme
   
-  def getLHSVarsFromVarDecl(var_decl:VarDecl):List[Ident] = var_decl match {
-    case VarDecl(var_decl_id, var_init) => List(idFromVarDeclId(var_decl_id))
-  }
-  def getRHSVarsFromVarDecl(var_decl:VarDecl):List[Ident] = var_decl match {
-    case VarDecl(var_decl_id, None) => List()
-    case VarDecl(var_decl_id, Some(var_init)) => HasVarOps.getVarsFrom(var_init) 
-  }
 
   trait HasVar[A] {
     def getVarsFrom(a:A):List[Ident]
+    def getLVarsFrom(a:A):List[Ident] = List()
   }
 
   object HasVarOps {
     def getVarsFrom[A](a:A)(implicit hv:HasVar[A]):List[Ident] = hv.getVarsFrom(a)
+    def getLVarsFrom[A](a:A)(implicit hv:HasVar[A]):List[Ident] = hv.getLVarsFrom(a)
   }
+
+
+
+  implicit def getVarsFromVarDecl:HasVar[VarDecl] = new HasVar[VarDecl] { 
+    override def getVarsFrom(var_decl:VarDecl):List[Ident] = var_decl match {
+      case VarDecl(var_decl_id, None) => List()
+      case VarDecl(var_decl_id, Some(var_init)) => HasVarOps.getVarsFrom(var_init) 
+    }  
+    override def getLVarsFrom(var_decl:VarDecl):List[Ident] = var_decl match {
+      case VarDecl(var_decl_id, var_init) => List(idFromVarDeclId(var_decl_id))
+    }
+  }
+
 
 
   implicit def getVarsFromVarInit:HasVar[VarInit] = new HasVar[VarInit] { 
     override def getVarsFrom(var_init:VarInit):List[Ident] =  var_init match {
       case InitExp(exp) => HasVarOps.getVarsFrom(exp)
       case InitArray(ArrayInit(var_inits)) => var_inits.flatMap(HasVarOps.getVarsFrom(_))
-   }
+    }
+    override def getLVarsFrom(var_init:VarInit):List[Ident] = var_init match {
+      case InitExp(exp) => HasVarOps.getLVarsFrom(exp)
+      case InitArray(ArrayInit(var_inits)) => var_inits.flatMap(HasVarOps.getLVarsFrom(_))
+    }
   }
   
   implicit def getVarsFromExp:HasVar[Exp] = new HasVar[Exp] {
+    override def getLVarsFrom(exp:Exp):List[Ident] = exp match {
+      case Lit(lit) => List()
+      case ClassLit(ty) => List()
+      case This => List()
+      case ThisClass(name) => List()
+      case InstanceCreation(type_args, type_decl, args, body) => List()
+      case QualInstanceCreation(exp, type_args, id, args, body) => List() 
+      case ArrayCreate(ty, exps, num_dims) => exps.flatMap(getLVarsFrom(_))
+      case ArrayCreateInit(ty,size, init) => init match {
+        case ArrayInit(var_inits) => var_inits.flatMap(HasVarOps.getLVarsFrom(_))
+      }
+      case FieldAccess_(access) => HasVarOps.getLVarsFrom(access)
+      case MethodInv(methodInv) => HasVarOps.getLVarsFrom(methodInv)
+      case ArrayAccess(idx)     => HasVarOps.getLVarsFrom(idx)
+      case ExpName(name)        => List()
+      case PostIncrement(exp)   => getLVarsFrom(exp)
+      case PostDecrement(exp)   => getLVarsFrom(exp)
+      case PreIncrement(exp)    => getLVarsFrom(exp)
+      case PreDecrement(exp)    => getLVarsFrom(exp)
+      case PrePlus(exp)         => getLVarsFrom(exp)
+      case PreMinus(exp)        => getLVarsFrom(exp)
+      case PreBitCompl(exp)     => getLVarsFrom(exp)
+      case PreNot(exp)          => getLVarsFrom(exp)
+      case Cast(ty, exp)        => getLVarsFrom(exp) 
+
+      case BinOp(e1, op, e2)    => getLVarsFrom(e1) ++ getLVarsFrom(e2)
+      case InstanceOf(e, ref_type) => getLVarsFrom(e)
+      case Cond(cond, true_exp, false_exp) => getLVarsFrom(cond) ++ getLVarsFrom(true_exp) ++ getLVarsFrom(false_exp) 
+      case Assign(lhs, op, rhs) => getLVarsFrom(rhs) ++ HasVarOps.getLVarsFrom(lhs)
+      case Lambda(params, body) => {
+        val ps = HasVarOps.getVarsFrom(params).toSet
+        HasVarOps.getLVarsFrom(body).filterNot(ps)
+      }
+      case MethodRef(name, id)  => List()
+
+
+    }
+
     override def getVarsFrom(exp:Exp):List[Ident] = exp match {
       case Lit(lit) => List()
       case ClassLit(ty) => List()
       case This => List()
       case ThisClass(name) => List()
-      case InstanceCreation(type_args, type_decl, args, body) => args.flatMap(HasVarOps.getVarsFrom(_))
+      case InstanceCreation(type_args, type_decl, args, body) => args.flatMap(HasVarOps.getVarsFrom(_)) 
+      // note: we can skip the body because any reference to the variables defined the enclosing scope 
+      //       because those variables must be final or effectively final
       case QualInstanceCreation(exp, type_args, id, args, body) => args.flatMap(HasVarOps.getVarsFrom(_))
       case ArrayCreate(ty, exps, num_dims) => exps.flatMap(getVarsFrom(_))
       case ArrayCreateInit(ty, size, init) => init match {
@@ -429,7 +481,7 @@ object CFG {
       case BinOp(e1, op, e2)    => getVarsFrom(e1) ++ getVarsFrom(e2)
       case InstanceOf(e, ref_type) => getVarsFrom(e)
       case Cond(cond, true_exp, false_exp) => getVarsFrom(cond) ++ getVarsFrom(true_exp) ++ getVarsFrom(false_exp) 
-      case Assign(lhs, op, rhs) => HasVarOps.getVarsFrom(lhs) ++ getVarsFrom(rhs)
+      case Assign(lhs, op, rhs) => getVarsFrom(rhs) // HasVarOps.getVarsFrom(lhs) ++ getVarsFrom(rhs)
       case Lambda(params, body) => {
         val ps = HasVarOps.getVarsFrom(params).toSet
         HasVarOps.getVarsFrom(body).filterNot(ps)
@@ -439,7 +491,12 @@ object CFG {
   }
 
   implicit def getVarsFromFieldAccess:HasVar[FieldAccess] = new HasVar[FieldAccess] { 
-    override def getVarsFrom(field_access:FieldAccess):List[Ident] = List() // TODO: check whether it should indeed empty
+    override def getLVarsFrom(field_access:FieldAccess):List[Ident] = List() // TODO: check whether it should indeed empty
+    override def getVarsFrom(field_access:FieldAccess):List[Ident] = field_access match {
+      case PrimaryFieldAccess(e,id) => HasVarOps.getVarsFrom(e)
+      case SuperFieldAccess(id) => List()
+      case ClassFieldAccess(name,id) => List()
+    }
   }
 
   implicit def getVarsFromMethodInvocation:HasVar[MethodInvocation] = new HasVar[MethodInvocation] {
@@ -449,26 +506,45 @@ object CFG {
       case SuperMethodCall(ref_types, id, args) => args.flatMap(HasVarOps.getVarsFrom(_))
       case ClassMethodCall(name, ref_types, id, args) => args.flatMap(HasVarOps.getVarsFrom(_))
       case TypeMethodCall(name, ref_types, id, args) => args.flatMap(HasVarOps.getVarsFrom(_))
-    } // TODO:Fixme
+    }
+    override def getLVarsFrom(methodInv:MethodInvocation):List[Ident] = methodInv match {
+      case MethodCall(name, args) => args.flatMap(HasVarOps.getLVarsFrom(_))
+      case PrimaryMethodCall(e,ref_type, id, args) => HasVarOps.getLVarsFrom(e) ++ args.flatMap(HasVarOps.getLVarsFrom(_))
+      case SuperMethodCall(ref_types, id, args) => args.flatMap(HasVarOps.getLVarsFrom(_))
+      case ClassMethodCall(name, ref_types, id, args) => args.flatMap(HasVarOps.getLVarsFrom(_))
+      case TypeMethodCall(name, ref_types, id, args) => args.flatMap(HasVarOps.getLVarsFrom(_))
+    }
   }
 
   implicit def getVarsFromArrayIndex:HasVar[ArrayIndex] = new HasVar[ArrayIndex] {
     override def getVarsFrom(idx:ArrayIndex):List[Ident] = idx match {
       case ArrayIndex(e, es) => HasVarOps.getVarsFrom(e) ++ es.flatMap(HasVarOps.getVarsFrom(_))
     }
+    override def getLVarsFrom(idx:ArrayIndex):List[Ident] = idx match {
+      case ArrayIndex(e, es) => HasVarOps.getLVarsFrom(e) ++ es.flatMap(HasVarOps.getLVarsFrom(_))
+    }
   }
 
   implicit def getVarsFromName:HasVar[Name] = new HasVar[Name] {
     override def getVarsFrom(n:Name):List[Ident] = n match {
-      case Name(ids) => List() // TODO: double check, is it save to assume names are not variable?
+      case Name(id::Nil) => List(id) // TODO: double check, is it safe to assume names are not variable?
+      case Name(_) => List()
+    }
+    override def getLVarsFrom(n:Name):List[Ident] = n match {
+      case Name(ids) => List() // TODO: double check, is it safe to assume names are not variable?
     }
   }
 
   implicit def getVarsFromLhs:HasVar[Lhs] = new HasVar[Lhs] { 
     override def getVarsFrom(lhs:Lhs):List[Ident] = lhs match {
-      case NameLhs(name) => HasVarOps.getVarsFrom(name)
+      case NameLhs(name) => List()
       case FieldLhs(field_access) => HasVarOps.getVarsFrom(field_access)
       case ArrayLhs(array_idx) => HasVarOps.getVarsFrom(array_idx)
+    }
+    override def getLVarsFrom(lhs:Lhs):List[Ident] = lhs match {
+      case NameLhs(name) => HasVarOps.getVarsFrom(name)
+      case FieldLhs(field_access) => List() // TODO: double check, is it safe to assume field access has no lhs var
+      case ArrayLhs(array_idx) => List() // TODO: double check, is it safe to assume array index has no lhs var
     }
   }
 
@@ -485,6 +561,11 @@ object CFG {
       case LambdaExpression_(e) => HasVarOps.getVarsFrom(e)
       case LambdaBlock(blk) => HasVarOps.getVarsFrom(blk)
     }
+    override def getLVarsFrom(lambExp:LambdaExpression):List[Ident] = lambExp match {
+      case LambdaExpression_(e) => HasVarOps.getLVarsFrom(e)
+      case LambdaBlock(blk) => HasVarOps.getLVarsFrom(blk)
+    }
+
   }
 
   implicit def getVarsFromBlock:HasVar[Block] = new HasVar[Block] {
@@ -493,35 +574,147 @@ object CFG {
         val localVarStmts = stmts.filter(isLocalVarsBlockStmt(_))
         val others = stmts.filter(!isLocalVarsBlockStmt(_)) 
         val localVars = localVarStmts.flatMap(stmt => stmt match {
-          case LocalVars(modifiers,ty, var_decls) => var_decls.flatMap(getLHSVarsFromVarDecl(_))
+          case LocalVars(modifiers,ty, var_decls) => var_decls.flatMap(HasVarOps.getLVarsFrom(_))
           case _ => List()
         }).toSet
         val otherVars = others.flatMap(HasVarOps.getVarsFrom(_)) ++ localVarStmts.flatMap(stmt => stmt match {
-          case LocalVars(modifiers,ty, var_decls) => var_decls.flatMap(getRHSVarsFromVarDecl(_))
+          case LocalVars(modifiers,ty, var_decls) => var_decls.flatMap(HasVarOps.getVarsFrom(_))
           case _ => List()
         })
         otherVars.filterNot(localVars)
       }
     }
+    override def getLVarsFrom(blk:Block):List[Ident] = blk match {
+      case Block(stmts) => {
+        val localVarStmts = stmts.filter(isLocalVarsBlockStmt(_))
+        val others = stmts.filter(!isLocalVarsBlockStmt(_)) 
+        val localVars = localVarStmts.flatMap(stmt => stmt match {
+          case LocalVars(modifiers,ty, var_decls) => var_decls.flatMap(HasVarOps.getLVarsFrom(_))
+          case _ => List()
+        }).toSet
+        val otherVars = others.flatMap(HasVarOps.getLVarsFrom(_)) 
+        otherVars.filterNot(localVars)
+      }
+    }    
   }
 
   implicit def getVarsFromBlockStmt:HasVar[BlockStmt] = new HasVar[BlockStmt] {
     override def getVarsFrom(blkStmt:BlockStmt):List[Ident] = blkStmt match {
       case BlockStmt_(stmt) => HasVarOps.getVarsFrom(stmt)
       case LocalClass(class_decl) => List() // TODO:Fixme
-      case LocalVars(modifiers, ty, var_decls) => var_decls.flatMap(getRHSVarsFromVarDecl(_))
+      case LocalVars(modifiers, ty, var_decls) => var_decls.flatMap(HasVarOps.getVarsFrom(_))
+    }
+    override def getLVarsFrom(blkStmt:BlockStmt):List[Ident] = blkStmt match {
+      case BlockStmt_(stmt) => HasVarOps.getLVarsFrom(stmt)
+      case LocalClass(class_decl) => List() // TODO:Fixme
+      case LocalVars(modifiers, ty, var_decls) => var_decls.flatMap(HasVarOps.getLVarsFrom(_))
     }
   }
   
   implicit def getVarsFromStmt:HasVar[Stmt] = new HasVar[Stmt] {
     override def getVarsFrom(stmt:Stmt):List[Ident] = stmt match {
-      case _ => List() // TODO: Fixme
+      case StmtBlock(blk) => HasVarOps.getVarsFrom(blk)
+      case IfThen(exp, stmt) => HasVarOps.getVarsFrom(exp) ++ getVarsFrom(stmt)
+      case IfThenElse(exp, then_stmt, else_stmt) => HasVarOps.getVarsFrom(exp) ++ getVarsFrom(then_stmt) ++ getVarsFrom(else_stmt)
+      case While(exp,stmt) => HasVarOps.getVarsFrom(exp) ++ getVarsFrom(stmt)
+      case BasicFor(init, loop_cond, post_update, stmt) => { 
+        val s = init.toList.flatMap(HasVarOps.getLVarsFrom(_)).toSet
+        val vs = init.toList.flatMap(HasVarOps.getVarsFrom(_)) ++ loop_cond.toList.flatMap(HasVarOps.getVarsFrom(_)) ++ post_update.toList.flatMap(x => x.flatMap(y => HasVarOps.getVarsFrom(y))) ++ getVarsFrom(stmt)
+        vs.filterNot(s)
+      }
+      case EnhancedFor(modifiers, ty, id, exp, stmt) => {
+        HasVarOps.getVarsFrom(exp) ++ getVarsFrom(stmt)
+      }
+      case Empty => List()
+      case ExpStmt(exp) => HasVarOps.getVarsFrom(exp)
+      case Assert(exp, msg) => HasVarOps.getVarsFrom(exp) ++ msg.toList.flatMap(HasVarOps.getVarsFrom(_))
+      case Switch(exp, blocks) => HasVarOps.getVarsFrom(exp) ++ blocks.flatMap(HasVarOps.getVarsFrom(_))
+      case Do(stmt, exp) => getVarsFrom(stmt) ++ HasVarOps.getVarsFrom(exp)
+      case Break(_) => List()
+      case Continue(_) => List()
+      case Return(exp) => exp.toList.flatMap(HasVarOps.getVarsFrom(_))
+      case Synchronized(exp, blk) => HasVarOps.getVarsFrom(exp) ++ HasVarOps.getVarsFrom(blk)
+      case Throw(exp) => HasVarOps.getVarsFrom(exp)
+      case Try(try_blk,catches,finally_blk) => HasVarOps.getVarsFrom(try_blk) ++ catches.flatMap(HasVarOps.getVarsFrom(_)) ++ finally_blk.toList.flatMap(HasVarOps.getVarsFrom(_))
+      case Labeled(id,stmt) => getVarsFrom(stmt) 
+    }
+    override def getLVarsFrom(stmt:Stmt):List[Ident] = stmt match {
+      case StmtBlock(blk) => HasVarOps.getLVarsFrom(blk)
+      case IfThen(exp, stmt) => HasVarOps.getLVarsFrom(exp) ++ getLVarsFrom(stmt)
+      case IfThenElse(exp, then_stmt, else_stmt) => HasVarOps.getLVarsFrom(exp) ++ getLVarsFrom(then_stmt) ++ getLVarsFrom(else_stmt)
+      case While(exp,stmt) => HasVarOps.getLVarsFrom(exp) ++ getLVarsFrom(stmt)
+      case BasicFor(init, loop_cond, post_update, stmt) => { 
+        val s = init.toList.flatMap(HasVarOps.getLVarsFrom(_)).toSet 
+        val vs = loop_cond.toList.flatMap(HasVarOps.getLVarsFrom(_)) ++ post_update.toList.flatMap(x => x.flatMap(y => HasVarOps.getLVarsFrom(y))) ++ getLVarsFrom(stmt)
+        vs.filterNot(s)
+      }
+      case EnhancedFor(modifiers, ty, id, exp, stmt) => {
+        HasVarOps.getLVarsFrom(exp) ++ getLVarsFrom(stmt).filterNot(Set(id))
+      }
+      case Empty => List()
+      case ExpStmt(exp) => HasVarOps.getLVarsFrom(exp)
+      case Assert(exp, msg) => HasVarOps.getLVarsFrom(exp) ++ msg.toList.flatMap(HasVarOps.getLVarsFrom(_))
+      case Switch(exp, blocks) => HasVarOps.getLVarsFrom(exp) ++ blocks.flatMap(HasVarOps.getLVarsFrom(_))
+      case Do(stmt, exp) => getLVarsFrom(stmt) ++ HasVarOps.getLVarsFrom(exp)
+      case Break(_) => List()
+      case Continue(_) => List()
+      case Return(exp) => exp.toList.flatMap(HasVarOps.getLVarsFrom(_))
+      case Synchronized(exp, blk) => HasVarOps.getLVarsFrom(exp) ++ HasVarOps.getLVarsFrom(blk)
+      case Throw(exp) => HasVarOps.getLVarsFrom(exp)
+      case Try(try_blk,catches,finally_blk) => HasVarOps.getLVarsFrom(try_blk) ++ catches.flatMap(HasVarOps.getLVarsFrom(_)) ++ finally_blk.toList.flatMap(HasVarOps.getLVarsFrom(_))
+      case Labeled(id,stmt) => getLVarsFrom(stmt) 
+    }
+  }
+
+  implicit def getVarsFromCatch:HasVar[Catch] = new HasVar[Catch] {
+    override def getVarsFrom(c:Catch):List[Ident] = c match {
+      case Catch(params, blk) => {
+        val ps = HasVarOps.getVarsFrom(params).toSet
+        HasVarOps.getVarsFrom(blk).filterNot(ps)
+      }
+    }
+    override def getLVarsFrom(c:Catch):List[Ident] = c match {
+      case Catch(params, blk) => {
+        val ps = HasVarOps.getVarsFrom(params).toSet
+        HasVarOps.getLVarsFrom(blk).filterNot(ps)
+      }
+    }
+  }
+
+  implicit def getVarsFromSwitchBlock:HasVar[SwitchBlock] = new HasVar[SwitchBlock] {
+    override def getVarsFrom(switch_block:SwitchBlock):List[Ident] = switch_block match {
+      case SwitchBlock(label, blk_stmts) => HasVarOps.getVarsFrom(label) ++ blk_stmts.flatMap(HasVarOps.getVarsFrom(_))
+    }
+    override def getLVarsFrom(switch_block:SwitchBlock):List[Ident] = switch_block match {
+      case SwitchBlock(label, blk_stmts) => HasVarOps.getLVarsFrom(label) ++ blk_stmts.flatMap(HasVarOps.getLVarsFrom(_))
+    }
+  }
+
+  implicit def getVarsFromSwitchLabel:HasVar[SwitchLabel] = new HasVar[SwitchLabel] {
+    override def getVarsFrom(switch_label:SwitchLabel):List[Ident] = switch_label match {
+      case SwitchCase(exp) => HasVarOps.getVarsFrom(exp)
+      case Default => List()
+    }
+    override def getLVarsFrom(switch_label:SwitchLabel):List[Ident] = switch_label match {
+      case SwitchCase(exp) => HasVarOps.getLVarsFrom(exp)
+      case Default => List()
     }
   }
 
   implicit def getVarsFromFormalParam:HasVar[FormalParam] = new HasVar[FormalParam] {
     override def getVarsFrom(fp:FormalParam):List[Ident] = fp match {
       case FormalParam(modifiers, ty, has_arity, var_decl_id) => List(idFromVarDeclId(var_decl_id))
+    }
+  }
+
+  implicit def getVarsFromForInit:HasVar[ForInit] = new HasVar[ForInit] {
+    override def getVarsFrom(for_init:ForInit):List[Ident] = for_init match {
+      case ForLocalVars(modifiers, ty, var_decls) => var_decls.flatMap(HasVarOps.getVarsFrom(_))
+      case ForInitExps(es) => es.flatMap(HasVarOps.getVarsFrom(_))
+    }
+    override def getLVarsFrom(for_init:ForInit):List[Ident] = for_init match {
+      case ForLocalVars(modifiers, ty, var_decls) => var_decls.flatMap(HasVarOps.getLVarsFrom(_))
+      case ForInitExps(es) => es.flatMap(HasVarOps.getLVarsFrom(_))
     }
   }
 
