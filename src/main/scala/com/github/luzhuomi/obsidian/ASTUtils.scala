@@ -18,4 +18,10 @@ object ASTUtils {
         case LocalVars(_,_,_) => true 
         case _ => false
     }
+
+    // def assign(lhs:Exp, rhs:Exp) : Exp = Assign(lhs, EqualA, rhs)
+
+    def eeq(lhs:Exp, rhs:Exp) : Exp = BinOp(lhs, Equal, rhs)
+
+    def eor(lhs:Exp, rhs:Exp) : Exp = BinOp(lhs, Or, rhs)
 }
