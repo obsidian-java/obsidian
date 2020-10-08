@@ -49,29 +49,6 @@ public class FibExcept {
         // 7
     }
 
-    int get1(int x) {
-        int i_1, i_3, i_5, i_6, t_6, res_1, res_7, res9;
-     L1:i_1 = this.lpos;
-        res_1 = -1;
-     L2:try {
-         L3:if(x < i_1) {
-                L4:throw new InputException();
-            } else { 
-                L5: join (i_5=phi(L3:i_1, L6:i_6)) while (i_5 < x) {
-                     L6: t_6 = this.f1 + this.f2;
-                         this.f1 = this.f2;
-                         this.f2 = t_6;
-                         i_6 = i_5 + 1;
-                     }
-                L7: this.lpos = i_5;
-                     res_7 = this.f2;
-            } join (i_3 = phi(L4:i_1, L7:i_5))
-        } catch (InputException e) {
-            L8:System.out.println("the input should be greater than " + i_1 + ".");
-        } join (res_2 = phi(L3:res_7, L8:res_1));
-      L9:return res_2; 
-    } 
-
     public static void main(String[] args) {
 
         FibExcept fs = new FibExcept();
