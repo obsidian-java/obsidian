@@ -1,6 +1,8 @@
 # obsidian
 Control flow obfuscation for Java code
 
+It is work in progress
+
 # Example 
 
 Some examples in Java
