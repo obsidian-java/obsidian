@@ -3,6 +3,10 @@ Control flow obfuscation for Java code
 
 It is work in progress
 
+# Documentation
+
+* [Technical Report](https://github.com/luzhuomi/obsidian/raw/master/pepm21-fixed.pdf)
+
 # Example 
 
 Some examples in Java
