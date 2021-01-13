@@ -221,6 +221,16 @@ object CFG_old {
   type State[S, A] = StateT[CFGResult, S, A]
   type SIState[A] = State[StateInfo, A]
 
+  /*
+  build a partial CFG, it is "partial" in the sense that 
+  1) the original goto are not yet connected to the labeled block
+      i.e. labeled block's preds list is yet to include the goto's block label 
+      hm.. not might be the case for java, coz continue L appear inside L:{...}
+  2) the succs of the continue and break blocks yet need to updated
+        but the continue and break's block label should be associated with the parent (switch or loop) block label
+  3) the non-native continue (serving as goto) need to be generated non-goto block (end of the block, a "goto succLabel" is required to be inserted before SSA to be built)
+      no need for Java?
+  */
   trait CFGClass[A] {
     def buildCFG(a: A)(implicit
         m: MonadError[SIState, String]
@@ -297,19 +307,6 @@ object CFG_old {
         }
     }
 
-  /*
-  max1 = max + 1
-  l0' = max
-  CFG1 = CFG update { pred : { succ = {max} } } union { l0' : { stmts = { if (exp == e1) { goto l1; } else { goto l1'; } }}, succs = { l1,l1'}, preds = preds }  update { l1: { preds += l0' } }
-                                                union { l1' : { stmts = { if (exp == e2) { goto l2; } else { goto l2'; } }}, succs = { l2,l2'}, preds = {l0'} }  update { l2: { preds += l1' } }
-                                                union { l2' : { stmts = { if (exp == e3) { goto l3; } else { goto l3'; } }}, succs = { l3,l3'}, preds = {l1'} }  update { l3: { preds += l2' } }
-                                                ...
-                                                union { ln-1' : { stmts = { if (exp == en) { goto ln; } else { goto l_default; }}, succs = { ln, l_default }, preds = {ln-2'} } update { ln- : { preds += ln-1' }} update { l_default : { preds += ln-1' } }
-
-  CFG1, max1, {}, false, {}, contNodes, {} |- stmt1,..., stmtn+1 => CFG2, max2, preds2, continable2, breakNodes, contNodes2, {(l1,l1',e1),...,(l_default, _)}
-  -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  CFG, max, preds, continuable, breakNodes, contNodes, caseNodes |- switch exp { stmt1,...,stmtn }   => CFG2, max2, preds2 union breakNodes2 , false, breakNodes, contNodes2, caseNodes
-   */
   implicit def blockCFGInstance: CFGClass[Block] =
     new CFGClass[Block] {
       override def buildCFG(
@@ -454,10 +451,11 @@ object CFG_old {
                       } yield ()
                     }
                 } yield ()
-              case (var_decl :: rest) => for {
-                _ <- buildCFG(LocalVars(modifiers, ty, var_decl::Nil))
-                _ <- buildCFG(LocalVars(modifiers, ty, rest))
-              } yield ()
+              case (var_decl :: rest) =>
+                for {
+                  _ <- buildCFG(LocalVars(modifiers, ty, var_decl :: Nil))
+                  _ <- buildCFG(LocalVars(modifiers, ty, rest))
+                } yield ()
             }
           case BlockStmt_(stmt) => ops.buildCFG(stmt)
         }
@@ -561,6 +559,19 @@ object CFG_old {
               }
             } yield ()
           case Switch(exp, blocks) =>
+          /*
+          max1 = max + 1
+          l0' = max
+          CFG1 = CFG update { pred : { succ = {max} } } union { l0' : { stmts = { if (exp == e1) { goto l1; } else { goto l1'; } }}, succs = { l1,l1'}, preds = preds }  update { l1: { preds += l0' } }
+                                                        union { l1' : { stmts = { if (exp == e2) { goto l2; } else { goto l2'; } }}, succs = { l2,l2'}, preds = {l0'} }  update { l2: { preds += l1' } }
+                                                        union { l2' : { stmts = { if (exp == e3) { goto l3; } else { goto l3'; } }}, succs = { l3,l3'}, preds = {l1'} }  update { l3: { preds += l2' } }
+                                                        ...
+                                                        union { ln-1' : { stmts = { if (exp == en) { goto ln; } else { goto l_default; }}, succs = { ln, l_default }, preds = {ln-2'} } update { ln- : { preds += ln-1' }} update { l_default : { preds += ln-1' } }
+
+          CFG1, max1, {}, false, {}, contNodes, {} |- stmt1,..., stmtn+1 => CFG2, max2, preds2, continable2, breakNodes, contNodes2, {(l1,l1',e1),...,(l_default, _)}
+          -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+          CFG, max, preds, continuable, breakNodes, contNodes, caseNodes |- switch exp { stmt1,...,stmtn }   => CFG2, max2, preds2 union breakNodes2 , false, breakNodes, contNodes2, caseNodes
+          */
             for {
               st <- get
               _ <- {
@@ -609,6 +620,17 @@ object CFG_old {
               }
             } yield ()
           case While(exp, stmt) =>
+          /*
+          max1 = max + 1
+          CFG1 = CFG update { pred : {succ = max} |  pred <- preds ++ preds1 } union { max: { stmts = [ if exp { goto max1 } else { goto max2 } ] } }
+          CFG1, max1, {max}, false, {}, {} |-n stmt => CFG2, max2, preds1, _, contNodes2, breakNodes2,  
+          CFG3 = CFG2 update { id : { succ = max} | id <- contNodes2 } update { id : { succ = max2 } | id <- breakNodes2 } update { max : { preds = preds ++ contNodes2 } }
+          ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+          CFG, max, preds, _, contNodes, breakNodes |- while (exp) { stmt } => CFG3, max2, {max} ++ breakNodes2, false, contNodes, breakNodes  
+              -- shouldn't be max2? no, should be max, because max2's block will be created after this statment
+          
+          shall/can we keep it as while instead of if else with continue/goto?
+          */
             for {
               st <- get
               _ <- {
@@ -745,9 +767,9 @@ object CFG_old {
             for {
               _ <- init match {
                 case None => m.pure(())
-                case Some(flv@ForLocalVars(modifiers, ty, var_decls)) =>
+                case Some(flv @ ForLocalVars(modifiers, ty, var_decls)) =>
                   ops.buildCFG(flv)
-                  // var_decls.traverse_(vd => ops.buildCFG(vd))
+                // var_decls.traverse_(vd => ops.buildCFG(vd))
                 case Some(ForInitExps(es)) =>
                   es.traverse_(e => buildCFG(ExpStmt(e)))
               }
@@ -984,7 +1006,7 @@ object CFG_old {
               case AndA     => And
               case XorA     => Xor
               case OrA      => Or
-              case EqualA   => Equal // this pattern should not be reached 
+              case EqualA   => Equal // this pattern should not be reached
               // the last case "EQualA" should never happen
             }
             val stmt = ExpStmt(Assign(lhs, EqualA, BinOp(rlhs, op, rhs)))
@@ -993,8 +1015,12 @@ object CFG_old {
             } yield ()
           }
 
-          case ExpStmt(PostIncrement(exp)) => ConvertableToLhsOps.getLhsFrom(exp) match {
-              case Nil => m.raiseError(s"BuildCFG Failed: Fail to extract lhs from exp ${exp}")
+          case ExpStmt(PostIncrement(exp)) =>
+            ConvertableToLhsOps.getLhsFrom(exp) match {
+              case Nil =>
+                m.raiseError(
+                  s"BuildCFG Failed: Fail to extract lhs from exp ${exp}"
+                )
               case List(lhs) => {
                 val stmt = ExpStmt(Assign(lhs, AddA, Lit(IntLit(1))))
                 for {
@@ -1002,69 +1028,98 @@ object CFG_old {
                   _ <- buildCFG(stmt)
                 } yield ()
               }
-              case _ =>  m.raiseError(s"BuildCFG Failed: too many lhs from exp ${exp}")  
-          }
-          case ExpStmt(PostDecrement(exp)) => ConvertableToLhsOps.getLhsFrom(exp) match {
-              case Nil => m.raiseError(s"BuildCFG Failed: Fail to extract lhs from exp ${exp}")
-              case List(lhs) => {
-                val stmt = ExpStmt(Assign(lhs, SubA, Lit(IntLit(1))))
-                for {
-                  _ <- buildCFG(ExpStmt(exp))
-                  _ <- buildCFG(stmt)
-                } yield ()
-              }
-              case _ =>  m.raiseError(s"BuildCFG Failed: too many lhs from exp ${exp}")  
-          }
-          case ExpStmt(PreIncrement(exp)) => ConvertableToLhsOps.getLhsFrom(exp) match {
-              case Nil => m.raiseError(s"BuildCFG Failed: Fail to extract lhs from exp ${exp}")
-              case List(lhs) => {
-                val stmt = ExpStmt(Assign(lhs, AddA, Lit(IntLit(1))))
-                for {
-                  _ <- buildCFG(ExpStmt(exp))
-                  _ <- buildCFG(stmt)
-                } yield ()
-              }
-              case _ =>  m.raiseError(s"BuildCFG Failed: too many lhs from exp ${exp}")  
-          }
-          case ExpStmt(PreDecrement(exp)) => ConvertableToLhsOps.getLhsFrom(exp) match {
-              case Nil => m.raiseError(s"BuildCFG Failed: Fail to extract lhs from exp ${exp}")
-              case List(lhs) => {
-                val stmt = ExpStmt(Assign(lhs, SubA, Lit(IntLit(1))))
-                for {
-                  _ <- buildCFG(ExpStmt(exp))
-                  _ <- buildCFG(stmt)
-                } yield ()
-              }
-              case _ =>  m.raiseError(s"BuildCFG Failed: too many lhs from exp ${exp}")  
-          }
-          case ExpStmt(e) => for {
-            st <- get
-            _  <- {
-              val cfg0 = st.cfg
-              val lhs = HasVarOps.getLVarsFrom(e)
-              val rhs = HasVarOps.getVarsFrom(e)
-              val preds0 = st.currPreds
-              val s = BlockStmt_(ExpStmt(e))
-              if (st.continuable) {
-                val cfg1 = preds0.foldLeft(cfg0) ((g,pred) => {
-                  val n = g(pred)
-                  g + (pred -> n.copy(stmts = n.stmts ++ List(s), lVars = n.lVars ++ lhs, rVars = n.rVars ++ rhs))
-                })
-                put(st.copy(cfg=cfg1, continuable=true))
-              } else {
-                val max = st.currId
-                val currNodeId = internalIdent(s"${labPref}${max}")
-                val max1 = max + 1 
-                val cfgNode = Node(List(s), Nil, lhs, rhs, preds0, Nil, AssignmentNode)
-                val cfg1p = preds0.foldLeft(cfg0)((g,pred) => {
-                  val n = g(pred)
-                  g + (pred -> n.copy(succs = n.succs ++ List(currNodeId) ))
-                })
-                val cfg1 = cfg1p + (currNodeId -> cfgNode)
-                put(st.copy(cfg=cfg1, currId=max1, currPreds=List(currNodeId), continuable=true))
-              }
+              case _ =>
+                m.raiseError(s"BuildCFG Failed: too many lhs from exp ${exp}")
             }
-          } yield ()
+          case ExpStmt(PostDecrement(exp)) =>
+            ConvertableToLhsOps.getLhsFrom(exp) match {
+              case Nil =>
+                m.raiseError(
+                  s"BuildCFG Failed: Fail to extract lhs from exp ${exp}"
+                )
+              case List(lhs) => {
+                val stmt = ExpStmt(Assign(lhs, SubA, Lit(IntLit(1))))
+                for {
+                  _ <- buildCFG(ExpStmt(exp))
+                  _ <- buildCFG(stmt)
+                } yield ()
+              }
+              case _ =>
+                m.raiseError(s"BuildCFG Failed: too many lhs from exp ${exp}")
+            }
+          case ExpStmt(PreIncrement(exp)) =>
+            ConvertableToLhsOps.getLhsFrom(exp) match {
+              case Nil =>
+                m.raiseError(
+                  s"BuildCFG Failed: Fail to extract lhs from exp ${exp}"
+                )
+              case List(lhs) => {
+                val stmt = ExpStmt(Assign(lhs, AddA, Lit(IntLit(1))))
+                for {
+                  _ <- buildCFG(ExpStmt(exp))
+                  _ <- buildCFG(stmt)
+                } yield ()
+              }
+              case _ =>
+                m.raiseError(s"BuildCFG Failed: too many lhs from exp ${exp}")
+            }
+          case ExpStmt(PreDecrement(exp)) =>
+            ConvertableToLhsOps.getLhsFrom(exp) match {
+              case Nil =>
+                m.raiseError(
+                  s"BuildCFG Failed: Fail to extract lhs from exp ${exp}"
+                )
+              case List(lhs) => {
+                val stmt = ExpStmt(Assign(lhs, SubA, Lit(IntLit(1))))
+                for {
+                  _ <- buildCFG(ExpStmt(exp))
+                  _ <- buildCFG(stmt)
+                } yield ()
+              }
+              case _ =>
+                m.raiseError(s"BuildCFG Failed: too many lhs from exp ${exp}")
+            }
+          case ExpStmt(e) =>
+            for {
+              st <- get
+              _ <- {
+                val cfg0 = st.cfg
+                val lhs = HasVarOps.getLVarsFrom(e)
+                val rhs = HasVarOps.getVarsFrom(e)
+                val preds0 = st.currPreds
+                val s = BlockStmt_(ExpStmt(e))
+                if (st.continuable) {
+                  val cfg1 = preds0.foldLeft(cfg0)((g, pred) => {
+                    val n = g(pred)
+                    g + (pred -> n.copy(
+                      stmts = n.stmts ++ List(s),
+                      lVars = n.lVars ++ lhs,
+                      rVars = n.rVars ++ rhs
+                    ))
+                  })
+                  put(st.copy(cfg = cfg1, continuable = true))
+                } else {
+                  val max = st.currId
+                  val currNodeId = internalIdent(s"${labPref}${max}")
+                  val max1 = max + 1
+                  val cfgNode =
+                    Node(List(s), Nil, lhs, rhs, preds0, Nil, AssignmentNode)
+                  val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
+                    val n = g(pred)
+                    g + (pred -> n.copy(succs = n.succs ++ List(currNodeId)))
+                  })
+                  val cfg1 = cfg1p + (currNodeId -> cfgNode)
+                  put(
+                    st.copy(
+                      cfg = cfg1,
+                      currId = max1,
+                      currPreds = List(currNodeId),
+                      continuable = true
+                    )
+                  )
+                }
+              }
+            } yield ()
 
           /*
       Assertion might throw an unchecked exception, which only be enabled when java is run with -ea flag.
@@ -1198,13 +1253,17 @@ object CFG_old {
                   val cfg0 = st.cfg
                   val s = BlockStmt_(Continue(Some(id)))
                   val preds0 = st.currPreds
-                  val cfg1 = preds0.foldLeft(cfg0)((g, pred) => {
+                  val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
                     val n = g(pred)
                     g + (pred -> n.copy(
                       stmts = n.stmts ++ List(s),
                       succs = n.succs ++ List(lp)
                     ))
-                  })
+                  }) 
+                  val cfg1 = cfg1p.get(lp) match {
+                    case None => cfg1p 
+                    case Some(n) => cfg1p + (lp -> n.copy(preds = (n.preds ++ preds0).toSet.toList ))
+                  }
                   for {
                     _ <- put(
                       st.copy(
@@ -1728,123 +1787,216 @@ object CFG_old {
     new CFGClass[Catch] {
       override def buildCFG(
           a: Catch
-      )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] = a match {
-        case Catch(params, blk) => for {
-          st <- get
-          _  <- {
-            val max = st.currId
-            val l = internalIdent(s"${labPref}${max}")
-            val lhs = HasVarOps.getLVarsFrom((params))
+      )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
+        a match {
+          case Catch(params, blk) =>
             for {
-              _ <- ops.buildCFG(blk)
-              st2 <- get
+              st <- get
               _ <- {
-                val cfg2 = st2.cfg
-                val n = cfg2(l)
-                val np = n.copy(localDecls = n.localDecls ++ lhs)
-                val cfg3 = cfg2 + (l -> np)
+                val max = st.currId
+                val l = internalIdent(s"${labPref}${max}")
+                val lhs = HasVarOps.getLVarsFrom((params))
                 for {
-                  _ <- put(st2.copy(cfg = cfg3, catchNodes = st.catchNodes ++ List(l)))
+                  _ <- ops.buildCFG(blk)
+                  st2 <- get
+                  _ <- {
+                    val cfg2 = st2.cfg
+                    val n = cfg2(l)
+                    val np = n.copy(localDecls = n.localDecls ++ lhs)
+                    val cfg3 = cfg2 + (l -> np)
+                    for {
+                      _ <- put(
+                        st2.copy(
+                          cfg = cfg3,
+                          catchNodes = st.catchNodes ++ List(l)
+                        )
+                      )
+                    } yield ()
+                  }
                 } yield ()
               }
             } yield ()
-          }
-        } yield ()
-      }
+        }
     }
 
   implicit def switchBlockCFGInstance: CFGClass[SwitchBlock] =
     new CFGClass[SwitchBlock] {
       override def buildCFG(
           a: SwitchBlock
-      )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] = a match {
-        case SwitchBlock(Default, blks_stmts) => for {
-          /*
-          CFG, max, preds, continuable, breakNodes, contNodes, caseNodes |- 
-            stmt => CFG2, max2, preds2, continuable2, breakNodes2, contNodes2, caseNodes2 
-          ------------------------------------------------------------------------------------------------------------------------------------------------------------------ 
-          CFG,max,preds, continuable, breakNodes, contNodes, caseNodes |- 
-            default: stmt => CFG2, max2, preds2 continuable2, breakNodes, contNodes2, caseNodes2 union (max, default) 
-          */
-          st <- get 
-          _  <- { 
-            val max = st.currId
-            val wrapNodeId = internalIdent(s"${labPref}${max}")
-            val rhsNodeId  = internalIdent(s"${labPref}${max+1}")
+      )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
+        a match {
+          case SwitchBlock(Default, blks_stmts) =>
             for {
-              _ <- put(st.copy(currId = max + 1, fallThroughCases = Nil))
-              _ <- blks_stmts.traverse_(ops.buildCFG(_))
-              st1 <- get
-              _ <- put(st1.copy(caseNodes=st1.caseNodes ++ List(DefaultCase(wrapNodeId,rhsNodeId))))
+              /*
+          CFG, max, preds, continuable, breakNodes, contNodes, caseNodes |-
+            stmt => CFG2, max2, preds2, continuable2, breakNodes2, contNodes2, caseNodes2
+          ------------------------------------------------------------------------------------------------------------------------------------------------------------------
+          CFG,max,preds, continuable, breakNodes, contNodes, caseNodes |-
+            default: stmt => CFG2, max2, preds2 continuable2, breakNodes, contNodes2, caseNodes2 union (max, default)
+               */
+              st <- get
+              _ <- {
+                val max = st.currId
+                val wrapNodeId = internalIdent(s"${labPref}${max}")
+                val rhsNodeId = internalIdent(s"${labPref}${max + 1}")
+                for {
+                  _ <- put(st.copy(currId = max + 1, fallThroughCases = Nil))
+                  _ <- blks_stmts.traverse_(ops.buildCFG(_))
+                  st1 <- get
+                  _ <- put(
+                    st1.copy(caseNodes =
+                      st1.caseNodes ++ List(DefaultCase(wrapNodeId, rhsNodeId))
+                    )
+                  )
+                } yield ()
+              }
             } yield ()
-          }
-        } yield () 
-        case SwitchBlock(SwitchCase(e), blk_stmts) => for {
-          /*
-          CFG, max, preds, continuable, breakNodes, contNodes, caseNodes |- 
-            stmt => CFG2, max2, preds2, continuable2, breakNodes2, contNodes2, caseNodes2 
-          ------------------------------------------------------------------------------------------------------------------------------------------------------------------ 
-          CFG,max,preds, continuable, breakNodes, contNodes, caseNodes |- 
-            case e: stmt => CFG2, max2, preds2 continuable2, breakNodes, contNodes2, caseNodes2 union (max, e) 
-          */
-          st <- get 
-          _ <- {
-            val max = st.currId
-            val fallThrough = st.fallThroughCases
-            val wrapNodeId = internalIdent(s"${labPref}${max}")
-            val rhsNodeId  = internalIdent(s"${labPref}${max+1}")
+          case SwitchBlock(SwitchCase(e), blk_stmts) =>
             for {
-              _ <- put(st.copy(currId=max + 1, fallThroughCases=Nil))
-              _ <- blk_stmts.traverse_(ops.buildCFG(_))
-              st1 <- get
-              _ <- put(st1.copy(caseNodes=st1.caseNodes++List(ExpCase(e, fallThrough, wrapNodeId, rhsNodeId))))
+              /*
+          CFG, max, preds, continuable, breakNodes, contNodes, caseNodes |-
+            stmt => CFG2, max2, preds2, continuable2, breakNodes2, contNodes2, caseNodes2
+          ------------------------------------------------------------------------------------------------------------------------------------------------------------------
+          CFG,max,preds, continuable, breakNodes, contNodes, caseNodes |-
+            case e: stmt => CFG2, max2, preds2 continuable2, breakNodes, contNodes2, caseNodes2 union (max, e)
+               */
+              st <- get
+              _ <- {
+                val max = st.currId
+                val fallThrough = st.fallThroughCases
+                val wrapNodeId = internalIdent(s"${labPref}${max}")
+                val rhsNodeId = internalIdent(s"${labPref}${max + 1}")
+                for {
+                  _ <- put(st.copy(currId = max + 1, fallThroughCases = Nil))
+                  _ <- blk_stmts.traverse_(ops.buildCFG(_))
+                  st1 <- get
+                  _ <- put(
+                    st1.copy(caseNodes =
+                      st1.caseNodes ++ List(
+                        ExpCase(e, fallThrough, wrapNodeId, rhsNodeId)
+                      )
+                    )
+                  )
+                } yield ()
+              }
             } yield ()
-          }
-        } yield ()
-      }
+        }
     }
 
   implicit def varDeclCFGInstance: CFGClass[ForLocalVars] =
     new CFGClass[ForLocalVars] {
       override def buildCFG(
           a: ForLocalVars
-      )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] = a match {
+      )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
+        a match {
 
-        case ForLocalVars(modifiers, ty, var_decls) => for {
+          case ForLocalVars(modifiers, ty, var_decls) =>
+            for {
 
-          /*
+              /*
 
           max1 = max + 1
-          CFG1 = CFG update { pred : {succ = max} |  pred <- preds } union { max : {ty x = exp[] } } 
+          CFG1 = CFG update { pred : {succ = max} |  pred <- preds } union { max : {ty x = exp[] } }
           --------------------------------------------------------
-          CFG, max, preds, false |- ty x = exp[] => CFG1, max1, [], false 
-          */
+          CFG, max, preds, false |- ty x = exp[] => CFG1, max1, [], false
+               */
 
-          st <- get
-          _ <- {
-            val max = st.currId
-            val currNodeId = internalIdent(s"${labPref}${max}")
-            val s = LocalVars(modifiers, ty, var_decls)
-            val lhs = var_decls.flatMap(HasVarOps.getLVarsFrom(_))
-            val rhs = var_decls.flatMap(HasVarOps.getVarsFrom(_))
-            val preds0 = st.currPreds
-            val cfgNode = Node(List(s), Nil, lhs, rhs, preds0, Nil, Other)
-            val cfg0 = st.cfg
-            val cfg1p = preds0.foldLeft(cfg0) ((g,pred) => {
-              val n = g(pred)
-              g + (pred -> n.copy(succs = (n.succs ++ List(currNodeId)).toSet.toList ))
-            })
-            val cfg1 = cfg1p + (currNodeId -> cfgNode)
-            for {
-              _ <-put(st.copy(cfg=cfg1, currId=max+1, currPreds=List(currNodeId), continuable=true))
+              st <- get
+              _ <- {
+                val max = st.currId
+                val currNodeId = internalIdent(s"${labPref}${max}")
+                val s = LocalVars(modifiers, ty, var_decls)
+                val lhs = var_decls.flatMap(HasVarOps.getLVarsFrom(_))
+                val rhs = var_decls.flatMap(HasVarOps.getVarsFrom(_))
+                val preds0 = st.currPreds
+                val cfgNode = Node(List(s), Nil, lhs, rhs, preds0, Nil, Other)
+                val cfg0 = st.cfg
+                val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
+                  val n = g(pred)
+                  g + (pred -> n.copy(succs =
+                    (n.succs ++ List(currNodeId)).toSet.toList
+                  ))
+                })
+                val cfg1 = cfg1p + (currNodeId -> cfgNode)
+                for {
+                  _ <- put(
+                    st.copy(
+                      cfg = cfg1,
+                      currId = max + 1,
+                      currPreds = List(currNodeId),
+                      continuable = true
+                    )
+                  )
+                } yield ()
+              }
             } yield ()
-          }
-        } yield ()
-      }
+        }
     }
 
   def internalIdent(s: String): Ident = Ident(s)
-  def formalArgsAsDecls(idents: List[Ident], cfg: CFG): CFG = cfg // TODO:fixme
+
+
+  /*
+  def updatePreds(cfg:CFG):CFG = cfg.toList.fodlLeft(cfg)( (g,p) => p match {
+    case (l,node) => {
+      val ss = node.stmts
+    }
+  })
+  */
+
+  /*
+  there are situation a phantom node (a label is mentioned in some goto or loop exit, but 
+  there is no statement, hence, buildCFG will not generate such node. see\
+  int f(int x) {
+    while (1) { // 0 
+      if (x < 0) { // 1
+        return x; // 2
+      } else { 
+        x--; // 3
+      }
+    }
+    // 4
+  }
+  note that 4 is phantom as succs of the failure etst of (1) at 0, which is not reachable,
+  but we need that empty node (and lambda function to be present) for the target code to be valid
+  */
+  def insertPhantoms(cfg: CFG): CFG = {
+    // succ lbl and source lbl
+    val allSuccsWithPreds: List[(Ident, Ident)] = cfg.toList.flatMap({
+      case (lbl, n) => n.succs.map(succ => (succ, lbl))
+    })
+    // succ lbl -> [source lbl]
+    val empty: Map[Ident, List[Ident]] = Map()
+    val phanTomSuccWithPreds: Map[Ident, List[Ident]] = allSuccsWithPreds
+      .filter({ case (succ_lbl, lbl) => !(cfg.contains(succ_lbl)) })
+      .foldLeft(empty)((m, p) =>
+        p match {
+          case (succ_lbl, lbl) =>
+            m.get(succ_lbl) match {
+              case None       => m + (succ_lbl -> List(lbl))
+              case Some(lbls) => m + (succ_lbl -> (lbls ++ List(lbl)))
+            }
+        }
+      )
+    phanTomSuccWithPreds.toList
+      .map(p =>
+        p match {
+          case (lbl, preds) =>
+            (lbl, Node(Nil, Nil, Nil, Nil, preds, Nil, Other))
+        }
+      )
+      .foldLeft(cfg)((g, p) =>
+        p match { case (lbl, node) => cfg + (lbl -> node) }
+      )
+  }
+
+  def formalArgsAsDecls(idents: List[Ident], cfg: CFG): CFG = {
+    val entryLabel = internalIdent(s"${labPref}0")
+    cfg.get(entryLabel) match {
+      case None    => cfg
+      case Some(n) => cfg + (entryLabel -> n.copy(lVars = idents ++ n.lVars))
+    }
+  }
 
   trait HasVar[A] {
     def getVarsFrom(a: A): List[Ident]
@@ -2352,34 +2504,34 @@ object CFG_old {
       // dominating name
       override def getLhsFrom(exp: Exp): List[Lhs] =
         exp match {
-          case Lit(lit)        => List()
-          case ClassLit(ty)    => List()
-          case This            => List()
-          case ThisClass(name) => List()
-          case InstanceCreation(type_args, type_decl, args, body) => List()
+          case Lit(lit)                                             => List()
+          case ClassLit(ty)                                         => List()
+          case This                                                 => List()
+          case ThisClass(name)                                      => List()
+          case InstanceCreation(type_args, type_decl, args, body)   => List()
           case QualInstanceCreation(exp, type_args, id, args, body) => List()
-          case ArrayCreate(ty, exps, num_dims) => List()
-          case ArrayCreateInit(ty, size, init) => List()
-          case FieldAccess_(access)    => List(FieldLhs(access))
-          case MethodInv(methodInv)    => List()
-          case ArrayAccess(idx)        => List(ArrayLhs(idx))
-          case ExpName(name)           => List(NameLhs(name))
-          case PostIncrement(exp)      => getLhsFrom(exp)
-          case PostDecrement(exp)      => getLhsFrom(exp)
-          case PreIncrement(exp)       => getLhsFrom(exp)
-          case PreDecrement(exp)       => getLhsFrom(exp)
-          case PrePlus(exp)            => getLhsFrom(exp)
-          case PreMinus(exp)           => getLhsFrom(exp)
-          case PreBitCompl(exp)        => getLhsFrom(exp)
-          case PreNot(exp)             => getLhsFrom(exp)
-          case Cast(ty, exp)           => getLhsFrom(exp)
-          case BinOp(e1, op, e2)       => List()
-          case InstanceOf(e, ref_type) => List()
-          case Cond(cond, true_exp, false_exp) => List()
-          case Assign(lhs, op, rhs) => List(lhs)
-          case Lambda(params, body) => List() 
-          case MethodRef(name, id) => List()
+          case ArrayCreate(ty, exps, num_dims)                      => List()
+          case ArrayCreateInit(ty, size, init)                      => List()
+          case FieldAccess_(access)                                 => List(FieldLhs(access))
+          case MethodInv(methodInv)                                 => List()
+          case ArrayAccess(idx)                                     => List(ArrayLhs(idx))
+          case ExpName(name)                                        => List(NameLhs(name))
+          case PostIncrement(exp)                                   => getLhsFrom(exp)
+          case PostDecrement(exp)                                   => getLhsFrom(exp)
+          case PreIncrement(exp)                                    => getLhsFrom(exp)
+          case PreDecrement(exp)                                    => getLhsFrom(exp)
+          case PrePlus(exp)                                         => getLhsFrom(exp)
+          case PreMinus(exp)                                        => getLhsFrom(exp)
+          case PreBitCompl(exp)                                     => getLhsFrom(exp)
+          case PreNot(exp)                                          => getLhsFrom(exp)
+          case Cast(ty, exp)                                        => getLhsFrom(exp)
+          case BinOp(e1, op, e2)                                    => List()
+          case InstanceOf(e, ref_type)                              => List()
+          case Cond(cond, true_exp, false_exp)                      => List()
+          case Assign(lhs, op, rhs)                                 => List(lhs)
+          case Lambda(params, body)                                 => List()
+          case MethodRef(name, id)                                  => List()
         }
-      }
-    
+    }
+
 }
