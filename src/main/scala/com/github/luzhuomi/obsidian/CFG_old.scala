@@ -13,64 +13,53 @@ import _root_.cats.syntax.contravariant
  Control Flow Graph construction
  */
 
-object CFG {
-
-  type NodeId = Ident
+object CFG_old {
 
   type CFG = Map[NodeId, Node]
 
   /**
-   * redesigning the CFG data type. Unlike the C CFG, which has only a single Node type
-   * the Java CFG should have a proper algebraic data type node. Some node has no statement
-   * e.g. If-else, while, try catch finally.
-   * 
-  */
-  
-  sealed trait Node
-  
-
-  /**
-    * A CFG node contains a sequence of assignment statments
+    * Node in a control flow graph
     *
-    * @param stmts list of statements
-    * @param lVars variables appearing on the lhs of assignments
-    * @param rVars variables appearing on the rhs of the assignments 
+    * @param stmts the list of statments contained in this node
+    * @param lVars variables appearing on the left hand side of assignment statement
+    * @param rVars variables appearing on the right hand side of assignment statement
     * @param localDecls locally declared variables
-    * @param preds predecessor node ids
-    * @param succs successor node ids
+    * @param preds predecessor nodes
+    * @param succs successor nodes
+    * @param nodeType node type, assignments, loop, switch, if-else, try-catch or throw
     */
-  case class AssignmentNode(
-    stmts: List[BlockStmt], 
-    lVars: List[Ident], 
-    rVars: List[Ident], 
-    localDecls: List[Ident],
-    preds: List[NodeId],
-    succs: List[NodeId]
+  case class Node(
+      stmts: List[BlockStmt],
+      lVars: List[Ident],
+      rVars: List[Ident],
+      localDecls: List[Ident],
+      preds: List[NodeId],
+      succs: List[NodeId],
+      nodeType: NodeType
   )
-  /**
-    * A CFG node contains an if-else statement
-    *
-    * @param condExp condintional expression
-    * @param thenNode then node id
-    * @param elseNode else node id
-    * @param preds predecessor ids
-    */
-  case class IfElseNode(
-    rVars: List[Ident],
-    condExp: Option[Exp],
-    thenNode: NodeId,
-    elseNode: Option[NodeId],
-    preds: List[NodeId]
-  ) {
-    val succs = this.thenNode :: this.elseNode.toList
-  }
 
-  case class LoopNode (
-    condExp: Option[Exp],
-    bodyNode: NodeId, 
-    preds: List[NodeId],
-    succs: List[NodeId]
-  )
+  type NodeId = Ident
+
+  sealed trait NodeType
+
+  case object AssignmentNode extends NodeType
+  case class LoopNode(break_nodes: List[NodeId], cont_nodes: List[NodeId])
+      extends NodeType
+  case class SwitchNode(break_nodes: List[NodeId], cont_nodes: List[NodeId])
+      extends NodeType
+  case object IfElseNode extends NodeType
+  case class TryCatchNode(
+      try_node: NodeId,
+      catch_nodes: List[NodeId],
+      finally_nodes: Option[NodeId]
+  ) extends NodeType
+  case object ThrowNode extends NodeType
+  case object BreakNode extends NodeType
+  case object ContNode extends NodeType
+  case object EmptyNode extends NodeType
+  case object AssertNode extends NodeType
+  case object ReturnNode extends NodeType
+  case object Other extends NodeType
 
   case class StateInfo(
       currId: Int,
