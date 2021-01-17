@@ -706,36 +706,23 @@ object CFG {
               }
             } yield ()
           case Switch(exp, blocks) =>
-            /*
-          max1 = max + 1
-          l0' = max
-          CFG1 = CFG update { pred : { succ = {max} } } union { l0' : { stmts = { if (exp == e1) { goto l1; } else { goto l1'; } }}, succs = { l1,l1'}, preds = preds }  update { l1: { preds += l0' } }
-                                                        union { l1' : { stmts = { if (exp == e2) { goto l2; } else { goto l2'; } }}, succs = { l2,l2'}, preds = {l0'} }  update { l2: { preds += l1' } }
-                                                        union { l2' : { stmts = { if (exp == e3) { goto l3; } else { goto l3'; } }}, succs = { l3,l3'}, preds = {l1'} }  update { l3: { preds += l2' } }
-                                                        ...
-                                                        union { ln-1' : { stmts = { if (exp == en) { goto ln; } else { goto l_default; }}, succs = { ln, l_default }, preds = {ln-2'} } update { ln- : { preds += ln-1' }} update { l_default : { preds += ln-1' } }
-
-          CFG1, max1, {}, false, {}, contNodes, {} |- stmt1,..., stmtn+1 => CFG2, max2, preds2, continable2, breakNodes, contNodes2, {(l1,l1',e1),...,(l_default, _)}
-          -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-          CFG, max, preds, continuable, breakNodes, contNodes, caseNodes |- switch exp { stmt1,...,stmtn }   => CFG2, max2, preds2 union breakNodes2 , false, breakNodes, contNodes2, caseNodes
-             */
 
             /*
             CFG, path++[0], {path}, false, {}, {}, {} |- case1 => CFG1, preds1, continuable1, breakNodes1, contNodes1, caseNodes1
-            CFG1, path++[1], {path} u preds1, false, breakNodes1, contNodes1, caseNodes1 |- case1 => CFG2, preds2, continable2, breakNodes2, contNodes2, caseNodes2
-            CFG2, path++[2], {path} u preds2, false, 
+            CFG1, path++[1], {path} u preds1, false, breakNodes1, contNodes1, caseNodes1 |- case2 => CFG2, preds2, continuable2, breakNodes2, contNodes2, caseNodes2
+            CFG2, path++[2], {path} u preds2, false, breakNodes2, contNodes2, caseNodes2 |- case3 => CFG3, preds3, continuable3, breakNodes3, contNodes3, caseNodes3
+            ...
+            CFGn-1, path++[n-1], {path} u predsn-1, false, breakNodesn-1, contNodem-1, caseNodesn-1 |- casen => CFGn, predsn, continuable3, breakNodesn, contNodesn, caseNodesn
+
             ---------------------------------------------------------------------------------------------------------------------------------------------------------
-            CFG, path, preds, continuable, breakNodes, contNodes, caseNodes |- swtch exp { case1, ..., casen } => 
+            CFG, path, preds, continuable, breakNodes, contNodes, caseNodes |- swtch exp { case1, ..., casen } => CFGn, predsn u breaknodesn, false,  breaknodes, contNodesn, caseNodesn 
             */
             for {
               st <- get
               _ <- {
-                val max = st.currId
-                val currNodeId = internalIdent(s"${labPref}${max}")
+                val currNodeId = p
                 val lhs = HasVarcfgOps.getLVarsFrom(exp)
                 val rhs = HasVarcfgOps.getVarsFrom(exp)
-                val max1 = max + 1
-                val l0 = max
                 val cfg0 = st.cfg
                 val preds0 = st.currPreds
                 val contNodes0 = st.contNodes
@@ -751,7 +738,9 @@ object CFG {
                       caseNodes = Nil
                     )
                   )
-                  _ <- blocks.traverse_((b: SwitchBlock) => cfgOps.buildCFG(b))
+                  _ <- blocks.zip(0 to blocks.size).traverse_(block_idx => block_idx match {
+                    case (block, idx) => cfgOps.buildCFG(block, childOf(p,idx))
+                  })
                   st1 <- get
                   _ <- {
                     val preds1 = st1.breakNodes
