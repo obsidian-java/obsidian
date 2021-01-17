@@ -49,26 +49,6 @@ object CFG {
   ) extends Node
 
   /**
-    * A CFG node contains an If-Then node
-    *
-    * @param id
-    * @param thenNode then node id
-    * @param lVars variables on the lhs of assignments. Though they can be constructed from stmts, we cache them here for convienence.
-    * @param rVars variables on the rhs of assignments
-    * @param preds predessor ids
-    * @param succs successor ids
-    */
-
-  case class IfThenNode(
-      id: ASTPath,
-      thenNode: NodeId,
-      lVars: List[Ident],
-      rVars: List[Ident],
-      preds: List[NodeId],
-      succs: List[NodeId]
-  ) extends Node
-
-  /**
     * A CFG node containing an if-else statement
     *
     * @param id
@@ -88,6 +68,28 @@ object CFG {
       preds: List[NodeId],
       succs: List[NodeId]
   ) extends Node
+
+
+  /**
+    * A CFG node containing a switch statement
+    *
+    * @param id
+    * @param caseNodes the list of case nodes location
+    * @param lVars
+    * @param rVars
+    * @param preds
+    * @param succs
+    */
+
+  case class SwtchNode(
+    id:ASTPath,
+    caseNodes: List[NodeId],
+    lVars: List[Ident],
+    rVars: List[Ident],
+    preds: List[NodeId],
+    succs: List[NodeId]
+  ) extends Node
+
 
   /**
     * A CFG node containing a while loop
@@ -167,7 +169,7 @@ object CFG {
   def setSuccs(n:Node, s:List[NodeId]):Node = n match {
     case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, s)
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, s)
-    case IfThenNode(id, thenNode, lVars, rVars, preds, succs) => IfThenNode(id, thenNode, lVars, rVars, preds, s) 
+    case SwtchNode(id, caseNodes, lVars, rVars, preds, succs) =>  SwtchNode(id, caseNodes, lVars, rVars, preds, s) 
     case ReturnNode(id, lVars, rVars, preds) => n
     case ThrowNode(id, lVars, rVars, preds, succs) => ThrowNode(id, lVars, rVars, preds, s)
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, s)
@@ -177,7 +179,7 @@ object CFG {
   def setPreds(n:Node, p:List[NodeId]):Node = n match {
     case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => AssignmentsNode(id, stmts,  localDecls, lVars, rVars, p, succs)
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => IfThenElseNode(id, thenNode, elseNode, lVars, rVars, p, succs)
-    case IfThenNode(id, thenNode, lVars, rVars, preds, succs) => IfThenNode(id, thenNode, lVars, rVars, p, succs) 
+    case SwtchNode(id, caseNodes, lVars, rVars, preds, succs) =>  SwtchNode(id, caseNodes, lVars, rVars, p, succs)  
     case ReturnNode(id, lVars, rVars, preds) => ReturnNode(id, lVars, rVars, p)
     case ThrowNode(id, lVars, rVars, preds, succs) => ThrowNode(id, lVars, rVars, p, succs)
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, p, succs)
@@ -187,7 +189,7 @@ object CFG {
   def setLVars(n:Node, lv:List[Ident]):Node = n match {
     case AssignmentsNode(id, stmts, localDecls,  lVars, rVars, preds, succs) => AssignmentsNode(id, stmts, localDecls, lv, rVars, preds, succs)
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => IfThenElseNode(id, thenNode, elseNode, lv, rVars, preds, succs)
-    case IfThenNode(id, thenNode, lVars, rVars, preds, succs) => IfThenNode(id, thenNode, lv, rVars, preds, succs) 
+    case SwtchNode(id, caseNodes, lVars, rVars, preds, succs) =>  SwtchNode(id, caseNodes, lv, rVars, preds, succs) 
     case ReturnNode(id, lVars, rVars, preds) => ReturnNode(id, lv, rVars, preds)
     case ThrowNode(id, lVars, rVars, preds, succs) => ThrowNode(id, lv, rVars, preds, succs)
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs)
@@ -197,7 +199,7 @@ object CFG {
   def setRVars(n:Node, rv:List[Ident]):Node = n match {
     case AssignmentsNode(id, stmts, localDecls,  lVars, rVars, preds, succs) => AssignmentsNode(id, stmts, localDecls, lVars, rv, preds, succs)
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => IfThenElseNode(id, thenNode, elseNode, lVars, rv, preds, succs)
-    case IfThenNode(id, thenNode, lVars, rVars, preds, succs) => IfThenNode(id, thenNode, lVars, rv, preds, succs) 
+    case SwtchNode(id, caseNodes, lVars, rVars, preds, succs) =>  SwtchNode(id, caseNodes, lVars, rv, preds, succs) 
     case ReturnNode(id, lVars, rVars, preds) => ReturnNode(id, lVars, rv, preds)
     case ThrowNode(id, lVars, rVars, preds, succs) => ThrowNode(id, lVars, rv, preds, succs)
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs)
@@ -207,7 +209,7 @@ object CFG {
   def getSuccs(n:Node):List[NodeId] = n match {
     case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => succs
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => succs
-    case IfThenNode(id, thenNode, lVars, rVars, preds, succs) => succs
+    case SwtchNode(id, caseNodes, lVars, rVars, preds, succs) =>  succs
     case ReturnNode(id, lVars, rVars, preds) => Nil
     case ThrowNode(id, lVars, rVars, preds, succs) => succs
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => succs
@@ -217,7 +219,7 @@ object CFG {
   def getPreds(n:Node):List[NodeId] = n match {
     case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => preds
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => preds
-    case IfThenNode(id, thenNode, lVars, rVars, preds, succs) => preds
+    case SwtchNode(id, caseNodes, lVars, rVars, preds, succs) =>  preds
     case ReturnNode(id, lVars, rVars, preds) => preds
     case ThrowNode(id, lVars, rVars, preds, succs) => preds
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => preds
@@ -227,7 +229,7 @@ object CFG {
   def getLVars(n:Node):List[Ident] = n match {
     case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => lVars
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => lVars
-    case IfThenNode(id, thenNode, lVars, rVars, preds, succs) => lVars
+    case SwtchNode(id, caseNodes, lVars, rVars, preds, succs) =>  lVars
     case ReturnNode(id, lVars, rVars, preds) => lVars
     case ThrowNode(id, lVars, rVars, preds, succs) => lVars
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => Nil
@@ -237,7 +239,7 @@ object CFG {
   def getRVars(n:Node):List[Ident] = n match {
     case AssignmentsNode(id, stmts, localDecls,  lVars, rVars, preds, succs) => rVars
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => rVars
-    case IfThenNode(id, thenNode, lVars, rVars, preds, succs) => rVars
+    case SwtchNode(id, caseNodes, lVars, rVars, preds, succs) =>  rVars 
     case ReturnNode(id, lVars, rVars, preds) => rVars
     case ThrowNode(id, lVars, rVars, preds, succs) => rVars
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => Nil
@@ -633,6 +635,7 @@ object CFG {
                 } yield ()
               case (var_decl :: rest) =>
                 for { // TODO Check whether multiple declaration in one statement is working fine.
+                  // if it does not work, we can add sub path to p, such as 0, 1, 2,
                   _ <- buildCFG(LocalVars(modifiers, ty, var_decl :: Nil), p)
                   _ <- buildCFG(LocalVars(modifiers, ty, rest), p)
                 } yield ()
@@ -651,90 +654,54 @@ object CFG {
           case IfThen(exp, stmt)                      => buildCFG(IfThenElse(exp, stmt, Empty), p)
           case IfThenElse(exp, true_stmt, false_stmt) =>
             /*
-      max1 = max + 1
-      CFG1 = CFG update { pred : {succ = max} |  pred <- preds } union { max : { stmts =  [ if exp { continue max1 } else { continue max2 } ], succ = [], preds = preds} }
-      CFG1, max1, {max}, false |-n trueStmt => CFG2, max2, preds1, _
-      CFG2, max2, {max}, false |-n falseStmt => CFG3, max3, preds2, _
+      
+      CFG1 = CFG update { pred : {succ = path} |  pred <- preds } union { path : { id= path, succ = [], preds = preds} }
+      CFG1, thenOf(path), {path}, false |-n trueStmt => CFG2, max2, preds1, _
+      CFG2, elseOf(max), {path}, false |-n falseStmt => CFG3, max3, preds2, _
       -------------------------------------------------------------------------------------------------------------
-      CFG, max, preds, _ |- if exp { trueStmt } else { falseStmt }  => CFG3, max3, preds1 U preds2, false
+      CFG, path, preds, _ |- if exp { trueStmt } else { falseStmt }  => CFG3, preds1 U preds2, false
 
-      In Java, we replace goto max1 and goto max2 with max1:Empty and max2:Empty
              */
             for {
               st <- get;
               _ <- {
-                val max = st.currId
-                val currNodeId = internalIdent(s"${labPref}${max}")
+                // val max = st.currId
+                val ifElseNodeId = p
                 val lhs = HasVarcfgOps.getLVarsFrom(exp)
                 val rhs = HasVarcfgOps.getVarsFrom(exp)
-                val max1 = max + 1
                 val cfg0 = st.cfg
                 val preds0 = st.currPreds
-                /* Note: we don't have max2 until we have CFG1
-             CFG1, max1, {max}, false |-n trueStmt => CFG, max2, preds1, _
-             we can given an empty statement to the new CFG node in CFG1 first and update it
-             after we have max2
-                 */
-                val cfgNode = Node(Nil, lhs, rhs, Nil, preds0, Nil, IfElseNode)
+                val ifElseNode = IfThenElseNode(ifElseNodeId, thenOf(p), elseOf(p), lhs, rhs, preds0, Nil)
                 val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
                   val n = g(pred)
-                  val n1 =
-                    n.copy(succs = (n.succs ++ List(currNodeId)).toSet.toList)
+                  val n1 = appSucc(n,ifElseNodeId)
                   g + (pred -> n1)
                 })
-                val cfg1 = cfg1p + (currNodeId -> cfgNode)
+                val cfg1 = cfg1p + (ifElseNodeId -> ifElseNode)
                 for {
                   _ <- put(
                     st.copy(
                       cfg = cfg1,
-                      currId = max1,
-                      currPreds = List(currNodeId),
+                      currPreds = List(ifElseNodeId),
                       continuable = false
                     )
                   );
-                  _ <- buildCFG(true_stmt);
-                  st1 <- get;
-                  _ <- {
-                    val max2 = st1.currId
-                    val preds1 = st1.currPreds
-                    val s = BlockStmt_(
-                      IfThenElse(
-                        exp,
-                        Continue(Some(internalIdent(s"${labPref}${max1}"))),
-                        Continue(Some(internalIdent(s"${labPref}${max2}")))
-                      )
+                  _ <- buildCFG(true_stmt, thenOf(ifElseNodeId))
+                  st1 <- get // after thenStmt being processed
+                  _ <- put(
+                    st1.copy(
+                      currPreds = List(ifElseNodeId),
+                      continuable = false
                     )
-                    val cfg2 = st1.cfg
-                    val n = cfg2(currNodeId)
-                    val cfg2p = cfg2 + (currNodeId -> n.copy(stmts = List(s)))
-                    for {
-                      _ <- put(
-                        st1.copy(
-                          cfg = cfg2p,
-                          currId = max2,
-                          currPreds = List(currNodeId),
-                          continuable = false
-                        )
-                      )
-                      _ <- buildCFG(false_stmt)
-                      st2 <- get
-                      _ <- {
-                        val max3 = st2.currId
-                        val preds2 = st2.currPreds
-                        val cfg3 = st2.cfg
-                        for {
-                          _ <- put(
-                            st2.copy(
-                              cfg = cfg3,
-                              currId = max3,
-                              currPreds = preds1 ++ preds2,
-                              continuable = false
-                            )
-                          )
-                        } yield ()
-                      }
-                    } yield ()
-                  }
+                  )
+                  _ <- buildCFG(false_stmt, elseOf(ifElseNodeId))
+                  st2 <- get // after elseStmt being processed
+                  _ <- put(
+                    st2.copy(
+                      currPreds = st1.currPreds ++ st2.currPreds,
+                      continuable = false
+                    )
+                  )
                 } yield ()
               }
             } yield ()
@@ -752,6 +719,14 @@ object CFG {
           -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
           CFG, max, preds, continuable, breakNodes, contNodes, caseNodes |- switch exp { stmt1,...,stmtn }   => CFG2, max2, preds2 union breakNodes2 , false, breakNodes, contNodes2, caseNodes
              */
+
+            /*
+            CFG, path++[0], {path}, false, {}, {}, {} |- case1 => CFG1, preds1, continuable1, breakNodes1, contNodes1, caseNodes1
+            CFG1, path++[1], {path} u preds1, false, breakNodes1, contNodes1, caseNodes1 |- case1 => CFG2, preds2, continable2, breakNodes2, contNodes2, caseNodes2
+            CFG2, path++[2], {path} u preds2, false, 
+            ---------------------------------------------------------------------------------------------------------------------------------------------------------
+            CFG, path, preds, continuable, breakNodes, contNodes, caseNodes |- swtch exp { case1, ..., casen } => 
+            */
             for {
               st <- get
               _ <- {
