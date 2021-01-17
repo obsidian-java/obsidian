@@ -244,18 +244,27 @@ object CFG {
     case WhileNode(id, bodyNode, lVars, rVars, preds, succs) => rVars
   }
 
-  def appSucc(n:Node, succ:NodeId) = setSuccs(n, getSuccs(n)++List(succ))
-  def appPred(n:Node, pred:NodeId) = setPreds(n, getPreds(n)++List(pred))
+  def appSucc(n:Node, succ:NodeId) = setSuccs(n, (getSuccs(n)++List(succ)).toSet.toList)
+  def appPred(n:Node, pred:NodeId) = setPreds(n, (getPreds(n)++List(pred)).toSet.toList)
   def appLVars(n:Node, lvs:List[Ident]) = setLVars(n, getLVars(n)++lvs)
   def appRVars(n:Node, rvs:List[Ident]) = setRVars(n, getRVars(n)++rvs)
 
   def appStmt(n:Node, stmt:ASTPath) = n match {
-    case AssignmentsNode(id, stmts, localDecls,  lVars, rVars, preds, succs) => AssignmentsNode(id, stmts++List(stmt), localDecls,  lVars, rVars, preds, succs)
+    case AssignmentsNode(id, stmts, localDecls,  lVars, rVars, preds, succs) => {
+      val stmtSet = stmts.toSet
+      if (stmtSet.contains(stmt)) {
+        n
+      } else {
+        AssignmentsNode(id, stmts++List(stmt), localDecls,  lVars, rVars, preds, succs)
+      }
+    } 
     case _ => n
   }
 
   def appLocalDecls(n:Node, lds:List[Ident]) = n match {
-    case AssignmentsNode(id, stmts, localDecls,  lVars, rVars, preds, succs) => AssignmentsNode(id, stmts, localDecls++lds,  lVars, rVars, preds, succs)
+    case AssignmentsNode(id, stmts, localDecls,  lVars, rVars, preds, succs) => { 
+      AssignmentsNode(id, stmts, (localDecls++lds).toSet.toList,  lVars, rVars, preds, succs)
+    }
     case _ => n
   }
 
@@ -607,9 +616,7 @@ object CFG {
                       )
                       val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
                         val n: Node = g(pred)
-                        val n1 = n.copy(succs =
-                          (n.succs ++ List(currNodeId)).toSet.toList
-                        )
+                        val n1 = appSucc(n,currNodeId)
                         g + (pred -> n1)
                       })
                       val cfg1 = cfg1p + (currNodeId -> cfgNode)
@@ -617,7 +624,6 @@ object CFG {
                         _ <- put(
                           st.copy(
                             cfg = cfg1,
-                            currId = max1,
                             currPreds = List(currNodeId),
                             continuable = true
                           )
@@ -626,23 +632,23 @@ object CFG {
                     }
                 } yield ()
               case (var_decl :: rest) =>
-                for {
-                  _ <- buildCFG(LocalVars(modifiers, ty, var_decl :: Nil))
-                  _ <- buildCFG(LocalVars(modifiers, ty, rest))
+                for { // TODO Check whether multiple declaration in one statement is working fine.
+                  _ <- buildCFG(LocalVars(modifiers, ty, var_decl :: Nil), p)
+                  _ <- buildCFG(LocalVars(modifiers, ty, rest), p)
                 } yield ()
             }
-          case BlockStmt_(stmt) => cfgOps.buildCFG(stmt)
+          case BlockStmt_(stmt) => cfgOps.buildCFG(stmt, p)
         }
     }
 
   implicit def stmtCFGInstance: CFGClass[Stmt] =
     new CFGClass[Stmt] {
       override def buildCFG(
-          a: Stmt
+          a: Stmt, p: ASTPath
       )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
         a match {
-          case StmtBlock(blk)                         => cfgOps.buildCFG(blk)
-          case IfThen(exp, stmt)                      => buildCFG(IfThenElse(exp, stmt, Empty))
+          case StmtBlock(blk)                         => cfgOps.buildCFG(blk,p)
+          case IfThen(exp, stmt)                      => buildCFG(IfThenElse(exp, stmt, Empty), p)
           case IfThenElse(exp, true_stmt, false_stmt) =>
             /*
       max1 = max + 1
