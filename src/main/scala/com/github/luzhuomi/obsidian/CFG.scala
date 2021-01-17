@@ -41,6 +41,7 @@ object CFG {
   case class AssignmentsNode(
       id: ASTPath,
       stmts: List[ASTPath],
+      localDecls: List[Ident],
       lVars: List[Ident],
       rVars: List[Ident],
       preds: List[NodeId],
@@ -164,7 +165,7 @@ object CFG {
   // update functions for nodes
 
   def setSuccs(n:Node, s:List[NodeId]):Node = n match {
-    case AssignmentsNode(id, stmts, lVars, rVars, preds, succs) => AssignmentsNode(id, stmts, lVars, rVars, preds, s)
+    case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, s)
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, s)
     case IfThenNode(id, thenNode, lVars, rVars, preds, succs) => IfThenNode(id, thenNode, lVars, rVars, preds, s) 
     case ReturnNode(id, lVars, rVars, preds) => n
@@ -174,7 +175,7 @@ object CFG {
   }
 
   def setPreds(n:Node, p:List[NodeId]):Node = n match {
-    case AssignmentsNode(id, stmts, lVars, rVars, preds, succs) => AssignmentsNode(id, stmts, lVars, rVars, p, succs)
+    case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => AssignmentsNode(id, stmts,  localDecls, lVars, rVars, p, succs)
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => IfThenElseNode(id, thenNode, elseNode, lVars, rVars, p, succs)
     case IfThenNode(id, thenNode, lVars, rVars, preds, succs) => IfThenNode(id, thenNode, lVars, rVars, p, succs) 
     case ReturnNode(id, lVars, rVars, preds) => ReturnNode(id, lVars, rVars, p)
@@ -184,7 +185,7 @@ object CFG {
   }
 
   def setLVars(n:Node, lv:List[Ident]):Node = n match {
-    case AssignmentsNode(id, stmts, lVars, rVars, preds, succs) => AssignmentsNode(id, stmts, lv, rVars, preds, succs)
+    case AssignmentsNode(id, stmts, localDecls,  lVars, rVars, preds, succs) => AssignmentsNode(id, stmts, localDecls, lv, rVars, preds, succs)
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => IfThenElseNode(id, thenNode, elseNode, lv, rVars, preds, succs)
     case IfThenNode(id, thenNode, lVars, rVars, preds, succs) => IfThenNode(id, thenNode, lv, rVars, preds, succs) 
     case ReturnNode(id, lVars, rVars, preds) => ReturnNode(id, lv, rVars, preds)
@@ -194,7 +195,7 @@ object CFG {
   }
 
   def setRVars(n:Node, rv:List[Ident]):Node = n match {
-    case AssignmentsNode(id, stmts, lVars, rVars, preds, succs) => AssignmentsNode(id, stmts, lVars, rv, preds, succs)
+    case AssignmentsNode(id, stmts, localDecls,  lVars, rVars, preds, succs) => AssignmentsNode(id, stmts, localDecls, lVars, rv, preds, succs)
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => IfThenElseNode(id, thenNode, elseNode, lVars, rv, preds, succs)
     case IfThenNode(id, thenNode, lVars, rVars, preds, succs) => IfThenNode(id, thenNode, lVars, rv, preds, succs) 
     case ReturnNode(id, lVars, rVars, preds) => ReturnNode(id, lVars, rv, preds)
@@ -204,7 +205,7 @@ object CFG {
   }
 
   def getSuccs(n:Node):List[NodeId] = n match {
-    case AssignmentsNode(id, stmts, lVars, rVars, preds, succs) => succs
+    case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => succs
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => succs
     case IfThenNode(id, thenNode, lVars, rVars, preds, succs) => succs
     case ReturnNode(id, lVars, rVars, preds) => Nil
@@ -214,7 +215,7 @@ object CFG {
   }
 
   def getPreds(n:Node):List[NodeId] = n match {
-    case AssignmentsNode(id, stmts, lVars, rVars, preds, succs) => preds
+    case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => preds
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => preds
     case IfThenNode(id, thenNode, lVars, rVars, preds, succs) => preds
     case ReturnNode(id, lVars, rVars, preds) => preds
@@ -224,7 +225,7 @@ object CFG {
   }
 
   def getLVars(n:Node):List[Ident] = n match {
-    case AssignmentsNode(id, stmts, lVars, rVars, preds, succs) => lVars
+    case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => lVars
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => lVars
     case IfThenNode(id, thenNode, lVars, rVars, preds, succs) => lVars
     case ReturnNode(id, lVars, rVars, preds) => lVars
@@ -234,7 +235,7 @@ object CFG {
   }
 
   def getRVars(n:Node):List[Ident] = n match {
-    case AssignmentsNode(id, stmts, lVars, rVars, preds, succs) => rVars
+    case AssignmentsNode(id, stmts, localDecls,  lVars, rVars, preds, succs) => rVars
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => rVars
     case IfThenNode(id, thenNode, lVars, rVars, preds, succs) => rVars
     case ReturnNode(id, lVars, rVars, preds) => rVars
@@ -245,8 +246,18 @@ object CFG {
 
   def appSucc(n:Node, succ:NodeId) = setSuccs(n, getSuccs(n)++List(succ))
   def appPred(n:Node, pred:NodeId) = setPreds(n, getPreds(n)++List(pred))
-  def appLVar(n:Node, lv:Ident) = setLVars(n, getLVars(n)++List(lv))
-  def appRVar(n:Node, rv:Ident) = setRVars(n, getRVars(n)++List(rv))
+  def appLVars(n:Node, lvs:List[Ident]) = setLVars(n, getLVars(n)++lvs)
+  def appRVars(n:Node, rvs:List[Ident]) = setRVars(n, getRVars(n)++rvs)
+
+  def appStmt(n:Node, stmt:ASTPath) = n match {
+    case AssignmentsNode(id, stmts, localDecls,  lVars, rVars, preds, succs) => AssignmentsNode(id, stmts++List(stmt), localDecls,  lVars, rVars, preds, succs)
+    case _ => n
+  }
+
+  def appLocalDecls(n:Node, lds:List[Ident]) = n match {
+    case AssignmentsNode(id, stmts, localDecls,  lVars, rVars, preds, succs) => AssignmentsNode(id, stmts, localDecls++lds,  lVars, rVars, preds, succs)
+    case _ => n
+  }
 
   /**
     * StateInfo, an state datatype for the CFG state monad
@@ -483,12 +494,14 @@ object CFG {
           case Block(Nil) => {
             val lhs = Nil
             val rhs = Nil
+            val stmts = Nil
+            val localDecls = Nil
             val currNodeId = p
             for {
               st         <- get;
               cfg0       <- m.pure(st.cfg);
               preds0     <- m.pure(st.currPreds);
-              cfgNode    <- m.pure(AssignmentsNode(currNodeId, Nil, lhs, rhs, preds0, Nil));
+              cfgNode    <- m.pure(AssignmentsNode(currNodeId, stmts, localDecls, lhs, rhs, preds0, Nil));
               cfg1p      <- m.pure(preds0.foldLeft(cfg0)((g, pred) => {
                 val n: Node = g(pred)
                 g + (pred -> appSucc(n,currNodeId))
@@ -570,34 +583,27 @@ object CFG {
                       val rvars = HasVarcfgOps.getVarsFrom(var_decl)
                       val cfg1 = preds0.foldLeft(cfg0)((g, pred) => {
                         val n: Node = g(pred)
-                        val n1 = n.copy(
-                          stmts = n.stmts ++ List(s),
-                          localDecls = n.localDecls ++ lvars,
-                          lVars = n.lVars ++ lvars,
-                          rVars = n.rVars ++ rvars
-                        )
+                        val n1 = appLocalDecls(appStmt(appRVars(appLVars(n, lvars), rvars), p), lvars)
                         g + (pred -> n1)
                       })
                       for {
                         _ <- put(st.copy(cfg = cfg1))
                       } yield ()
                     } else {
-                      val max = st.currId
-                      val currNodeId = internalIdent(s"${labPref}${max}")
-                      val max1 = max + 1
+                      val currNodeId = p
                       val cfg0 = st.cfg
                       val preds0 = st.currPreds
                       val s = a
                       val lvars = HasVarcfgOps.getLVarsFrom(var_decl)
                       val rvars = HasVarcfgOps.getVarsFrom(var_decl)
-                      val cfgNode = Node(
-                        List(s),
+                      val cfgNode = AssignmentsNode(
+                        currNodeId,
+                        List(p),
                         lvars,
                         rvars,
                         lvars,
                         preds0,
-                        Nil,
-                        AssignmentNode
+                        Nil
                       )
                       val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
                         val n: Node = g(pred)
