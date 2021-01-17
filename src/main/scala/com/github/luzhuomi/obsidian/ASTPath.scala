@@ -180,6 +180,8 @@ object ASTPath {
 
     // AST Path name constructors (selected)
 
+    val rootPath: ASTPath = List()
+    def childOf(p:ASTPath, childIdx:Int): ASTPath = p ++ List(childIdx)
     def thenOf(p:ASTPath): ASTPath = p ++ List(0)
     def elseOf(p:ASTPath): ASTPath = p ++ List(1) 
     def tryOf(p:ASTPath): ASTPath = p ++ List(0)
