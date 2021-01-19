@@ -81,7 +81,7 @@ object CFG {
     * @param succs
     */
 
-  case class SwtchNode(
+  case class SwitchNode(
     id:ASTPath,
     caseNodes: List[NodeId],
     lVars: List[Ident],
@@ -708,7 +708,8 @@ object CFG {
           case Switch(exp, blocks) =>
 
             /*
-            CFG, path++[0], {path}, false, {}, {}, {} |- case1 => CFG1, preds1, continuable1, breakNodes1, contNodes1, caseNodes1
+            CFG0  = CFG union { p : switchNode(p,path++[0], ..., path++[n], preds, [path++[0], ..., path++[n]] ) } update { pred : {succ: succ u {path} | pred \in preds}}
+            CFG0, path++[0], {path}, false, {}, {}, {} |- case1 => CFG1, preds1, continuable1, breakNodes1, contNodes1, caseNodes1
             CFG1, path++[1], {path} u preds1, false, breakNodes1, contNodes1, caseNodes1 |- case2 => CFG2, preds2, continuable2, breakNodes2, contNodes2, caseNodes2
             CFG2, path++[2], {path} u preds2, false, breakNodes2, contNodes2, caseNodes2 |- case3 => CFG3, preds3, continuable3, breakNodes3, contNodes3, caseNodes3
             ...
@@ -728,31 +729,41 @@ object CFG {
                 val contNodes0 = st.contNodes
                 val breakNodes0 = st.breakNodes
                 val caseNodes0 = st.caseNodes
+                val childNodeIds = (0 to blocks.size).map(idx=>childOf(p,idx)).toList
+                val switchNode = SwitchNode(currNodeId, childNodeIds, lhs, rhs, preds0, childNodeIds)
+                val cfg1p = preds0.foldLeft(cfg0)((g,pred) => {
+                  val n = g(pred)
+                  g + (pred -> appSucc(n,currNodeId))
+                })
+                val cfg1 = cfg1p + (currNodeId -> switchNode)
                 for {
                   _ <- put(
                     st.copy(
-                      currPreds = Nil,
+                      cfg = cfg1,
+                      currPreds = List(currNodeId),
                       fallThroughCases = Nil,
                       continuable = false,
                       breakNodes = Nil,
                       caseNodes = Nil
                     )
                   )
-                  _ <- blocks.zip(0 to blocks.size).traverse_(block_idx => block_idx match {
-                    case (block, idx) => cfgOps.buildCFG(block, childOf(p,idx))
+                  _ <- blocks.zip(childNodeIds).traverse_(block_path => block_path match {
+                    case (block, child_path) => for { 
+                      st <- get
+                      _ <- put(
+                        st.copy(currPreds = (List(currNodeId) ++ st.currPreds).toSet.toList)
+                      )
+                      _ <- cfgOps.buildCFG(block, child_path)
+                    } yield ()
                   })
                   st1 <- get
                   _ <- {
-                    val preds1 = st1.breakNodes
+                    val preds1 = st1.currPreds
                     val breakNodes1 = st1.breakNodes
                     val caseNodes1 = st1.caseNodes
                     for {
-                      _ <- put(st1.copy(currPreds = preds0))
-                      mb_preds <- caseExpsToIfNodes(exp, caseNodes1)
-                      st2 <- get
-                      _ <- put(
-                        st2.copy(
-                          currPreds = preds1 ++ breakNodes1 ++ mb_preds,
+                      _ <- put(st1.copy(
+                          currPreds = preds1 ++ breakNodes1,
                           breakNodes = breakNodes0,
                           caseNodes = caseNodes0,
                           continuable = false
@@ -765,24 +776,21 @@ object CFG {
             } yield ()
           case While(exp, stmt) =>
             /*
-          max1 = max + 1
-          CFG1 = CFG update { pred : {succ = max} |  pred <- preds ++ preds1 } union { max: { stmts = [ if exp { goto max1 } else { goto max2 } ] } }
-          CFG1, max1, {max}, false, {}, {} |-n stmt => CFG2, max2, preds1, _, contNodes2, breakNodes2,
-          CFG3 = CFG2 update { id : { succ = max} | id <- contNodes2 } update { id : { succ = max2 } | id <- breakNodes2 } update { max : { preds = preds ++ contNodes2 } }
-          ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-          CFG, max, preds, _, contNodes, breakNodes |- while (exp) { stmt } => CFG3, max2, {max} ++ breakNodes2, false, contNodes, breakNodes
-              -- shouldn't be max2? no, should be max, because max2's block will be created after this statment
 
-          shall/can we keep it as while instead of if else with continue/goto?
+          CFG1 = CFG update { pred: {succ = p} | pred <- preds } union { path: whilenode(childOF(path), lhs, rhs, preds, childOf(path))}
+          CFG1, childOF(path), {path}, _, {}, {} |- stmt |- CFG2,  preds2, continuable2, contNodes2, breakNodes2
+          CFG3 = CFG3 update { nodeid: { succ = {path} | nodeid <- contNodes2 } } update { path : { preds = preds ++ contNodes2 } }
+          -------------------------------------------------------------------------------------------------------------------------------
+          CFG, path, preds, _, contNodes, breakNodes |- while (exp) { stmt } =>  CFG3, {path} ++ breakNodes2, false, breakNodes ,contNOdes
              */
             for {
               st <- get
               _ <- {
-                val max = st.currId
-                val currNodeId = internalIdent(s"${labPref}${max}")
+                
+                val currNodeId = p
                 val lhs = HasVarcfgOps.getVarsFrom(exp)
                 val rhs = HasVarcfgOps.getLVarsFrom(exp)
-                val max1 = max + 1
+                
                 val cfg0 = st.cfg
                 val preds0 = st.currPreds
                 val contNodes0 = st.contNodes
