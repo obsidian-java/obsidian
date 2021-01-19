@@ -169,7 +169,7 @@ object CFG {
   def setSuccs(n:Node, s:List[NodeId]):Node = n match {
     case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, s)
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, s)
-    case SwtchNode(id, caseNodes, lVars, rVars, preds, succs) =>  SwtchNode(id, caseNodes, lVars, rVars, preds, s) 
+    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  SwitchNode(id, caseNodes, lVars, rVars, preds, s) 
     case ReturnNode(id, lVars, rVars, preds) => n
     case ThrowNode(id, lVars, rVars, preds, succs) => ThrowNode(id, lVars, rVars, preds, s)
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, s)
@@ -179,7 +179,7 @@ object CFG {
   def setPreds(n:Node, p:List[NodeId]):Node = n match {
     case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => AssignmentsNode(id, stmts,  localDecls, lVars, rVars, p, succs)
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => IfThenElseNode(id, thenNode, elseNode, lVars, rVars, p, succs)
-    case SwtchNode(id, caseNodes, lVars, rVars, preds, succs) =>  SwtchNode(id, caseNodes, lVars, rVars, p, succs)  
+    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  SwitchNode(id, caseNodes, lVars, rVars, p, succs)  
     case ReturnNode(id, lVars, rVars, preds) => ReturnNode(id, lVars, rVars, p)
     case ThrowNode(id, lVars, rVars, preds, succs) => ThrowNode(id, lVars, rVars, p, succs)
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, p, succs)
@@ -189,7 +189,7 @@ object CFG {
   def setLVars(n:Node, lv:List[Ident]):Node = n match {
     case AssignmentsNode(id, stmts, localDecls,  lVars, rVars, preds, succs) => AssignmentsNode(id, stmts, localDecls, lv, rVars, preds, succs)
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => IfThenElseNode(id, thenNode, elseNode, lv, rVars, preds, succs)
-    case SwtchNode(id, caseNodes, lVars, rVars, preds, succs) =>  SwtchNode(id, caseNodes, lv, rVars, preds, succs) 
+    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  SwitchNode(id, caseNodes, lv, rVars, preds, succs) 
     case ReturnNode(id, lVars, rVars, preds) => ReturnNode(id, lv, rVars, preds)
     case ThrowNode(id, lVars, rVars, preds, succs) => ThrowNode(id, lv, rVars, preds, succs)
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs)
@@ -199,7 +199,7 @@ object CFG {
   def setRVars(n:Node, rv:List[Ident]):Node = n match {
     case AssignmentsNode(id, stmts, localDecls,  lVars, rVars, preds, succs) => AssignmentsNode(id, stmts, localDecls, lVars, rv, preds, succs)
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => IfThenElseNode(id, thenNode, elseNode, lVars, rv, preds, succs)
-    case SwtchNode(id, caseNodes, lVars, rVars, preds, succs) =>  SwtchNode(id, caseNodes, lVars, rv, preds, succs) 
+    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  SwitchNode(id, caseNodes, lVars, rv, preds, succs) 
     case ReturnNode(id, lVars, rVars, preds) => ReturnNode(id, lVars, rv, preds)
     case ThrowNode(id, lVars, rVars, preds, succs) => ThrowNode(id, lVars, rv, preds, succs)
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs)
@@ -209,7 +209,7 @@ object CFG {
   def getSuccs(n:Node):List[NodeId] = n match {
     case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => succs
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => succs
-    case SwtchNode(id, caseNodes, lVars, rVars, preds, succs) =>  succs
+    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  succs
     case ReturnNode(id, lVars, rVars, preds) => Nil
     case ThrowNode(id, lVars, rVars, preds, succs) => succs
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => succs
@@ -219,7 +219,7 @@ object CFG {
   def getPreds(n:Node):List[NodeId] = n match {
     case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => preds
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => preds
-    case SwtchNode(id, caseNodes, lVars, rVars, preds, succs) =>  preds
+    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  preds
     case ReturnNode(id, lVars, rVars, preds) => preds
     case ThrowNode(id, lVars, rVars, preds, succs) => preds
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => preds
@@ -229,7 +229,7 @@ object CFG {
   def getLVars(n:Node):List[Ident] = n match {
     case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => lVars
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => lVars
-    case SwtchNode(id, caseNodes, lVars, rVars, preds, succs) =>  lVars
+    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  lVars
     case ReturnNode(id, lVars, rVars, preds) => lVars
     case ThrowNode(id, lVars, rVars, preds, succs) => lVars
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => Nil
@@ -239,7 +239,7 @@ object CFG {
   def getRVars(n:Node):List[Ident] = n match {
     case AssignmentsNode(id, stmts, localDecls,  lVars, rVars, preds, succs) => rVars
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => rVars
-    case SwtchNode(id, caseNodes, lVars, rVars, preds, succs) =>  rVars 
+    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  rVars 
     case ReturnNode(id, lVars, rVars, preds) => rVars
     case ThrowNode(id, lVars, rVars, preds, succs) => rVars
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => Nil
@@ -248,6 +248,7 @@ object CFG {
 
   def appSucc(n:Node, succ:NodeId) = setSuccs(n, (getSuccs(n)++List(succ)).toSet.toList)
   def appPred(n:Node, pred:NodeId) = setPreds(n, (getPreds(n)++List(pred)).toSet.toList)
+  def appPreds(n:Node, preds:List[NodeId]) = setPreds(n, (getPreds(n) ++ preds).toSet.toList)
   def appLVars(n:Node, lvs:List[Ident]) = setLVars(n, getLVars(n)++lvs)
   def appRVars(n:Node, rvs:List[Ident]) = setRVars(n, getRVars(n)++rvs)
 
@@ -779,7 +780,7 @@ object CFG {
 
           CFG1 = CFG update { pred: {succ = p} | pred <- preds } union { path: whilenode(childOF(path), lhs, rhs, preds, childOf(path))}
           CFG1, childOF(path), {path}, _, {}, {} |- stmt |- CFG2,  preds2, continuable2, contNodes2, breakNodes2
-          CFG3 = CFG3 update { nodeid: { succ = {path} | nodeid <- contNodes2 } } update { path : { preds = preds ++ contNodes2 } }
+          CFG3 = CFG3 update { nodeid: { succ = {path} | nodeid <- contNodes2++preds2 } } update { path : { preds = preds ++ contNodes2 ++ preds2 } }
           -------------------------------------------------------------------------------------------------------------------------------
           CFG, path, preds, _, contNodes, breakNodes |- while (exp) { stmt } =>  CFG3, {path} ++ breakNodes2, false, breakNodes ,contNOdes
              */
@@ -795,97 +796,48 @@ object CFG {
                 val preds0 = st.currPreds
                 val contNodes0 = st.contNodes
                 val breakNodes0 = st.breakNodes
+                val childNodeId = childOf(currNodeId,0)
                 val cfgNode =
-                  Node(Nil, lhs, rhs, Nil, preds0, Nil, LoopNode(Nil, Nil))
+                  WhileNode(currNodeId, childNodeId, lhs, rhs, preds0, List(childNodeId))
                 val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
                   val n = g(pred)
-                  g + (pred -> n.copy(succs =
-                    (n.succs ++ List(currNodeId)).toSet.toList
-                  ))
+                  g + (pred -> appSucc(n, currNodeId))
                 })
                 val cfg1 = cfg1p + (currNodeId -> cfgNode)
                 for {
                   _ <- put(
                     st.copy(
                       cfg = cfg1,
-                      currId = max1,
                       currPreds = List(currNodeId),
                       continuable = false,
                       breakNodes = Nil
                     )
                   )
-                  _ <- buildCFG(stmt)
+                  _ <- buildCFG(stmt, childOf(p,0))
                   st1 <- get
                   _ <- {
-                    val max2 = st1.currId
-                    val preds1 = st1.currPreds
-                    /* s         = AST.CBlockStmt $ AST.CIf exp
-                      (AST.CGoto (internalIdent (labPref ++ show max1)) nodeInfo)
-                      (Just (AST.CGoto (internalIdent (labPref ++ show max2)) nodeInfo)) nodeInfo -- problem, the following statement is not neccessarily max2, i.e. the next available num. the next available num can be used in a sibling block, e.g. the current loop is in then branch, the next available int is usined in the else branch for instance
-              int search(int a[], int size, int x) {
-              if (a) { // 0
-                int i;  // 1
-                for (i=0 /* // 2 */; i< size; i++) // 3
-                  {
-                  // 4
-                  if (a[i] == x)
-                    {
-                      return i; // 5
-                    }
-                  // 6
-                  // 7 i++
-                      }
-                  }
-                  // 8 implicit else
-                  // 9
-                return -1;
-                }
-                3 will have if ... { goto 4 } else { goto 8 } which is an else from the outer if statement 0.
-                the correct translation should be  if ... { goto 4 } else { goto 9 }
-                     */
-                    val s = BlockStmt_(
-                      IfThen(
-                        exp,
-                        Continue(Some(internalIdent(s"${labPref}${max1}")))
-                      )
-                    )
+                    val preds2 = st1.currPreds
+                    val contNodes2 = st1.contNodes
                     val cfg2 = st1.cfg
-                    val cfg2p = preds1.foldLeft(cfg2)((g, pred) => {
+                    val cfg2p = (preds2++contNodes2).foldLeft(cfg2)((g, pred) => {
                       val n = g(pred)
-                      g + (pred -> n.copy(succs =
-                        (n.succs ++ List(currNodeId)).toSet.toList
-                      ))
+                      g + (pred -> appSucc(n, currNodeId))
                     })
                     val breakNodes2 = st1.breakNodes
-                    val contNodes2 = st1.contNodes
                     val currNode = cfg2p(currNodeId)
-                    val cfg2pp = cfg2p + (currNodeId -> currNode.copy(
-                      stmts = List(s),
-                      preds =
-                        (currNode.preds ++ preds1 ++ contNodes2).toSet.toList,
-                      succs = currNode.succs.toSet.toList,
-                      nodeType = LoopNode(breakNodes2, contNodes2)
-                    ))
+                    val cfg2pp = cfg2p + (currNodeId -> 
+                      appPreds(cfg2p(currNodeId), preds2 ++ contNodes2))
                     val cfg3 = contNodes2.foldLeft(cfg2pp)(
                       (g, l) => { // update the break and cont immediately
                         val n = g(l)
-                        g + (l -> n.copy(succs =
-                          (n.succs ++ List(currNodeId)).toSet.toList
-                        ))
+                        g + (l -> appSucc(n,currNodeId))
                       }
                     )
-                    /*
-              val cfg3p  = breakNodes2.foldLeft(cfg3) ( (g,l) => {
-                val n = g(l)
-                g + ( l -> n.copy(succs = (n.succs ++ List(intdent(s"${labPref}${max2}")).toSet.toList)))
-              })
-                     */
                     val cfg3p = cfg3
                     for {
                       _ <- put(
                         st1.copy(
                           cfg = cfg3p,
-                          currId = max2,
                           currPreds = List(currNodeId) ++ breakNodes2,
                           continuable = false,
                           contNodes = contNodes0,
