@@ -308,10 +308,20 @@ object Desugar {
         case ExpName(name) => ExpName(name)
         case FieldAccess_(access) => FieldAccess_(dsgOps.desugar(access))
         case InstanceCreation(type_args, type_decl, args, body) => InstanceCreation(type_args, type_decl, args.map(dsgOps.desugar(_)), body) // we don't desugar anonymous class body
-
+        case InstanceOf(e, ref_type) => InstanceOf(dsgOps.desugar(e), ref_type)
+        case Lambda(params, body) => Lambda(params, body) // we do not desugar the body of lambda term
+        case Lit(lit) => Lit(lit)
+        case MethodInv(methodInv) => MethodInv(dsgOps.desugar(methodInv))
       }
     }
   }
+
+  implicit def methodInvDSGInstance:DSG[MethodInvocation] = {
+    new DSG[MethodInvocation] {
+      override def desugar(a: Syntax.MethodInvocation): Syntax.MethodInvocation = a // TODO
+    }
+  }
+  
 
   implicit def arrayInitDSGInstance:DSG[ArrayInit] = {
     new DSG[ArrayInit] {
@@ -324,12 +334,7 @@ object Desugar {
       override def desugar(a: Syntax.FieldAccess): Syntax.FieldAccess = a // TODO
     }
   }
-
-  implicit def argumentDSGInstance:DSG[Argument] = {
-    new DSG[Argument] {
-      override def desugar(a: Syntax.Argument): Syntax.Argument = a // TODO
-    }
-  }
+  
   implicit def catchDSGInstance: DSG[Catch] = {
     new DSG[Catch] {
       override def desugar(a: Syntax.Catch): Syntax.Catch = a match {
@@ -337,7 +342,7 @@ object Desugar {
       }
     }
   }
-
+  
   implicit def switchBlockDSGInstance: DSG[SwitchBlock] = new DSG[SwitchBlock] {
     override def desugar(a: Syntax.SwitchBlock): Syntax.SwitchBlock = a match {
       case SwitchBlock(Default, blk_stmts) => SwitchBlock(Default, blk_stmts.map(dsgOps.desugar(_)))
