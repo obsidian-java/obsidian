@@ -855,12 +855,14 @@ object CFG {
       --------------------------------------------------------------------------------------
       CFG, max, preds, continuable, contNodes, breakNodes |- do  { stmt } while (exp) => CFG2, max2, {max}, false, contNodes', breakNodes'
            */
+          // Desguaring should be done separately in a desugarer
+          /*
           case Do(stmt, exp) =>
             for {
               _ <- buildCFG(stmt)
               _ <- buildCFG(While(exp, stmt))
             } yield ()
-
+          */
           /*
       CFG, max, preds, continuable |- init => CFG1, max1, preds1, continuable1
       CFG1, max1, preds1, continuable1 |- while (exp2) { stmt; exp3 } => CFG2, max2, preds2, continuabl2

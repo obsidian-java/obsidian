@@ -2,8 +2,6 @@ package com.github.luzhuomi.obsidian
 
 import scala.collection.Map._
 import com.github.luzhuomi.scalangj.Syntax._
-import com.github.luzhuomi.scalangj.Syntax
-import javax.management.Query
 
 /**
   * an AST Path is a sequence of integers that represent the hierachical position of a statement
@@ -171,7 +169,7 @@ object ASTPath {
 
     implicit def catchQueryableInstrance:Queryable[Catch] = {
         new Queryable[Catch] {
-            override def query(a: Syntax.Catch, p: ASTPath): Option[Syntax.BlockStmt] = a match {
+            override def query(a: Catch, p: ASTPath): Option[BlockStmt] = a match {
                 case Catch(params, blk) => queryOps.query(blk,p) 
             }
         }
@@ -185,5 +183,5 @@ object ASTPath {
     def thenOf(p:ASTPath): ASTPath = p ++ List(0)
     def elseOf(p:ASTPath): ASTPath = p ++ List(1) 
     def tryOf(p:ASTPath): ASTPath = p ++ List(0)
-    
+
 }
