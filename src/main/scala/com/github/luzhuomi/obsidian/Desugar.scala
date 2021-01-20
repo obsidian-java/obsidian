@@ -312,6 +312,8 @@ object Desugar {
         case Lambda(params, body) => Lambda(params, body) // we do not desugar the body of lambda term
         case Lit(lit) => Lit(lit)
         case MethodInv(methodInv) => MethodInv(dsgOps.desugar(methodInv))
+        case MethodRef(name, id) => MethodRef(name, id)
+        case PostDecrement(exp) => 
       }
     }
   }
