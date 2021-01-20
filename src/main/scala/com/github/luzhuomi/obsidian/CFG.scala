@@ -917,7 +917,7 @@ object CFG {
                     ExpName(Name(i :: Nil)),
                     LThan,
                     dotField(exp, Ident("length"))
-                  )
+                  )ppr
                 )
                 val exp3 = Some(List(PostIncrement(ExpName(Name(i :: Nil)))))
                 val var_decls2 = List(
