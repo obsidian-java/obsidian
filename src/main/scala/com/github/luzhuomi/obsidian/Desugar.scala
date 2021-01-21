@@ -254,6 +254,42 @@ object Desugar {
             )
             StmtBlock(blk)
           }
+          /**
+            * x = y--; ===> 
+            * 
+            * { x = y;
+            *   y = y - 1;
+            * }
+            */
+          case ExpStmt(Assign(lhs,op,PostDecrement(ExpName(name)))) => {
+              val a = ExpStmt(Assign(lhs,op,ExpName(name)))
+              val i = ExpStmt(Assign(NameLhs(name), EqualA, BinOp(ExpName(name), Sub ,Lit(IntLit(1)))))
+              StmtBlock(Block(List(
+                  BlockStmt_(a), BlockStmt_(i)
+              )))            
+          }
+          case ExpStmt(Assign(lhs,op,PostIncrement(ExpName(name)))) => {
+              val a = ExpStmt(Assign(lhs,op,ExpName(name)))
+              val i = ExpStmt(Assign(NameLhs(name), EqualA, BinOp(ExpName(name), Add ,Lit(IntLit(1)))))
+              StmtBlock(Block(List(
+                  BlockStmt_(a), BlockStmt_(i)
+              )))            
+          }
+          case ExpStmt(Assign(lhs,op,PreDecrement(ExpName(name)))) => {
+              val a = ExpStmt(Assign(lhs,op,ExpName(name)))
+              val i = ExpStmt(Assign(NameLhs(name), EqualA, BinOp(ExpName(name), Sub ,Lit(IntLit(1)))))
+              StmtBlock(Block(List(
+                  BlockStmt_(i), BlockStmt_(a)
+              )))            
+          }
+          case ExpStmt(Assign(lhs,op,PreIncrement(ExpName(name)))) => {
+              val a = ExpStmt(Assign(lhs,op,ExpName(name)))
+              val i = ExpStmt(Assign(NameLhs(name), EqualA, BinOp(ExpName(name), Add ,Lit(IntLit(1)))))
+              StmtBlock(Block(List(
+                  BlockStmt_(i), BlockStmt_(a)
+              )))            
+          }
+          // TODO: what about case like x = (y = y + 1)?
           case ExpStmt(exp) => ExpStmt(dsgOps.desugar(exp))
           case IfThen(exp, stmt) => // if then is desugar if then else with else branch empty
             IfThenElse(dsgOps.desugar(exp), dsgOps.desugar(stmt), Empty)
@@ -313,27 +349,58 @@ object Desugar {
         case Lit(lit) => Lit(lit)
         case MethodInv(methodInv) => MethodInv(dsgOps.desugar(methodInv))
         case MethodRef(name, id) => MethodRef(name, id)
-        case PostDecrement(exp) => 
+        case PostDecrement(exp) => PostDecrement(exp) // nothigng to do, exp must be a name, this case should not be fired.
+        case PostIncrement(exp) => PostIncrement(exp)
+        case PreBitCompl(exp) => PreBitCompl(dsgOps.desugar(exp))
+        case PreDecrement(exp) => PreDecrement(exp) 
+        case PreIncrement(exp) => PreIncrement(exp) 
+        case PreMinus(exp) => PreMinus(dsgOps.desugar(exp))
+        case PreNot(exp) => PreNot(dsgOps.desugar(exp))
+        case PrePlus(exp) => PrePlus(dsgOps.desugar(exp))
+        case QualInstanceCreation(exp, type_args, id, args, body) => QualInstanceCreation(dsgOps.desugar(exp), type_args, id, args.map(dsgOps.desugar(_)), body) // we don't desugar body
+        case This => This
+        case ThisClass(name) => ThisClass(name)
       }
     }
   }
 
   implicit def methodInvDSGInstance:DSG[MethodInvocation] = {
     new DSG[MethodInvocation] {
-      override def desugar(a: Syntax.MethodInvocation): Syntax.MethodInvocation = a // TODO
+      override def desugar(a: Syntax.MethodInvocation): Syntax.MethodInvocation = a match {
+          case ClassMethodCall(name, ref_types, id, args) => ClassMethodCall(name, ref_types, id, args.map(dsgOps.desugar(_)))
+          case MethodCall(name, args) => MethodCall(name, args.map(dsgOps.desugar(_)))
+          case PrimaryMethodCall(e, ref_types, id, args) => PrimaryMethodCall(dsgOps.desugar(e),ref_types, id, args.map(dsgOps.desugar(_)))
+          case SuperMethodCall(ref_types, id, args) => SuperMethodCall(ref_types, id, args.map(dsgOps.desugar(_)))
+          case TypeMethodCall(name, ref_types, id, args) => TypeMethodCall(name, ref_types, id, args.map(dsgOps.desugar(_)))
+      }
     }
   }
   
 
   implicit def arrayInitDSGInstance:DSG[ArrayInit] = {
     new DSG[ArrayInit] {
-      override def desugar(a: Syntax.ArrayInit): Syntax.ArrayInit = a // TODO
+      override def desugar(a: Syntax.ArrayInit): Syntax.ArrayInit = a match {
+          case ArrayInit(var_inits) => ArrayInit(var_inits.map(dsgOps.desugar(_)))
+      }
     }
+  }
+
+  implicit def varInitDSGInstance:DSG[VarInit] = {
+      new DSG[VarInit] {
+          override def desugar(a: Syntax.VarInit): Syntax.VarInit = a match {
+              case InitArray(array_init) => InitArray(dsgOps.desugar(array_init))
+              case InitExp(exp) => InitExp(dsgOps.desugar(exp))
+          }
+      }
   }
 
   implicit def fieldAccessDSGInstance:DSG[FieldAccess] = {
     new DSG[FieldAccess] {
-      override def desugar(a: Syntax.FieldAccess): Syntax.FieldAccess = a // TODO
+      override def desugar(a: Syntax.FieldAccess): Syntax.FieldAccess = a match {
+          case ClassFieldAccess(name, id) => ClassFieldAccess(name, id) 
+          case PrimaryFieldAccess(e, id) => PrimaryFieldAccess(dsgOps.desugar(e), id)
+          case SuperFieldAccess(id) =>  SuperFieldAccess(id)
+      }
     }
   }
   
