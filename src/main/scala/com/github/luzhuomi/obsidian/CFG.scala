@@ -863,6 +863,12 @@ object CFG {
       CFG1 = CFG update { pred : {succ = max} |  pred <- preds } union { max : {x = exp} }
       --------------------------------------------------------
       CFG, max, preds, false |- x = exp => CFG1, max1, [], false
+
+
+      CFG1 = CFG update { pred: {stmts = stmts ++ [path], lVars = lVars ++[x] } }
+      x \not in {v | v \in lVars preds, preds \in preds}
+      ----------------------------------------------------------------
+      CFG, path, preds, true |- x = exp => CFG1, 
            */
           case s @ ExpStmt(Assign(lhs, EqualA, rhs)) => {
             val xs = HasVarcfgOps.getLVarsFrom(lhs).toSet
@@ -871,11 +877,10 @@ object CFG {
               st <- get
               _ <- {
                 val preds0 = st.currPreds
-                val max = st.currId
                 val cfg0 = st.cfg
                 val is_reassigned = preds0.foldLeft(false)((b, pred) => {
                   val n = cfg0(pred)
-                  n.lVars.exists(v => xs(v))
+                  (b || (n.lVars.exists(v => xs(v)))
                 })
                 if ((st.continuable) && (!is_reassigned)) {
                   val cfg1 = preds0.foldLeft(cfg0)((g, pred) => {
