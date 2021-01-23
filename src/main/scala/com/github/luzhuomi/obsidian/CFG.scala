@@ -130,6 +130,7 @@ object CFG {
       succs: List[NodeId]
   ) extends Node
 
+
   /**
     * A CFG node containing a return statement
     *
@@ -164,6 +165,55 @@ object CFG {
       succs: List[NodeId]
   ) extends Node
 
+  /**
+    * A CFG node containing an assert statement
+    *
+    * @param id
+    * @param lVars variables on the lhs of assignments. Though they can be constructed from stmts, we cache them here for convienence.
+    * @param rVars variables on the rhs of assignments
+    * @param preds
+    * @param succs
+    */
+
+  case class AssertNode(
+    id: ASTPath, 
+    lVars: List[Ident],
+    rVars: List[Ident],
+    preds: List[NodeId],
+    succs: List[NodeId]
+  ) extends Node
+
+
+  /**
+    * a CFG mode containing a break statement
+    *
+    * @param id
+    * @param preds
+    * @param succs
+    */
+
+  case class BreakNode(
+    id: ASTPath,
+    preds: List[NodeId],
+    succs: List[NodeId]
+  ) extends Node
+
+  /**
+    * a CFG node containing a continue statement
+    *
+    * @param id
+    * @param preds
+    * @param cuccs
+    */
+  case class ContNode(
+    id: ASTPath,
+    preds: List[NodeId], 
+    succs: List[NodeId]
+  ) extends Node
+
+
+ 
+
   // update functions for nodes
 
   def setSuccs(n:Node, s:List[NodeId]):Node = n match {
@@ -174,6 +224,9 @@ object CFG {
     case ThrowNode(id, lVars, rVars, preds, succs) => ThrowNode(id, lVars, rVars, preds, s)
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, s)
     case WhileNode(id, bodyNode, lVars, rVars, preds, succs) => WhileNode(id, bodyNode, lVars, rVars, preds, s)
+    case AssertNode(id, lvars, rvars, preds, succs) => AssertNode(id, lvars, rvars,  preds, s) 
+    case BreakNode(id, preds, succs) => BreakNode(id, preds, s)
+    case ContNode(id, preds, cuccs) => ContNode(id, preds, s)
   }
 
   def setPreds(n:Node, p:List[NodeId]):Node = n match {
@@ -184,6 +237,9 @@ object CFG {
     case ThrowNode(id, lVars, rVars, preds, succs) => ThrowNode(id, lVars, rVars, p, succs)
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, p, succs)
     case WhileNode(id, bodyNode, lVars, rVars, preds, succs) => WhileNode(id, bodyNode, lVars, rVars, p, succs)
+    case AssertNode(id, lvars, rvars, preds, succs) => AssertNode(id, lvars, rvars, p, succs)  
+    case BreakNode(id, preds, succs) => BreakNode(id, p, succs)
+    case ContNode(id, preds, succs) => ContNode(id, p, succs)
   }
 
   def setLVars(n:Node, lv:List[Ident]):Node = n match {
@@ -194,6 +250,9 @@ object CFG {
     case ThrowNode(id, lVars, rVars, preds, succs) => ThrowNode(id, lv, rVars, preds, succs)
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs)
     case WhileNode(id, bodyNode, lVars, rVars, preds, succs) => WhileNode(id, bodyNode, lv, rVars, preds, succs)
+    case AssertNode(id, lvars, rvars,  preds, succs) => AssertNode(id, lv, rvars,  preds, succs)
+    case BreakNode(id, preds, succs) => n
+    case ContNode(id, preds, cuccs) => n
   }
 
   def setRVars(n:Node, rv:List[Ident]):Node = n match {
@@ -204,6 +263,9 @@ object CFG {
     case ThrowNode(id, lVars, rVars, preds, succs) => ThrowNode(id, lVars, rv, preds, succs)
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs)
     case WhileNode(id, bodyNode, lVars, rVars, preds, succs) => WhileNode(id, bodyNode, lVars, rv, preds, succs)
+    case AssertNode(id, lvars, rvars,  preds, succs) => AssertNode(id, lvars, rv,  preds, succs) 
+    case BreakNode(id, preds, succs) => n
+    case ContNode(id, preds, cuccs) => n  
   }
 
   def getSuccs(n:Node):List[NodeId] = n match {
@@ -214,6 +276,9 @@ object CFG {
     case ThrowNode(id, lVars, rVars, preds, succs) => succs
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => succs
     case WhileNode(id, bodyNode, lVars, rVars, preds, succs) => succs
+    case AssertNode(id, lVars, rVars, preds, succs) => succs
+    case BreakNode(id, preds, succs) => succs
+    case ContNode(id, preds, succs) => succs
   }
 
   def getPreds(n:Node):List[NodeId] = n match {
@@ -224,6 +289,9 @@ object CFG {
     case ThrowNode(id, lVars, rVars, preds, succs) => preds
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => preds
     case WhileNode(id, bodyNode, lVars, rVars, preds, succs) => preds
+    case AssertNode(id, lVars, rVars, preds, succs) => preds
+    case BreakNode(id, preds, succs) => preds
+    case ContNode(id, preds, cuccs) => preds
   }
 
   def getLVars(n:Node):List[Ident] = n match {
@@ -234,6 +302,9 @@ object CFG {
     case ThrowNode(id, lVars, rVars, preds, succs) => lVars
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => Nil
     case WhileNode(id, bodyNode, lVars, rVars, preds, succs) => lVars
+    case AssertNode(id, lVars, rVars, preds, succs) => lVars
+    case BreakNode(id, preds, succs) => Nil
+    case ContNode(id, preds, cuccs) => Nil
   }
 
   def getRVars(n:Node):List[Ident] = n match {
@@ -244,6 +315,9 @@ object CFG {
     case ThrowNode(id, lVars, rVars, preds, succs) => rVars
     case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => Nil
     case WhileNode(id, bodyNode, lVars, rVars, preds, succs) => rVars
+    case AssertNode(id, lVars, rVars, preds, succs) => rVars
+    case BreakNode(id, preds, succs) => Nil
+    case ContNode(id, preds, cuccs) => Nil
   }
 
   def appSucc(n:Node, succ:NodeId) = setSuccs(n, (getSuccs(n)++List(succ)).toSet.toList)
@@ -288,21 +362,37 @@ object CFG {
     * @param labelMap
     */
   case class StateInfo(
-      currId: NodeId,
+      currId: NodeId, 
       cfg: CFG,
       currPreds: List[NodeId],
       continuable: Boolean, // is this still needed
-      contNodes: List[
-        NodeId
-      ], // it seems some of these are needed to support duff's device, which is only doable in C.
-      breakNodes: List[NodeId],
+      contNodes: Map[NodeId, List[NodeId]], // label node id -> [continue statement id]
+      breakNodes: Map[NodeId, List[NodeId]], // label node id -> [break statement id]
       caseNodes: List[CaseExp],
       formalArgs: List[Ident],
       fallThroughCases: List[Exp],
       throwNodes: List[NodeId],
       catchNodes: List[NodeId],
-      labelMap: Map[Ident, Ident] // mapping source code label to CFG labels
+      
+      labelMap: Map[Ident, NodeId] // mapping source code label to CFG labels
+
   )
+
+  /**
+    * addpend: 
+    *  add a value associated wtih key to a map,
+    * if the key exits, the value is appended to the existing value list.
+    * otherwise, a new entry added
+    *
+    * @param key the key
+    * @param value the value to be insered
+    * @param m a map from key to list of values
+    * @return an udpated map
+    */
+  def addpend[A,B](key:A, value:B, m:Map[A,List[B]]):Map[A,List[B]] = m.get(key) match {
+    case None => m + (key -> List(value))
+    case Some(vs) => m + (key -> (vs ++ List(value)))
+  }
 
   sealed trait CaseExp {
     def getWrapperId(): NodeId
@@ -325,8 +415,8 @@ object CFG {
     Map[NodeId, Node](),
     List(),
     false,
-    List(),
-    List(),
+    Map(),
+    Map(),
     List(),
     List(),
     List(),
@@ -666,7 +756,6 @@ object CFG {
             for {
               st <- get;
               _ <- {
-                // val max = st.currId
                 val ifElseNodeId = p
                 val lhs = HasVarcfgOps.getLVarsFrom(exp)
                 val rhs = HasVarcfgOps.getVarsFrom(exp)
@@ -710,14 +799,13 @@ object CFG {
 
             /*
             CFG0  = CFG union { p : switchNode(p,path++[0], ..., path++[n], preds, [path++[0], ..., path++[n]] ) } update { pred : {succ: succ u {path} | pred \in preds}}
-            CFG0, path++[0], {path}, false, {}, {}, {} |- case1 => CFG1, preds1, continuable1, breakNodes1, contNodes1, caseNodes1
+            CFG0, path++[0], {path}, false, breakNodes, contNodes, caseNodes |- case1 => CFG1, preds1, continuable1, breakNodes1, contNodes1, caseNodes1
             CFG1, path++[1], {path} u preds1, false, breakNodes1, contNodes1, caseNodes1 |- case2 => CFG2, preds2, continuable2, breakNodes2, contNodes2, caseNodes2
             CFG2, path++[2], {path} u preds2, false, breakNodes2, contNodes2, caseNodes2 |- case3 => CFG3, preds3, continuable3, breakNodes3, contNodes3, caseNodes3
             ...
             CFGn-1, path++[n-1], {path} u predsn-1, false, breakNodesn-1, contNodem-1, caseNodesn-1 |- casen => CFGn, predsn, continuable3, breakNodesn, contNodesn, caseNodesn
-
             ---------------------------------------------------------------------------------------------------------------------------------------------------------
-            CFG, path, preds, continuable, breakNodes, contNodes, caseNodes |- swtch exp { case1, ..., casen } => CFGn, predsn u breaknodesn, false,  breaknodes, contNodesn, caseNodesn 
+            CFG, path, preds, continuable, breakNodes, contNodes, caseNodes |- swtch exp { case1, ..., casen } => CFGn, predsn u breakNodesn(p), false,  breakNodesn, contNodesn, caseNodesn 
             */
             for {
               st <- get
@@ -727,8 +815,6 @@ object CFG {
                 val rhs = HasVarcfgOps.getVarsFrom(exp)
                 val cfg0 = st.cfg
                 val preds0 = st.currPreds
-                val contNodes0 = st.contNodes
-                val breakNodes0 = st.breakNodes
                 val caseNodes0 = st.caseNodes
                 val childNodeIds = (0 to blocks.size).map(idx=>childOf(p,idx)).toList
                 val switchNode = SwitchNode(currNodeId, childNodeIds, lhs, rhs, preds0, childNodeIds)
@@ -744,7 +830,6 @@ object CFG {
                       currPreds = List(currNodeId),
                       fallThroughCases = Nil,
                       continuable = false,
-                      breakNodes = Nil,
                       caseNodes = Nil
                     )
                   )
@@ -764,8 +849,7 @@ object CFG {
                     val caseNodes1 = st1.caseNodes
                     for {
                       _ <- put(st1.copy(
-                          currPreds = preds1 ++ breakNodes1,
-                          breakNodes = breakNodes0,
+                          currPreds = preds1 ++ breakNodes1(currNodeId).toList,
                           caseNodes = caseNodes0,
                           continuable = false
                         )
@@ -780,9 +864,9 @@ object CFG {
 
           CFG1 = CFG update { pred: {succ = p} | pred <- preds } union { path: whilenode(childOF(path), lhs, rhs, preds, childOf(path))}
           CFG1, childOF(path), {path}, _, {}, {} |- stmt |- CFG2,  preds2, continuable2, contNodes2, breakNodes2
-          CFG3 = CFG3 update { nodeid: { succ = {path} | nodeid <- contNodes2++preds2 } } update { path : { preds = preds ++ contNodes2 ++ preds2 } }
+          CFG3 = CFG3 update { nodeid: { succ = {path} | nodeid <- contNodes2(path)++preds2 } } update { path : { preds = preds ++ contNodes2(path) ++ preds2 } }
           -------------------------------------------------------------------------------------------------------------------------------
-          CFG, path, preds, _, contNodes, breakNodes |- while (exp) { stmt } =>  CFG3, {path} ++ breakNodes2, false, breakNodes ,contNOdes
+          CFG, path, preds, _, contNodes, breakNodes |- while (exp) { stmt } =>  CFG3, {path} ++ breakNodes2(path), false, breakNodes2 ,contNodes2
              */
             for {
               st <- get
@@ -810,7 +894,6 @@ object CFG {
                       cfg = cfg1,
                       currPreds = List(currNodeId),
                       continuable = false,
-                      breakNodes = Nil
                     )
                   )
                   _ <- buildCFG(stmt, childOf(p,0))
@@ -819,15 +902,15 @@ object CFG {
                     val preds2 = st1.currPreds
                     val contNodes2 = st1.contNodes
                     val cfg2 = st1.cfg
-                    val cfg2p = (preds2++contNodes2).foldLeft(cfg2)((g, pred) => {
+                    val cfg2p = (preds2++contNodes2(currNodeId).toList).foldLeft(cfg2)((g, pred) => {
                       val n = g(pred)
                       g + (pred -> appSucc(n, currNodeId))
                     })
                     val breakNodes2 = st1.breakNodes
                     val currNode = cfg2p(currNodeId)
                     val cfg2pp = cfg2p + (currNodeId -> 
-                      appPreds(cfg2p(currNodeId), preds2 ++ contNodes2))
-                    val cfg3 = contNodes2.foldLeft(cfg2pp)(
+                      appPreds(cfg2p(currNodeId), preds2 ++ contNodes2(currNodeId).toList))
+                    val cfg3 = contNodes2(currNodeId).toList.foldLeft(cfg2pp)(
                       (g, l) => { // update the break and cont immediately
                         val n = g(l)
                         g + (l -> appSucc(n,currNodeId))
@@ -838,10 +921,8 @@ object CFG {
                       _ <- put(
                         st1.copy(
                           cfg = cfg3p,
-                          currPreds = List(currNodeId) ++ breakNodes2,
-                          continuable = false,
-                          contNodes = contNodes0,
-                          breakNodes = breakNodes0
+                          currPreds = List(currNodeId) ++ breakNodes2(currNodeId).toList,
+                          continuable = false
                         )
                       )
                     } yield ()
@@ -880,44 +961,35 @@ object CFG {
                 val cfg0 = st.cfg
                 val is_reassigned = preds0.foldLeft(false)((b, pred) => {
                   val n = cfg0(pred)
-                  (b || (n.lVars.exists(v => xs(v)))
+                  (b || (getLVars(n).exists(v => xs(v))))
                 })
                 if ((st.continuable) && (!is_reassigned)) {
                   val cfg1 = preds0.foldLeft(cfg0)((g, pred) => {
                     val n = g(pred)
-                    g + (pred -> n.copy(
-                      stmts = n.stmts ++ List(BlockStmt_(s)),
-                      lVars = n.lVars ++ xs.toList,
-                      rVars = n.rVars ++ ys
-                    ))
+                    g + (pred -> appRVars(appLVars(appStmt(n, p), xs.toList), ys))
                   })
                   for {
                     _ <- put(st.copy(cfg = cfg1, continuable = true))
                   } yield ()
                 } else {
-                  val currNodeId = internalIdent(s"${labPref}${max}")
-                  val max1 = max + 1
-                  val cfgNode = Node(
-                    List(BlockStmt_(s)),
+                  val currNodeId = p
+                  val cfgNode = AssignmentsNode(
+                    currNodeId,
+                    List(currNodeId),
+                    Nil,
                     xs.toList,
                     ys,
-                    Nil,
                     preds0,
-                    Nil,
-                    AssignmentNode
-                  )
+                    Nil)
                   val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
                     val n = g(pred)
-                    g + (pred -> n.copy(succs =
-                      (n.succs ++ List(currNodeId)).toSet.toList
-                    ))
+                    g + (pred -> appSucc(n, currNodeId))
                   })
                   val cfg1 = cfg1p + (currNodeId -> cfgNode)
                   for {
                     _ <- put(
                       st.copy(
                         cfg = cfg1,
-                        currId = max1,
                         currPreds = List(currNodeId),
                         continuable = true
                       )
@@ -933,93 +1005,11 @@ object CFG {
       ---------------------------------------------------------------------------------------
       CFG, max, preds, true |- lhs += rhs  => CFG', max', preds', continuable
            */
-          case ExpStmt(Assign(lhs, aop, rhs)) => {
-            val rlhs = lhsToRhs(lhs)
-            val op = aop match {
-              case MultA    => Mult
-              case DivA     => Div
-              case RemA     => Rem
-              case AddA     => Add
-              case SubA     => Sub
-              case LShiftA  => LShift
-              case RShiftA  => RShift
-              case RRShiftA => RRShift
-              case AndA     => And
-              case XorA     => Xor
-              case OrA      => Or
-              case EqualA   => Equal // this pattern should not be reached
-              // the last case "EQualA" should never happen
-            }
-            val stmt = ExpStmt(Assign(lhs, EqualA, BinOp(rlhs, op, rhs)))
-            for {
-              _ <- buildCFG(stmt)
-            } yield ()
-          }
-
-          case ExpStmt(PostIncrement(exp)) =>
-            ConvertableToLhscfgOps.getLhsFrom(exp) match {
-              case Nil =>
-                m.raiseError(
-                  s"BuildCFG Failed: Fail to extract lhs from exp ${exp}"
-                )
-              case List(lhs) => {
-                val stmt = ExpStmt(Assign(lhs, AddA, Lit(IntLit(1))))
-                for {
-                  _ <- buildCFG(ExpStmt(exp))
-                  _ <- buildCFG(stmt)
-                } yield ()
-              }
-              case _ =>
-                m.raiseError(s"BuildCFG Failed: too many lhs from exp ${exp}")
-            }
-          case ExpStmt(PostDecrement(exp)) =>
-            ConvertableToLhscfgOps.getLhsFrom(exp) match {
-              case Nil =>
-                m.raiseError(
-                  s"BuildCFG Failed: Fail to extract lhs from exp ${exp}"
-                )
-              case List(lhs) => {
-                val stmt = ExpStmt(Assign(lhs, SubA, Lit(IntLit(1))))
-                for {
-                  _ <- buildCFG(ExpStmt(exp))
-                  _ <- buildCFG(stmt)
-                } yield ()
-              }
-              case _ =>
-                m.raiseError(s"BuildCFG Failed: too many lhs from exp ${exp}")
-            }
-          case ExpStmt(PreIncrement(exp)) =>
-            ConvertableToLhscfgOps.getLhsFrom(exp) match {
-              case Nil =>
-                m.raiseError(
-                  s"BuildCFG Failed: Fail to extract lhs from exp ${exp}"
-                )
-              case List(lhs) => {
-                val stmt = ExpStmt(Assign(lhs, AddA, Lit(IntLit(1))))
-                for {
-                  _ <- buildCFG(ExpStmt(exp))
-                  _ <- buildCFG(stmt)
-                } yield ()
-              }
-              case _ =>
-                m.raiseError(s"BuildCFG Failed: too many lhs from exp ${exp}")
-            }
-          case ExpStmt(PreDecrement(exp)) =>
-            ConvertableToLhscfgOps.getLhsFrom(exp) match {
-              case Nil =>
-                m.raiseError(
-                  s"BuildCFG Failed: Fail to extract lhs from exp ${exp}"
-                )
-              case List(lhs) => {
-                val stmt = ExpStmt(Assign(lhs, SubA, Lit(IntLit(1))))
-                for {
-                  _ <- buildCFG(ExpStmt(exp))
-                  _ <- buildCFG(stmt)
-                } yield ()
-              }
-              case _ =>
-                m.raiseError(s"BuildCFG Failed: too many lhs from exp ${exp}")
-            }
+          case ExpStmt(Assign(lhs, aop, rhs)) => m.raiseError("Accumulative assignment is encountered during CFG construction, which should have been desugared!")
+          case ExpStmt(PostIncrement(exp)) => m.raiseError("PostIncrement is encountered during CFG construction, which should have been desugared!") 
+          case ExpStmt(PostDecrement(exp)) => m.raiseError("PostDecrement is encountered during CFG construction, which should have been desugared!") 
+          case ExpStmt(PreIncrement(exp)) => m.raiseError("PreIncrement is encountered during CFG construction, which should have been desugared!") 
+          case ExpStmt(PreDecrement(exp)) => m.raiseError("PreDecrement is encountered during CFG construction, which should have been desugared!") 
           case ExpStmt(e) =>
             for {
               st <- get
@@ -1032,28 +1022,20 @@ object CFG {
                 if (st.continuable) {
                   val cfg1 = preds0.foldLeft(cfg0)((g, pred) => {
                     val n = g(pred)
-                    g + (pred -> n.copy(
-                      stmts = n.stmts ++ List(s),
-                      lVars = n.lVars ++ lhs,
-                      rVars = n.rVars ++ rhs
-                    ))
+                    g + (pred -> appRVars(appLVars(appStmt(n, p),lhs),rhs))
                   })
                   put(st.copy(cfg = cfg1, continuable = true))
                 } else {
-                  val max = st.currId
-                  val currNodeId = internalIdent(s"${labPref}${max}")
-                  val max1 = max + 1
-                  val cfgNode =
-                    Node(List(s), Nil, lhs, rhs, preds0, Nil, AssignmentNode)
+                  val currNodeId = p
+                  val cfgNode = AssignmentsNode(currNodeId, List(p), Nil, lhs, rhs, preds0, Nil)
                   val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
                     val n = g(pred)
-                    g + (pred -> n.copy(succs = n.succs ++ List(currNodeId)))
+                    g + (pred -> appSucc(n, currNodeId))
                   })
                   val cfg1 = cfg1p + (currNodeId -> cfgNode)
                   put(
                     st.copy(
                       cfg = cfg1,
-                      currId = max1,
                       currPreds = List(currNodeId),
                       continuable = true
                     )
@@ -1081,32 +1063,25 @@ object CFG {
                 val es = List(exp) ++ msg.toList
                 val lhs = es.flatMap(HasVarcfgOps.getLVarsFrom(_))
                 val rhs = es.flatMap(HasVarcfgOps.getVarsFrom(_))
-                val max = st.currId
-                val currNodeId = internalIdent(s"${labPref}${max}")
-                val max1 = max + 1
+                val currNodeId = p
                 val preds0 = st.currPreds
                 val cfg0 = st.cfg
-                val cfgNode = Node(
-                  List(BlockStmt_(s)),
+                val cfgNode = AssertNode(
+                  p, 
                   lhs,
                   rhs,
-                  Nil,
                   preds0,
-                  Nil,
-                  AssertNode
+                  Nil
                 )
                 val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
                   val n = g(pred)
-                  g + (pred -> n.copy(succs =
-                    (n.succs ++ List(currNodeId)).toSet.toList
-                  ))
+                  g + (pred -> appSucc(n,currNodeId))
                 })
                 val cfg1 = cfg1p + (currNodeId -> cfgNode)
                 for {
                   _ <- put(
                     st.copy(
                       cfg = cfg1,
-                      currId = max1,
                       currPreds = List(currNodeId),
                       continuable = false
                     )
@@ -1114,65 +1089,37 @@ object CFG {
                 } yield ()
               }
             } yield ()
-
+          
+          case Break(None) => m.raiseError("Break without label is encountered during CFG construction, which should have been eliminated during the labeling step.")
           case Break(Some(id)) =>
-            m.raiseError(
-              "break with label is not supported."
-            ) // this seems to require callCC?
-          case Break(None) =>
             for {
               st <- get
-              _ <-
-                if (st.continuable) {
-                  /*
-                CFG1 = CFG update { pred: {stmts = stmts ++ [break] } | pred <- preds }
-                -----------------------------------------------------------------------------------------------------------------------------
-                CFG, max, preds, true, contNodes, breakNodes |- break =>  CFG1, max, {}, false, contNodes, breakNode union preds
-                   */
-                  val cfg0 = st.cfg
-                  val preds0 = st.currPreds
-                  val s = BlockStmt_(Break(None))
-                  val cfg1 = preds0.foldLeft(cfg0)((g, pred) => {
-                    val n = g(pred)
-                    g + (pred -> n.copy(stmts = n.stmts ++ List(s)))
-                  })
-                  for {
-                    _ <- put(
-                      st.copy(
-                        cfg = cfg1,
-                        currPreds = Nil,
-                        continuable = false,
-                        breakNodes = st.breakNodes ++ preds0
-                      )
-                    )
-                  } yield ()
-                } else {
-                  val max = st.currId
-                  val currNodeId = internalIdent(s"${labPref}${max}")
-                  val max1 = max + 1
-                  val cfg0 = st.cfg
-                  val preds0 = st.currPreds
-                  val s = BlockStmt_(Break(None))
-                  val cfgNode =
-                    Node(List(s), Nil, Nil, Nil, preds0, Nil, BreakNode)
-                  val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
-                    val n = g(pred)
-                    g + (pred -> n.copy(succs =
-                      (n.succs ++ List(currNodeId)).toSet.toList
-                    ))
-                  })
-                  val cfg1 = cfg1p + (currNodeId -> cfgNode)
-                  for {
-                    _ <- put(
-                      st.copy(
-                        cfg = cfg1,
-                        currId = max1,
-                        currPreds = Nil,
-                        continuable = false,
-                        breakNodes = st.breakNodes ++ List(currNodeId)
-                      )
-                    )
-                  } yield ()
+              _ <-{
+                  val labelMap = st.labelMap
+                  labelMap.get(id) match {
+                    case None => m.raiseError(s"A label (${id}) is associated with now AST Path location during CFG construction. ")
+                    case Some(targetNodeId) => {
+                        val currNodeId = p
+                        val cfg0 = st.cfg
+                        val preds0 = st.currPreds
+                        val cfgNode = BreakNode(p,  preds0, Nil)
+                        val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
+                          val n = g(pred)
+                          g + (pred -> appSucc(n, p))
+                        })
+                        val cfg1 = cfg1p + (currNodeId -> cfgNode)
+                        for {
+                          _ <- put(
+                            st.copy(
+                              cfg = cfg1,
+                              currPreds = Nil,
+                              continuable = false,
+                              breakNodes = addpend(targetNodeId, currNodeId, st.breakNodes)
+                            )
+                          )
+                        } yield ()
+                    }
+                  }
                 }
             } yield ()
 
@@ -1181,72 +1128,31 @@ object CFG {
               st <- get
               _ <- st.labelMap.get(id) match {
                 case None =>
-                  m.raiseError(
-                    s"BuildCFG failed, continue with a label ${id} that is not in the label map."
-                  )
-                case Some(lp) if (st.continuable) => {
-                  /*
-            l' = labelMap(l)
-            CFG1 = CFG update { pred: {stmts = stmts ++ [continue l], succs = succs ++ [l'] } | pred <- preds }
-            -----------------------------------------------------------------------------------------------------------------------------
-            CFG, max, preds, true, contNode, breaknodes, labllMap |- continue l => CFG1, max, {}, false, contNode union preds, breakNodes, labelMap
-                   */
-                  val cfg0 = st.cfg
-                  val s = BlockStmt_(Continue(Some(id)))
-                  val preds0 = st.currPreds
-                  val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
-                    val n = g(pred)
-                    g + (pred -> n.copy(
-                      stmts = n.stmts ++ List(s),
-                      succs = n.succs ++ List(lp)
-                    ))
-                  })
-                  val cfg1 = cfg1p.get(lp) match {
-                    case None => cfg1p
-                    case Some(n) =>
-                      cfg1p + (lp -> n.copy(preds =
-                        (n.preds ++ preds0).toSet.toList
-                      ))
-                  }
-                  for {
-                    _ <- put(
-                      st.copy(
-                        cfg = cfg1,
-                        currPreds = Nil,
-                        continuable = false,
-                        contNodes = st.contNodes ++ preds0
-                      )
-                    )
-                  } yield ()
-                }
-                case Some(lp) => {
+                  m.raiseError(s"A label (${id}) is associated with now AST Path location during CFG construction. ")
+                case Some(targetNodeId) => {
                   /*
             l' = labelMap(l)
             max1 = max + 1
-            CFG1 = CFG update { pred: {uccs = succs ++ [max] } | pred <- preds } union { max : { stmts = [continue l], succs = [l'] }}
+            CFG1 = CFG update { pred: {succs = succs ++ [path] } | pred <- preds } union { path : { preds= preds, succs = [l'] }}
+            contNodes1 = contNodes + (l' -> contNodes(l') ++ [path])
             -----------------------------------------------------------------------------------------------------------------------------
-            CFG, max, preds, false, contNode, breaknodes, labllMap |- continue l => CFG1, max1, {}, false, contNode uinion {max}, breakNodes, labelMap
+            CFG, path, preds, false, contNode, breaknodes, labelMap |- continue l => CFG1, {}, false, contNodes1, breakNodes, labelMap
                    */
                   val cfg0 = st.cfg
-                  val s = BlockStmt_(Continue(Some(id)))
-                  val max = st.currId
-                  val max1 = max + 1
                   val preds0 = st.currPreds
-                  val currNodeId = internalIdent(s"${labPref}${max}")
-                  val cfgNode =
-                    Node(List(s), Nil, Nil, Nil, preds0, List(lp), ContNode)
+                  val currNodeId = p
+                  val cfgNode = ContNode(currNodeId, preds0, List(targetNodeId)) // seems redundant, the succs is also updated in the while loop case.
                   val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
                     val n = g(pred)
-                    g + (pred -> n.copy(succs = n.succs ++ List(currNodeId)))
+                    g + (pred -> appSucc(n, currNodeId))
                   })
                   val cfg1 = cfg1p + (currNodeId -> cfgNode)
                   for {
                     _ <- put(
                       st.copy(
                         cfg = cfg1,
-                        currId = max1,
                         continuable = false,
-                        contNodes = st.contNodes ++ List(currNodeId)
+                        contNodes = addpend(targetNodeId, currNodeId, st.contNodes)
                       )
                     )
                   } yield ()
@@ -1254,127 +1160,31 @@ object CFG {
               }
             } yield ()
 
-          case Continue(None) =>
-            for {
-              st <- get
-              _ <-
-                if (st.continuable) {
-                  /*
-                CFG1 = CFG update { pred: {stmts = stmts ++ [continue] } | pred <- preds }
-                -----------------------------------------------------------------------------------------------------------------------------
-                CFG, max, preds, true, contNode, breakNodes |- continue =>  CFG1, max, {}, false, contNode union preds, breakNodes
-                   */
-                  val cfg0 = st.cfg
-                  val preds0 = st.currPreds
-                  val s = BlockStmt_(Continue(None))
-                  val cfg1 = preds0.foldLeft(cfg0)((g, pred) => {
-                    val n = g(pred)
-                    g + (pred -> n.copy(stmts = n.stmts ++ List(s)))
-                  })
-                  for {
-                    _ <- put(
-                      st.copy(
-                        cfg = cfg1,
-                        currPreds = Nil,
-                        continuable = false,
-                        contNodes = st.contNodes ++ preds0
-                      )
-                    )
-                  } yield ()
-                } else {
-                  /*
-                max1 = max + 1
-                CFG1 = CFG update { pred: {succ = max} | pred <- preds } union { max : { stmts = [ continue ], preds = preds, succ = [] } }
-                -----------------------------------------------------------------------------------------------------------------------------
-                CFG, max, preds, false, contNode, breakNodes |- continue =>  CFG1, max1, {max}, false, contNode union { max }, breakNodes
-
-                check the preds {max} should be {}
-                   */
-                  val max = st.currId
-                  val currNodeId = internalIdent(s"${labPref}${max}")
-                  val max1 = max + 1
-                  val cfg0 = st.cfg
-                  val preds0 = st.currPreds
-                  val s = BlockStmt_(Continue(None))
-                  val cfgNode =
-                    Node(List(s), Nil, Nil, Nil, preds0, Nil, ContNode)
-                  val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
-                    val n = g(pred)
-                    g + (pred -> n.copy(succs =
-                      (n.succs ++ List(currNodeId)).toSet.toList
-                    ))
-                  })
-                  val cfg1 = cfg1p + (currNodeId -> cfgNode)
-                  for {
-                    _ <- put(
-                      st.copy(
-                        cfg = cfg1,
-                        currId = max1,
-                        currPreds = Nil,
-                        continuable = false,
-                        contNodes = st.contNodes ++ List(currNodeId)
-                      )
-                    )
-                  } yield ()
-                }
-            } yield ()
-
+          case Continue(None) => m.raiseError("Continue without label is encountered during CFG construction, which should have been eliminated during the labeling step.")
           /*
-      CFG1 = CFG update { pred : {stmts = stmts ++ [ return exp ] } }
-      --------------------------------------------------------
-      CFG, max, preds, true |- return exp  => CFG1, max, [] , false
-
-      max1 = max + 1
-      CFG1 = CFG update { pred : {succ = max} |  pred <- preds } union { max : {stmts = return exp } }
-      --------------------------------------------------------
-      CFG, max, preds, false |- return exp => CFG1, max, [], false
+          CFG1 = CFG update { pred : {succ = path} |  pred <- preds } union { path : {preds =preds } }
+          --------------------------------------------------------
+          CFG, path, preds, false |- return exp => CFG1, [], false
            */
           case Return(o_exp) =>
             for {
               st <- get
-              _ <-
-                if (st.continuable) {
-                  val cfg0 = st.cfg
+              _ <- {
+                  val currNodeId = p
                   val lhs = o_exp.toList.flatMap(HasVarcfgOps.getLVarsFrom(_))
                   val rhs = o_exp.toList.flatMap(HasVarcfgOps.getVarsFrom(_))
-                  val preds0 = st.currPreds
-                  val s = BlockStmt_(Return(o_exp))
-                  val cfg1 = preds0.foldLeft(cfg0)((g, pred) => {
-                    val n = g(pred)
-                    g + (pred -> n.copy(
-                      stmts = n.stmts ++ List(s),
-                      lVars = n.lVars ++ lhs,
-                      rVars = n.rVars ++ rhs
-                    ))
-                  })
-                  for {
-                    _ <- put(
-                      st.copy(cfg = cfg1, currPreds = Nil, continuable = false)
-                    )
-                  } yield ()
-                } else {
-                  val max = st.currId
-                  val currNodeId = internalIdent(s"${labPref}${max}")
-                  val lhs = o_exp.toList.flatMap(HasVarcfgOps.getLVarsFrom(_))
-                  val rhs = o_exp.toList.flatMap(HasVarcfgOps.getVarsFrom(_))
-                  val max1 = max + 1
                   val cfg0 = st.cfg
                   val preds0 = st.currPreds
-                  val s = BlockStmt_(Return(o_exp))
-                  val cfgNode =
-                    Node(List(s), lhs, rhs, Nil, preds0, Nil, ReturnNode)
+                  val cfgNode = ReturnNode(currNodeId, lhs, rhs, preds0)
                   val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
                     val n = g(pred)
-                    g + (pred -> n.copy(succs =
-                      (n.succs ++ List(currNodeId).toSet.toList)
-                    ))
+                    g + (pred -> appSucc(n, currNodeId))
                   })
                   val cfg1 = cfg1p + (currNodeId -> cfgNode)
                   for {
                     _ <- put(
                       st.copy(
                         cfg = cfg1,
-                        currId = max1,
                         currPreds = Nil,
                         continuable = false
                       )
@@ -1383,33 +1193,27 @@ object CFG {
                 }
             } yield ()
           case Synchronized(exp, blk) =>
-            m.raiseError("Synronized statement is not suppored.")
+            m.raiseError("Synronized statement is not suppored by CFG construction.")
           case Throw(exp) =>
             for {
               /*
-      max1 = max + 1
-      CFG1 = CFG update { pred: {succ = max}} pred <- preds } union { max : {throw exp} }
+      
+      CFG1 = CFG update { pred: {succ = max}} pred <- preds } union { max : {preds = preds} }
       -----------------------------------------------------------------------------------------------
-      CFG, max, preds, continuable breakNodes, contNodes, caseNodes, throwNodes |- throw exp => CFG1, max1, [], false
+      CFG, path, preds, continuable, breakNodes, contNodes, caseNodes, throwNodes |- throw exp => CFG1, max1, [], false
 
                */
               st <- get
               _ <- {
-                val max = st.currId
-                val max1 = max + 1
                 val cfg0 = st.cfg
-                val currNodeId = internalIdent(s"${labPref}${max}")
+                val currNodeId = p
                 val preds0 = st.currPreds
-                val s = BlockStmt_(Throw(exp))
                 val lhs = HasVarcfgOps.getLVarsFrom(exp)
                 val rhs = HasVarcfgOps.getVarsFrom(exp)
-                val cfgNode =
-                  Node(List(s), lhs, rhs, Nil, preds0, Nil, ThrowNode)
+                val cfgNode = ThrowNode(currNodeId, lhs, rhs, preds0, Nil)
                 val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
                   val n = g(pred)
-                  g + (pred -> n.copy(succs =
-                    (n.succs ++ List(currNodeId).toSet.toList)
-                  ))
+                  g + (pred -> appSucc(n, currNodeId))
                 })
                 val cfg1 = cfg1p + (currNodeId -> cfgNode)
                 for {
@@ -1417,7 +1221,6 @@ object CFG {
                     st.copy(
                       cfg = cfg1,
                       continuable = false,
-                      currId = max1,
                       currPreds = Nil,
                       throwNodes = st.throwNodes ++ List(currNodeId)
                     )
@@ -1439,7 +1242,7 @@ object CFG {
       CFG2, max2, preds1++preds2, false, breakNodes2, contNodes2, caseNodes2, throwNodes2 |-
         blk3 => CFG3, max3, preds3, continuable3, breakNodes3, contNode3, caseNodes3, throwNodes3
       ----------------------------------------------------------------------------------------------------------------
-      CFG, max, preds, continuable, breakNodes, contNodes, caseNodes, throwNodes, catchNodes |- try {blk1} catch (x) {blk2} finally {blk3}
+      CFG, path, preds, continuable, breakNodes, contNodes, caseNodes, throwNodes, catchNodes |- try {blk1} catch (x) {blk2} finally {blk3}
        => CFG3, max3, preds3, false, breakNodes3, contNode3, caseNodes3, throwNodes ++ throwNodes3, catchNodes
        // local catch Nodes should not escape
 

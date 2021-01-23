@@ -5,6 +5,58 @@ import com.github.luzhuomi.scalangj.Syntax._
 import com.github.luzhuomi.scalangj.Syntax
 import com.github.luzhuomi.obsidian.ASTUtils._
 
+
+/**
+  * Issues
+  * 
+  *  #1. Desugaring do { stmt } while (exp) to
+  *      { stmt; while (exp) {stmt;}; }
+  *      causes label out of scope. e.g.
+  * 
+  *  int i = 1;
+  *  L1: do { 
+  *     if (i==0) { continue L1; }
+  *     else { i = i -1; }
+  *  }  while ( i > 0 ) 
+  *  
+  *  becomes
+  * 
+  * if (i==0) { continue L1; }
+  *     else { i = i -1; }
+  * L1: while (i > 0) {
+  *     if (i==0) { continue L1; }
+  *         else { i = i -1; }
+  * }
+  * 
+  * the desugared version is invalid Java (syntatically correct, however the label is out of scoped)
+  * 
+  * it is ok, we should able to translate to CPS
+  * 
+  * what about there is no label?
+  * 
+  *  do { 
+  *     if (i==0) { continue; }
+  *     else { i = i -1; }
+  *  }  while ( i > 0 ) 
+  * 
+  *  is desugared to 
+  * 
+  * if (i==0) { continue; } // this is dangling...
+  *     else { i = i -1; }
+  * while (i > 0) {
+  *     if (i==0) { continue }
+  *         else { i = i -1; }
+  * }
+  * 
+  * maybe we should aggresively add labels to loop?
+  * this have to be done before desugaring
+  * 
+  * alternatively, we add do ... loop to the CPS and SSA forms. 
+  * 
+  * let's try the first approach first (i.e. adding the label to loop)
+  */
+
+
 object Desugar {
   trait DSG[A] {
     def desugar(a: A): A
