@@ -203,7 +203,7 @@ object CFG {
     *
     * @param id
     * @param preds
-    * @param cuccs
+    * @param succs
     */
   case class ContNode(
     id: ASTPath,
@@ -211,9 +211,39 @@ object CFG {
     succs: List[NodeId]
   ) extends Node
 
+  /**
+    * a CFG node containing a default statement
+    *
+    * @param id
+    * @param stmts
+    * @param preds
+    * @param succs
+    */
+  case class DefaultNode(
+    id: ASTPath,
+    stmts: List[ASTPath],
+    preds: List[NodeId],
+    succs: List[NodeId]
+  ) extends Node
+
+
+  /**
+    * A CFG Node containing a case statement
+    *
+    * @param id
+    * @param stmts
+    * @param preds
+    * @param succs
+    */
+
+  case class CaseNode(
+    id: ASTPath,
+    stmts: List[ASTPath],
+    preds: List[NodeId],
+    succs: List[NodeId]
+  ) extends Node
 
  
-
   // update functions for nodes
 
   def setSuccs(n:Node, s:List[NodeId]):Node = n match {
@@ -227,6 +257,8 @@ object CFG {
     case AssertNode(id, lvars, rvars, preds, succs) => AssertNode(id, lvars, rvars,  preds, s) 
     case BreakNode(id, preds, succs) => BreakNode(id, preds, s)
     case ContNode(id, preds, cuccs) => ContNode(id, preds, s)
+    case DefaultNode(id, stmts, preds, succs) => DefaultNode(id, stmts, preds, s)
+    case CaseNode(id, stmts, preds, succs) => CaseNode(id, stmts, preds, s) 
   }
 
   def setPreds(n:Node, p:List[NodeId]):Node = n match {
@@ -240,6 +272,8 @@ object CFG {
     case AssertNode(id, lvars, rvars, preds, succs) => AssertNode(id, lvars, rvars, p, succs)  
     case BreakNode(id, preds, succs) => BreakNode(id, p, succs)
     case ContNode(id, preds, succs) => ContNode(id, p, succs)
+    case DefaultNode(id, stmts, preds, succs) => DefaultNode(id, stmts, p, succs)
+    case CaseNode(id, stmts, preds, succs) => CaseNode(id, stmts, p, succs) 
   }
 
   def setLVars(n:Node, lv:List[Ident]):Node = n match {
@@ -253,6 +287,9 @@ object CFG {
     case AssertNode(id, lvars, rvars,  preds, succs) => AssertNode(id, lv, rvars,  preds, succs)
     case BreakNode(id, preds, succs) => n
     case ContNode(id, preds, cuccs) => n
+    case DefaultNode(id, stmts, preds, succs) => n
+    case CaseNode(id, stmts, preds, succs) => n
+
   }
 
   def setRVars(n:Node, rv:List[Ident]):Node = n match {
@@ -266,6 +303,8 @@ object CFG {
     case AssertNode(id, lvars, rvars,  preds, succs) => AssertNode(id, lvars, rv,  preds, succs) 
     case BreakNode(id, preds, succs) => n
     case ContNode(id, preds, cuccs) => n  
+    case DefaultNode(id, stmts, preds, succs) => n
+    case CaseNode(id, stmts, preds, succs) => n
   }
 
   def getSuccs(n:Node):List[NodeId] = n match {
@@ -279,6 +318,8 @@ object CFG {
     case AssertNode(id, lVars, rVars, preds, succs) => succs
     case BreakNode(id, preds, succs) => succs
     case ContNode(id, preds, succs) => succs
+    case DefaultNode(id, stmts, preds, succs) => succs
+    case CaseNode(id, stmts, preds, succs) => succs
   }
 
   def getPreds(n:Node):List[NodeId] = n match {
@@ -292,6 +333,8 @@ object CFG {
     case AssertNode(id, lVars, rVars, preds, succs) => preds
     case BreakNode(id, preds, succs) => preds
     case ContNode(id, preds, cuccs) => preds
+    case DefaultNode(id, stmts, preds, succs) => preds
+    case CaseNode(id, stmts, preds, succs) => preds
   }
 
   def getLVars(n:Node):List[Ident] = n match {
@@ -305,6 +348,8 @@ object CFG {
     case AssertNode(id, lVars, rVars, preds, succs) => lVars
     case BreakNode(id, preds, succs) => Nil
     case ContNode(id, preds, cuccs) => Nil
+    case DefaultNode(id, stmts, preds, succs) => Nil
+    case CaseNode(id, stmts, preds, succs) => Nil
   }
 
   def getRVars(n:Node):List[Ident] = n match {
@@ -318,6 +363,8 @@ object CFG {
     case AssertNode(id, lVars, rVars, preds, succs) => rVars
     case BreakNode(id, preds, succs) => Nil
     case ContNode(id, preds, cuccs) => Nil
+    case DefaultNode(id, stmts, preds, succs) => Nil
+    case CaseNode(id, stmts, preds, succs) => Nil
   }
 
   def appSucc(n:Node, succ:NodeId) = setSuccs(n, (getSuccs(n)++List(succ)).toSet.toList)
@@ -1368,11 +1415,13 @@ object CFG {
           a: SwitchBlock, p:ASTPath
       )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
         a match {
-          case SwitchBlock(Default, blks_stmts) =>
-            for {
-              /*
-          CFG, childOf(path,0), preds, continuable, breakNodes, contNodes, caseNodes |- 
-            stmt1 => CFG1, preds1, continuable1, breakNodes1, contNodes1, caseNodes1
+          case SwitchBlock(Default, blk_stmts) => {
+          /*
+          it seems that we can get rid of the caseNodes
+          CFG0 = CFG update (path -> DefaultNode(path, [childOf(path,0), ..., childOf(path, n-1), preds, [childOf(path,0)]]))
+                    union [ pred -> { succs = succs + [path]}]
+          CFG0, childOf(path,0), preds, continuable, breakNodes, contNodes, caseNodes |- 
+            stmt1 => CFG1, preds1, continuable1, breakNodes1, contNodes1, caseNodes1 
 
           CFG1, childOf(path,1), preds1, continable1, breakNodes1, contNodes1, caseNodes1 |- 
             stmt2 => CFG2, preds2, continuable2, breakNodes2, contNodes2, caseNode2
@@ -1380,50 +1429,58 @@ object CFG {
           ------------------------------------------------------------------------------------------------------------------------------------------------------------------
           CFG, path,preds, continuable, breakNodes, contNodes, caseNodes |-
             default: stmt1; ... ; stmtn; => CFG2, max2, preds2 continuable2, breakNodes, contNodes2, caseNodes2 union (max, default)
-               */
-              st <- get
-              _ <- {
-                for {
-                  _ <- put(st.copy(currId = max + 1, fallThroughCases = Nil))
-                  _ <- blks_stmts.traverse_(cfgOps.buildCFG(_))
-                  st1 <- get
-                  _ <- put(
-                    st1.copy(caseNodes =
-                      st1.caseNodes ++ List(DefaultCase(wrapNodeId, rhsNodeId))
-                    )
-                  )
-                } yield ()
-              }
-            } yield ()
-          case SwitchBlock(SwitchCase(e), blk_stmts) =>
+          */
+            val children_path = (0 to blk_stmts.size).map(idx => childOf(p, idx)).toList
             for {
-              /*
-          CFG, max, preds, continuable, breakNodes, contNodes, caseNodes |-
-            stmt => CFG2, max2, preds2, continuable2, breakNodes2, contNodes2, caseNodes2
-          ------------------------------------------------------------------------------------------------------------------------------------------------------------------
-          CFG,max,preds, continuable, breakNodes, contNodes, caseNodes |-
-            case e: stmt => CFG2, max2, preds2 continuable2, breakNodes, contNodes2, caseNodes2 union (max, e)
-               */
               st <- get
               _ <- {
-                val max = st.currId
-                val fallThrough = st.fallThroughCases
-                val wrapNodeId = internalIdent(s"${labPref}${max}")
-                val rhsNodeId = internalIdent(s"${labPref}${max + 1}")
-                for {
-                  _ <- put(st.copy(currId = max + 1, fallThroughCases = Nil))
-                  _ <- blk_stmts.traverse_(cfgOps.buildCFG(_))
-                  st1 <- get
-                  _ <- put(
-                    st1.copy(caseNodes =
-                      st1.caseNodes ++ List(
-                        ExpCase(e, fallThrough, wrapNodeId, rhsNodeId)
-                      )
-                    )
-                  )
+                val cfgNode = DefaultNode(p, children_path, st.currPreds, Nil) // will update later
+                for { 
+                  _ <- put(st.copy(
+                    cfg = st.cfg + (p -> cfgNode),
+                    currPreds = List(p),
+                    continuable = false
+                  ))
+                  _ <- blk_stmts.zip(children_path).traverse_( bp => bp match { 
+                      case (blk,path) => cfgOps.buildCFG(blk, path)
+                    })
                 } yield ()
-              }
+              } 
             } yield ()
+          }
+          case SwitchBlock(SwitchCase(e), blk_stmts) => {
+          /*
+          it seems that we can get rid of the caseNodes
+          CFG0 = CFG update (path -> CaseNode(path, [childOf(path,0), ..., childOf(path, n-1), preds, [childOf(path,0)]]))
+                    union [ pred -> { succs = succs + [path]}]
+          CFG0, childOf(path,0), preds, continuable, breakNodes, contNodes, caseNodes |- 
+            stmt1 => CFG1, preds1, continuable1, breakNodes1, contNodes1, caseNodes1 
+
+          CFG1, childOf(path,1), preds1, continable1, breakNodes1, contNodes1, caseNodes1 |- 
+            stmt2 => CFG2, preds2, continuable2, breakNodes2, contNodes2, caseNode2
+          ...
+          ------------------------------------------------------------------------------------------------------------------------------------------------------------------
+          CFG, path,preds, continuable, breakNodes, contNodes, caseNodes |-
+            case lit: stmt1; ... ; stmtn; => CFG2, max2, preds2 continuable2, breakNodes, contNodes2, caseNodes2 union (max, default)
+          */              
+            val children_path = (0 to blk_stmts.size).map(idx => childOf(p, idx)).toList
+            for {
+              st <- get
+              _ <- {
+                val cfgNode = CaseNode(p, children_path, st.currPreds, Nil) // will update later
+                for { 
+                  _ <- put(st.copy(
+                    cfg = st.cfg + (p -> cfgNode),
+                    currPreds = List(p),
+                    continuable = false
+                  ))
+                  _ <- blk_stmts.zip(children_path).traverse_( bp => bp match { 
+                      case (blk,path) => cfgOps.buildCFG(blk, path)
+                    })
+                } yield ()
+              } 
+            } yield ()
+          }
         }
     }
 
