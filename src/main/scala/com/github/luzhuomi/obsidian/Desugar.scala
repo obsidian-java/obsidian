@@ -203,10 +203,10 @@ object Desugar {
             *  for (t x: exp) { stmt } ===> for (int i = 0; i < exp.length; i++) { t x = exp3[i]; stmt }
             */
           case EnhancedFor(modifiers, ty @ PrimType_(_), id, exp, stmt) => {
+            val i = Ident(s"idx_loop${id.toString()}")
             val var_decls = List(
               VarDecl(VarId(i), Some(InitExp(Lit(IntLit(0)))))
             )
-            val i = Ident(s"idx_loop${id.toString()}")
             val init = Some(ForLocalVars(Nil, PrimType_(IntT), var_decls))
             val exp2 = Some(
               BinOp(
@@ -357,6 +357,8 @@ object Desugar {
           case Switch(exp, blocks) => Switch(dsgOps.desugar(exp), blocks.map(dsgOps.desugar(_)))
           case Synchronized(exp, blk) => Synchronized(dsgOps.desugar(exp), dsgOps.desugar(blk))
           case Throw(exp) => Throw(dsgOps.desugar(exp))
+          // TODO: collapse catches into 1 catch with if else and instance of
+          //       add an empty finally block if it is None
           case Try(try_blk, catches, finally_blk) => Try(dsgOps.desugar(try_blk), catches.map(c => dsgOps.desugar(c)), finally_blk.map(b => dsgOps.desugar(b)))
           case While(exp, stmt) => While(dsgOps.desugar(exp), dsgOps.desugar(stmt))
         }
@@ -365,7 +367,7 @@ object Desugar {
 
   implicit def expDSGInstance: DSG[Exp] = {
     new DSG[Exp] {
-      override def desguar(a: Exp): Exp = a match {
+      override def desugar(a: Exp): Exp = a match {
         case ArrayAccess(idx) => ArrayAccess(idx)
         case Cast(ty, exp) => Cast(ty, dsgOps.desugar(exp))
         case ArrayCreate(ty, exps, num_dims) => ArrayCreate(ty, exps.map(dsgOps.desugar(_)), num_dims)

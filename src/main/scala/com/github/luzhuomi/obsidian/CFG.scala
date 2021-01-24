@@ -1484,10 +1484,12 @@ object CFG {
         }
     }
 
+  /* not needed, for loop is desugared into while
+
   implicit def varDeclCFGInstance: CFGClass[ForLocalVars] =
     new CFGClass[ForLocalVars] {
       override def buildCFG(
-          a: ForLocalVars
+          a: ForLocalVars, p: ASTPath
       )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
         a match {
 
@@ -1499,13 +1501,12 @@ object CFG {
           max1 = max + 1
           CFG1 = CFG update { pred : {succ = max} |  pred <- preds } union { max : {ty x = exp[] } }
           --------------------------------------------------------
-          CFG, max, preds, false |- ty x = exp[] => CFG1, max1, [], false
+          CFG, path, preds, false |- ty x = exp[] => CFG1, [], false
                */
 
               st <- get
               _ <- {
-                val max = st.currId
-                val currNodeId = internalIdent(s"${labPref}${max}")
+                val currNodeId = p
                 val s = LocalVars(modifiers, ty, var_decls)
                 val lhs = var_decls.flatMap(HasVarcfgOps.getLVarsFrom(_))
                 val rhs = var_decls.flatMap(HasVarcfgOps.getVarsFrom(_))
@@ -1533,8 +1534,11 @@ object CFG {
             } yield ()
         }
     }
-
+    */
   def internalIdent(s: String): Ident = Ident(s)
+
+
+
 
   /*
   def updatePreds(cfg:CFG):CFG = cfg.toList.fodlLeft(cfg)( (g,p) => p match {
@@ -1560,6 +1564,8 @@ object CFG {
   note that 4 is phantom as succs of the failure etst of (1) at 0, which is not reachable,
   but we need that empty node (and lambda function to be present) for the target code to be valid
    */
+  
+  /*
   def insertPhantoms(cfg: CFG): CFG = {
     // succ lbl and source lbl
     val allSuccsWithPreds: List[(Ident, Ident)] = cfg.toList.flatMap({
@@ -1589,14 +1595,16 @@ object CFG {
         p match { case (lbl, node) => cfg + (lbl -> node) }
       )
   }
-
+  */
   def formalArgsAsDecls(idents: List[Ident], cfg: CFG): CFG = {
-    val entryLabel = internalIdent(s"${labPref}0")
+    val entryLabel = List(0)
     cfg.get(entryLabel) match {
       case None    => cfg
-      case Some(n) => cfg + (entryLabel -> n.copy(lVars = idents ++ n.lVars))
+      case Some(n) => cfg + (entryLabel -> appLVars(n, idents))
     }
   }
+
+  
 
   trait HasVar[A] {
     def getVarsFrom(a: A): List[Ident]
