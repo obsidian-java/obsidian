@@ -149,7 +149,8 @@ object ASTPath {
                     case Try(try_blk, catches, finally_blk) if (i-1) < catches.size => queryOps.query(catches(i-1), q)
                     case Try(try_blk, catches, Some(finally_blk)) if i == catches.size + 1 => queryOps.query(finally_blk, q)
                     case Try(try_blk, catches, finally_blk) => None
-                    case Labeled(id, stmt) if i == 0 => queryOps.query(stmt,q)
+                    case Labeled(id, stmt) => queryOps.query(stmt,p) // label have the same path as its containing statement, this is for the ease of CFG construction.
+                    // i.e. l1: switch (e) { ... }, we can build a mapping from l1 to the path where the switch statement is located.
                     case _ => None
                 }
             }
@@ -183,5 +184,6 @@ object ASTPath {
     def thenOf(p:ASTPath): ASTPath = p ++ List(0)
     def elseOf(p:ASTPath): ASTPath = p ++ List(1) 
     def tryOf(p:ASTPath): ASTPath = p ++ List(0)
+
 
 }

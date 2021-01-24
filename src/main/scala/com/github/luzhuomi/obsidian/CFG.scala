@@ -124,8 +124,8 @@ object CFG {
   case class TryCatchFinallyNode(
       id: ASTPath,
       tryNode: NodeId,
-      catchNodes: List[NodeId],
-      finallyNode: Option[NodeId],
+      catchNodes: NodeId,
+      finallyNode: NodeId,
       preds: List[NodeId],
       succs: List[NodeId]
   ) extends Node
@@ -1229,43 +1229,35 @@ object CFG {
               }
             } yield ()
 
-          case Try(try_blk, catches, finally_blk) =>
+          case Try(try_blk, List(catch_blk), Some(finally_blk)) => // there should be only one catch block, multiple catch blocks have been desguared into one.
             for {
               /*
-      max0 = max + 1
-      n = { stmts = {try ... catch ... finally}, try_node = max0, catch_nodes = [catchNodes2], finally_node = max2 }
-      CFG0 = CFG + { max -> n }
-      CFG0, max0, {max}, false, breakNodes, contNodes, caseNodes, {}, _ |-
-        blk1 => CFG1, max1, preds1, continuable1, breakNodes1, contNodes1, caseNodes1, throwNodes1, catchNodes,
-      CFG1, max1, throwNodes1, false, breakNodes1, contNodes1, caseNodes1, throwNodes, {},  |-
+      n = { try_node = tryOf(path), catch_nodes = [ childOf(path, n+1) | n <- (0.. num_catches) ], finally_node = childOf(path, num_catches+1), preds = preds, succs = Nil }
+      CFG0 = CFG + { path -> n }
+      CFG0, tryOf(path), {path}, false, breakNodes, contNodes, caseNodes, {}, _ |-
+        blk1 => CFG1, preds1, continuable1, breakNodes1, contNodes1, caseNodes1, throwNodes1, catchNodes,
+      CFG1, childOf(path,1), throwNodes1, false, breakNodes1, contNodes1, caseNodes1, throwNodes, {},  |-
         blk2 => CFG2, max2, preds2, continuable2, breakNodes2, contNodes2, caseNodes2, throwNodes2, catchNodes2
-      CFG2, max2, preds1++preds2, false, breakNodes2, contNodes2, caseNodes2, throwNodes2 |-
-        blk3 => CFG3, max3, preds3, continuable3, breakNodes3, contNode3, caseNodes3, throwNodes3
+      CFGN, childOf(path, 2), preds1++preds2, false, breakNodes2, contNodes2, caseNodes2, throwNodes2 |-
+        blk3 => CFG3, preds3, continuable3, breakNodes3, contNode3, caseNodes3, throwNodes3
       ----------------------------------------------------------------------------------------------------------------
       CFG, path, preds, continuable, breakNodes, contNodes, caseNodes, throwNodes, catchNodes |- try {blk1} catch (x) {blk2} finally {blk3}
        => CFG3, max3, preds3, false, breakNodes3, contNode3, caseNodes3, throwNodes ++ throwNodes3, catchNodes
        // local catch Nodes should not escape
-
                */
               st <- get
               _ <- {
-                val max0 = st.currId
-                val max1 = max0 + 1
+                val currNodeId = p
                 val preds0 = st.currPreds
-                val s = BlockStmt_(Try(try_blk, catches, finally_blk))
-                val l0 = internalIdent(s"${labPref}${max0}")
-                val l1 = internalIdent(s"${labPref}${max1}")
-                val n = Node(
-                  List(s),
-                  Nil,
-                  Nil,
-                  Nil,
+                val n = TryCatchFinallyNode(
+                  currNodeId,
+                  tryOf(currNodeId),
+                  childOf(currNodeId,1),
+                  childOf(currNodeId, 2),
                   preds0,
-                  Nil,
-                  TryCatchNode(l1, Nil, None)
-                ) // will be updated later
-
-                val cfg0 = st.cfg + (l0 -> n)
+                  List(tryOf(currNodeId))
+                )
+                val cfg0 = st.cfg + (currNodeId-> n)
                 val throwNodes0 = st.throwNodes
                 val catchNodes0 = st.catchNodes
                 for { // building for try block
@@ -1273,289 +1265,93 @@ object CFG {
                     st.copy(
                       cfg = cfg0,
                       throwNodes = Nil,
-                      currId = max1,
-                      currPreds = List(l0),
+                      currPreds = List(currNodeId),
                       continuable = false
                     )
                   )
-                  _ <- cfgOps.buildCFG(try_blk)
+                  _ <- cfgOps.buildCFG(try_blk, tryOf(currNodeId))
                   st1 <- get
                   _ <- { // building for catch blocks
                     val preds1 = st1.currPreds
                     val throwNodes1 = st1.throwNodes
                     for {
                       _ <- put(
-                        st1.copy(throwNodes = throwNodes0, catchNodes = Nil)
+                        st1.copy(throwNodes = throwNodes0, catchNodes = Nil, currPreds = throwNodes1)
                       )
-                      _ <- catches.traverse_(c =>
-                        for {
-                          st1p <- get
-                          _ <- put(
-                            st1p.copy(
-                              continuable = false,
-                              currPreds = throwNodes1
-                            )
-                          )
-                          _ <- cfgOps.buildCFG(c)
-                        } yield ()
-                      )
+                      _ <- cfgOps.buildCFG(catch_blk, childOf(currNodeId, 1))
                       st2 <- get
                       _ <- { // building for finally blocks if any
                         val catchNodes2 = st2.catchNodes
                         val preds2 = st2.currPreds
-                        finally_blk match {
-                          case Some(blk) => {
-                            val max2 = st2.currId
-                            val l3 = internalIdent(s"${labPref}${max2}")
-                            for {
-                              _ <- put(
-                                st2.copy(
-                                  currPreds = preds1 ++ preds2,
-                                  continuable = false
-                                )
-                              )
-                              _ <- cfgOps.buildCFG(blk)
-                              st3 <- get
-                              _ <- { // update the node for the try / catch stmt, to
-                                val cfg3 = st3.cfg
-                                val n3 = cfg3(l0)
-                                val cfg4 = cfg3 + (l0 -> n3.copy(nodeType =
-                                  TryCatchNode(l1, catchNodes2, Some(l3))
-                                ))
-                                for {
-                                  _ <- put(
-                                    st3.copy(
-                                      cfg = cfg4,
-                                      continuable = false,
-                                      catchNodes = catchNodes0
-                                    )
-                                  )
-                                } yield ()
-                              }
-                            } yield ()
-                          }
-                          case None => {
-                            val cfg3 = st2.cfg
-                            val n3 = cfg3(l0)
-                            val cfg4 = cfg3 + (l0 -> n3.copy(nodeType =
-                              TryCatchNode(l1, catchNodes2, None)
-                            ))
-                            for {
-                              _ <- put(
-                                st2.copy(
-                                  cfg = cfg4,
-                                  currPreds = preds1 ++ preds2,
-                                  continuable = false,
-                                  catchNodes = catchNodes0
-                                )
-                              )
-                            } yield ()
-                          }
-                        }
+                        for {
+                          _ <- put(
+                            st2.copy(
+                              currPreds = preds1 ++ preds2, // preds1 from try, preds2 from catch
+                              continuable = false
+                            )
+                          )
+                          _ <- cfgOps.buildCFG(finally_blk,childOf(currNodeId,2))
+                          st3 <- get
+                          _ <- put(
+                            st3.copy(
+                              continuable = false,
+                              throwNodes = throwNodes0 ++ st3.throwNodes,
+                              catchNodes = catchNodes0
+                            )
+                          )
+                        } yield ()
                       }
                     } yield ()
                   }
                 } yield ()
               }
             } yield ()
-
-          case Labeled(id, stmt) =>
+          case Try(try_blk, _, _ ) => m.raiseError("An error is encountered during the CFG construction. try-catch-finally block should have been desugared to have one catch block and one finally block.")
+          case Labeled(id, stmt) => // label shoudl have same path as its containing statement, for the ease of building the labl map
             for {
               /*
             ASSUMPTION, labeled statements in Java must be introduced first then used by continue or break.
 
-            lblMap1 = lblMap + (l -> max)
-            CFG1, max, preds, false, lblMap1 |- stmt => CFG2, max2, preds, continuable, lblMap2
+            lblMap1 = lblMap + (l -> path)
+            CFG1, path, preds, false, lblMap1 |- stmt => CFG2, preds2, continuable2, lblMap2
             ------------------------------------------------------------------------------
-            CFG, max, preds, _, lblMap |- l: stmt => CFG2, max2, preds, continuable, lblMap2
+            CFG, path, preds, _, lblMap |- l: stmt => CFG2, preds2, continuable2, lblMap2
                */
               st <- get
               _ <- put(
                 st.copy(
-                  labelMap = st.labelMap + (id -> internalIdent(
-                    s"${labPref}${st.currId}"
-                  )),
+                  labelMap = st.labelMap + (id -> p),
                   continuable = false
                 )
               )
-              _ <- buildCFG(stmt)
+              _ <- buildCFG(stmt,p)
             } yield ()
         }
-    }
-
-  /**
-    * Helper functoin for buildCFG for the case of switch
-    */
-  def caseExpsToIfNodes(exp: Exp, ces: List[CaseExp])(implicit
-      m: MonadError[SIState, String]
-  ): State[StateInfo, List[NodeId]] =
-    ces match {
-      case Nil => m.pure(Nil)
-      case (DefaultCase(wrapNodeId, rhsNodeId) :: _) =>
-        for {
-          st <- get
-          _ <- {
-            val preds0 = st.currPreds
-            val cfg0 = st.cfg
-            val stmts =
-              List(
-                BlockStmt_(Continue(Some(rhsNodeId)))
-              ) // instead of Goto L, we put continue L
-            val cfgNode = Node(
-              stmts,
-              Nil,
-              Nil,
-              Nil,
-              preds0,
-              List(rhsNodeId),
-              AssignmentNode
-            )
-            val rhsNode = cfg0(rhsNodeId)
-            val cfg0p = cfg0 + (rhsNodeId -> rhsNode.copy(preds =
-              (rhsNode.preds ++ List(wrapNodeId))
-            ))
-            val cfg0pp = preds0.foldLeft(cfg0p)((g, pred) => {
-              val n = g(pred)
-              val np = n.copy(succs = (n.succs ++ List(wrapNodeId)))
-              g + (pred -> np)
-            })
-            val cfg1 = cfg0pp + (wrapNodeId -> cfgNode)
-            for {
-              _ <- put(
-                st.copy(
-                  cfg = cfg1,
-                  currPreds = List(wrapNodeId),
-                  continuable = false
-                )
-              )
-            } yield ()
-          }
-        } yield Nil
-      case (ExpCase(e, es, wrapNodeId, rhsNodeId) :: next :: ps) =>
-        for {
-          st <- get
-          ns <- {
-            val preds0 = st.currPreds
-            val cfg0 = st.cfg
-            val nextNodeId = next.getWrapperId
-            val lhs = HasVarcfgOps.getLVarsFrom(exp)
-            val rhs = HasVarcfgOps.getVarsFrom(exp)
-            val lhsp = (e :: es).flatMap(HasVarcfgOps.getLVarsFrom(_))
-            val rhsp = (e :: es).flatMap(HasVarcfgOps.getVarsFrom(_))
-            val cond = es.foldLeft(eeq(exp, e))((a, e) => eor(eeq(exp, e), a))
-            val stmts = List(
-              BlockStmt_(
-                IfThenElse(
-                  cond,
-                  Continue(Some(rhsNodeId)),
-                  Continue(Some(nextNodeId))
-                )
-              )
-            )
-            val cfgNode = Node(
-              stmts,
-              (lhs ++ lhsp).toSet.toList,
-              (rhs ++ rhsp).toSet.toList,
-              Nil,
-              preds0,
-              List(rhsNodeId, nextNodeId),
-              AssignmentNode
-            )
-            val n = cfg0(rhsNodeId)
-            val cfg0p =
-              cfg0 + (rhsNodeId -> n.copy(preds = n.preds ++ List(wrapNodeId)))
-            val cfg0pp = preds0.foldLeft(cfg0p)((g, pred) => {
-              val n = g(pred)
-              g + (pred -> n.copy(succs =
-                (n.succs ++ List(wrapNodeId)).toSet.toList
-              ))
-            })
-            val cfg1 = cfg0pp + (wrapNodeId -> cfgNode)
-            for {
-              _ <- put(
-                st.copy(
-                  cfg = cfg1,
-                  currPreds = List(wrapNodeId),
-                  continuable = false
-                )
-              )
-              ns <- caseExpsToIfNodes(exp, next :: ps)
-            } yield ns
-          }
-        } yield ns
-      case (ExpCase(e, es, wrapNodeId, rhsNodeId) :: Nil) =>
-        for {
-          st <- get
-          ns <- {
-            val preds0 = st.currPreds
-            val cfg0 = st.cfg
-            val max = st.currId
-            val lhs = HasVarcfgOps.getLVarsFrom(exp)
-            val rhs = HasVarcfgOps.getVarsFrom(exp)
-            val lhsp = (e :: es).flatMap(HasVarcfgOps.getLVarsFrom(_))
-            val rhsp = (e :: es).flatMap(HasVarcfgOps.getVarsFrom(_))
-            val cond = es.foldLeft(eeq(exp, e))((a, e) => eor(eeq(exp, e), a))
-            val stmts = List(
-              BlockStmt_(IfThen(cond, Continue(Some(rhsNodeId))))
-            )
-            val cfgNode = Node(
-              stmts,
-              (lhs ++ lhsp).toSet.toList,
-              (rhs ++ rhsp).toSet.toList,
-              Nil,
-              preds0,
-              List(rhsNodeId),
-              AssignmentNode
-            )
-            val n = cfg0(rhsNodeId)
-            val cfg0p =
-              cfg0 + (rhsNodeId -> n.copy(preds = n.preds ++ List(wrapNodeId)))
-            val cfg0pp = preds0.foldLeft(cfg0p)((g, pred) => {
-              val n = g(pred)
-              g + (pred -> n.copy(succs =
-                (n.succs ++ List(wrapNodeId)).toSet.toList
-              ))
-            })
-            val cfg1 = cfg0pp + (wrapNodeId -> cfgNode)
-            for {
-              _ <- put(
-                st.copy(
-                  cfg = cfg1,
-                  currPreds = List(wrapNodeId),
-                  continuable = false
-                )
-              )
-            } yield List(wrapNodeId)
-          }
-        } yield ns
     }
 
   implicit def catchCFGInstance: CFGClass[Catch] =
     new CFGClass[Catch] {
       override def buildCFG(
-          a: Catch
+          a: Catch, p: ASTPath
       )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
         a match {
           case Catch(params, blk) =>
             for {
               st <- get
               _ <- {
-                val max = st.currId
-                val l = internalIdent(s"${labPref}${max}")
                 val lhs = HasVarcfgOps.getLVarsFrom((params))
                 for {
-                  _ <- cfgOps.buildCFG(blk)
+                  _ <- cfgOps.buildCFG(blk,p)
                   st2 <- get
                   _ <- {
                     val cfg2 = st2.cfg
-                    val n = cfg2(l)
-                    val np = n.copy(localDecls = n.localDecls ++ lhs)
-                    val cfg3 = cfg2 + (l -> np)
+                    val n = cfg2(p)
+                    val cfg3 = cfg2 + (p -> appLocalDecls(n, lhs)) // TODO: check whether n is definitely assignments node
                     for {
                       _ <- put(
                         st2.copy(
                           cfg = cfg3,
-                          catchNodes = st.catchNodes ++ List(l)
+                          catchNodes = st.catchNodes ++ List(p)
                         )
                       )
                     } yield ()
@@ -1569,23 +1365,24 @@ object CFG {
   implicit def switchBlockCFGInstance: CFGClass[SwitchBlock] =
     new CFGClass[SwitchBlock] {
       override def buildCFG(
-          a: SwitchBlock
+          a: SwitchBlock, p:ASTPath
       )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
         a match {
           case SwitchBlock(Default, blks_stmts) =>
             for {
               /*
-          CFG, max, preds, continuable, breakNodes, contNodes, caseNodes |-
-            stmt => CFG2, max2, preds2, continuable2, breakNodes2, contNodes2, caseNodes2
+          CFG, childOf(path,0), preds, continuable, breakNodes, contNodes, caseNodes |- 
+            stmt1 => CFG1, preds1, continuable1, breakNodes1, contNodes1, caseNodes1
+
+          CFG1, childOf(path,1), preds1, continable1, breakNodes1, contNodes1, caseNodes1 |- 
+            stmt2 => CFG2, preds2, continuable2, breakNodes2, contNodes2, caseNode2
+          ...
           ------------------------------------------------------------------------------------------------------------------------------------------------------------------
-          CFG,max,preds, continuable, breakNodes, contNodes, caseNodes |-
-            default: stmt => CFG2, max2, preds2 continuable2, breakNodes, contNodes2, caseNodes2 union (max, default)
+          CFG, path,preds, continuable, breakNodes, contNodes, caseNodes |-
+            default: stmt1; ... ; stmtn; => CFG2, max2, preds2 continuable2, breakNodes, contNodes2, caseNodes2 union (max, default)
                */
               st <- get
               _ <- {
-                val max = st.currId
-                val wrapNodeId = internalIdent(s"${labPref}${max}")
-                val rhsNodeId = internalIdent(s"${labPref}${max + 1}")
                 for {
                   _ <- put(st.copy(currId = max + 1, fallThroughCases = Nil))
                   _ <- blks_stmts.traverse_(cfgOps.buildCFG(_))
