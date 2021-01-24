@@ -61,3 +61,7 @@ public class Test {
     some assignment statement only
 
   */
+
+  object Flatten {
+	  
+  }
