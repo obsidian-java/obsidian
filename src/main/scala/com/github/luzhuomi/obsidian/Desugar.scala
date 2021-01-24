@@ -359,10 +359,73 @@ object Desugar {
           case Throw(exp) => Throw(dsgOps.desugar(exp))
           // TODO: collapse catches into 1 catch with if else and instance of
           //       add an empty finally block if it is None
-          case Try(try_blk, catches, finally_blk) => Try(dsgOps.desugar(try_blk), catches.map(c => dsgOps.desugar(c)), finally_blk.map(b => dsgOps.desugar(b)))
+          case Try(try_blk, catches, finally_blk) => {
+            val catches_p = catches.map(c => dsgOps.desugar(c))
+            val catches_merged = mergeCatches(catches_p)
+            val finally_blk_p = finally_blk.map(b => dsgOps.desugar(b)) match {
+              case Some(b) => Some(b)
+              case None => Some(Block(Nil))
+            }
+            Try(dsgOps.desugar(try_blk), List(catches_merged), finally_blk_p)
+          }
           case While(exp, stmt) => While(dsgOps.desugar(exp), dsgOps.desugar(stmt))
         }
     }
+  }
+
+  /**
+    * mergeCatches : merge a list of catch clauses into a single one with if else and instance of
+    * 
+    * e.g. 
+    * 
+    * catch (Ex1 ex1) { stmt1 }
+    * catch (Ex2 ex2) { stmt2 }
+    * 
+    * ==>
+    * 
+    * catch (Exception ex) {
+    *   if (ex instanceOf Ex1) {
+    *      Ex1 ex1 = (Ex1) ex;
+    *      stmt21
+    *   } else {
+    *      if (ex instanceOf Ex2) {
+    *         Ex2 ex2 = (Ex2) ex;
+    *         stmt2;
+    *      } else {
+    *         throw ex;
+    *      }
+    *   }
+    * }
+    *
+    * @param catches
+    * @return
+    */
+  def mergeCatches(catches:List[Catch]):Catch = {
+    val exceptionTy:RefType = ClassRefType(ClassType(List((Ident("Exception"), Nil))))
+    val ex_top:Ident = Ident("exception_desugured")
+    val params_top:FormalParam = FormalParam(Nil, RefType_(exceptionTy), false, VarId(ex_top))
+    val conds:List[Exp] = catches.map(
+      c => c match {
+        case Catch(FormalParam(_, RefType_(ty), _, _), blk_each) => {
+          InstanceOf(ExpName(Name(List(ex_top))), ty)
+        }
+      }
+    )
+    val blks:List[Block] = catches.map(
+      c => c match {
+        case Catch(FormalParam(mods,rty,_ ,VarId(ex_inner)), Block(block_stmts)) => {
+          val localVar = LocalVars(mods, rty, List(VarDecl(VarId(ex_inner), Some(InitExp(Cast(rty, ExpName(Name(List(ex_top)))))))))
+          Block(localVar::block_stmts)
+        } 
+      }
+    )
+    val lastStmt:Stmt = Throw(ExpName(Name(List(ex_top))))
+    val ifelse = conds.zip(blks).foldRight(lastStmt)( (condBlk, elStmt) => condBlk match {
+      case (cond, blk) => {
+        IfThenElse(cond, StmtBlock(blk), elStmt)
+      }
+    })
+    Catch(params_top, Block(List(BlockStmt_(ifelse))))
   }
 
   implicit def expDSGInstance: DSG[Exp] = {
