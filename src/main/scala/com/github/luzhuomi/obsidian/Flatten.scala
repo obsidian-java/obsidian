@@ -132,11 +132,31 @@ public class Test {
 					case None => None
 					case Some((exp, initCtxt)) => Some((exp, e1 => ArrayCreateInit(ty,size, initCtxt(e1))))
 				}
+				case FieldAccess_(access) => None // the exp in field access should not contain assignment
+				case MethodInv(methdInv) => naOps.nestedAssignment(methdInv) match {
+					case None => None 
+					case Some((exp, methdInvCtxt)) => Some((exp, e1=> MethodInv(methdInvCtxt(e1))))
+				}
+				case ArrayAccess(idx) => naOps.nestedAssignment(idx) match {
+					case None => None
+					case Some((exp, idxCtxt)) => Some((exp, e1=>ArrayAccess(idxCtxt(e1))))
+				}
+				case ExpName(name) => None
+				
+
 			}
 
 	  }
 
 	  implicit def ArrayInitNestedAssignmentInstance:NestedAssignment[ArrayInit] = new NestedAssignment[ArrayInit] {
 		  override def nestedAssignment(a: Syntax.ArrayInit): Option[(Syntax.Exp, Syntax.Exp => Syntax.ArrayInit)] = None //TODO: FixMe
+	  }
+
+	  implicit def MethodInvocationNestedAssignmentInstance:NestedAssignment[MethodInvocation] = new NestedAssignment[MethodInvocation] {
+		  override def nestedAssignment(a: Syntax.MethodInvocation): Option[(Syntax.Exp, Syntax.Exp => Syntax.MethodInvocation)] = None // TODO: FixMe
+	  }
+	  
+	  implicit def ArrayIndexNestedAssignmentInstance:NestedAssignment[ArrayIndex] = new NestedAssignment[ArrayIndex] {
+		  override def nestedAssignment(a: Syntax.ArrayIndex): Option[(Syntax.Exp, Syntax.Exp => Syntax.ArrayIndex)] = None // TODO: FixMe
 	  }
   }
