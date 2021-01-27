@@ -142,7 +142,10 @@ public class Test {
 					case Some((exp, idxCtxt)) => Some((exp, e1=>ArrayAccess(idxCtxt(e1))))
 				}
 				case ExpName(name) => None
-				
+				case PostDecrement(exp) => naOps.nestedAssignment(exp) match {
+					case None => None
+					case Some((exp, expCtxt)) => Some((exp, e1=>PostDecrement(e1)))
+				}
 
 			}
 
