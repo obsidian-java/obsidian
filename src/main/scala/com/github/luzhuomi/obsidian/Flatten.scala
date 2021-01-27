@@ -1,5 +1,9 @@
 package com.github.luzhuomi.obsidian
 
+import com.github.luzhuomi.scalangj.Syntax._
+import com.github.luzhuomi.scalangj.Syntax
+
+
 /**
   * We need a flattening step before the desugaring step to handle nested post-/pre-increment and assignment
   * consider the following 
@@ -98,4 +102,41 @@ public class Test {
   */
 
   object Flatten {
+	  trait NestedAssignment[A] {
+		  /**
+			* nestedAssign: return the left most inner most nested assignment if it exists
+			*
+			* @param a
+			* @return an optional pair consists of the nested assignment and the context 
+			*   a context is A with an expression place hodler
+			*/
+		  def nestedAssignment(a:A):Option[(Exp, Exp => A)]
+	  }
+
+	  object naOps {
+		  def nestedAssignment[A](a:A)(implicit d:NestedAssignment[A]):Option[(Exp, Exp => A)] = {
+			  d.nestedAssignment(a)
+		  }
+	  }
+
+	  implicit def ExpNestedAssignmentInstance:NestedAssignment[Exp] = new NestedAssignment[Exp] {
+			override def nestedAssignment(e:Exp):Option[(Exp, Exp => Exp)] = e match {
+				case Lit(_) => None
+				case ClassLit(_) => None 
+				case This => None
+				case ThisClass(_) => None
+				case InstanceCreation(type_args, type_decl, args, body) => None
+				case QualInstanceCreation(exp, type_args, id, args, body) => None
+				case ArrayCreate(ty, exps, num_dims) => None
+				case ArrayCreateInit(ty, size, init) => naOps.nestedAssignment(init) match {
+					case None => None
+					case Some((exp, initCtxt)) => Some((exp, e1 => ArrayCreateInit(ty,size, initCtxt(e1))))
+				}
+			}
+
+	  }
+
+	  implicit def ArrayInitNestedAssignmentInstance:NestedAssignment[ArrayInit] = new NestedAssignment[ArrayInit] {
+		  override def nestedAssignment(a: Syntax.ArrayInit): Option[(Syntax.Exp, Syntax.Exp => Syntax.ArrayInit)] = None //TODO: FixMe
+	  }
   }
