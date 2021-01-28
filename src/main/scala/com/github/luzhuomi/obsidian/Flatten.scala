@@ -189,7 +189,16 @@ public class Test {
 		  case PostIncrement(ExpName(n)) => for {
 			  fresh_name <- rename(n)
 		  } yield (fresh_name, ExpStmt(Assign(NameLhs(fresh_name), EqualA, exp)))
-		case Assign(NameLhs(n), op, rhs) => m.pure((n, Empty)) // TODO other cases
+		  case PreDecrement(ExpName(n)) => for {
+			  fresh_name <- rename(n)
+		  } yield (fresh_name, ExpStmt(Assign(NameLhs(fresh_name), EqualA, exp)))
+		  case PreIncrement(ExpName(n)) => for {
+			  fresh_name <- rename(n)
+		  } yield (fresh_name, ExpStmt(Assign(NameLhs(fresh_name), EqualA, exp)))		  
+		  case Assign(NameLhs(n), op, rhs) => for {
+			  fresh_name <- rename(n)
+		  } yield (fresh_name, ExpStmt(Assign(NameLhs(fresh_name), EqualA, exp)))
+		// TODO other cases
 	  }
 
 	  def rename(n:Name)(implicit m:Monad[FlatState]):FlatState[Name] = n match {
@@ -246,7 +255,7 @@ public class Test {
 				}
 				case ExpName(name) => None
 				case PostIncrement(exp) => naOps.nestedAssignment(exp) match {
-					case None => None
+					case None => Some((e, x => x))
 					case Some((e0, expCtxt)) => Some((e0, e1=>PostIncrement(e1)))
 				}
 				case PostDecrement(exp) => naOps.nestedAssignment(exp) match {
@@ -302,9 +311,13 @@ public class Test {
 					}
 					case Some((cond_n, cond_ctxt)) => Some((cond_n, e=>Cond(cond_ctxt(e), true_exp, false_exp)))
 				}
-				case Assign(lhs, op, rhs) => naOps.nestedAssignment(lhs) match {
+				case Assign(lhs@NameLhs(n), op, rhs) => naOps.nestedAssignment(rhs) match {
+					case None => Some((e, x => x))
+					case Some((rhs_n, rhs_ctxt)) => Some((rhs_n, e=>Assign(lhs, op, rhs_ctxt(e))))
+				}
+				case Assign(lhs, op, rhs) => naOps.nestedAssignment(lhs) match { // what about lhs is not a Name
 					case None => naOps.nestedAssignment(rhs) match {
-						case None => Some((e, x => x))
+						case None => None
 						case Some((rhs_n, rhs_ctxt)) => Some((rhs_n, e=>Assign(lhs, op, rhs_ctxt(e))))
 					}
 					case Some((lhs_n, lhs_ctxt)) => Some((lhs_n, e=>Assign(lhs_ctxt(e), op, rhs)))
