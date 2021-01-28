@@ -2,7 +2,7 @@ package com.github.luzhuomi.obsidian
 
 import cats._
 import cats.implicits._
-import cats.data.State
+import cats.data.StateT
 import com.github.luzhuomi.scalangj.Syntax._
 import com.github.luzhuomi.scalangj.Syntax
 
@@ -113,11 +113,52 @@ public class Test {
 
 	  val initStateInfo= StateInfo(0,"_is__flattened_")
 
+	  sealed trait FlatResult[+A]
+	  case class FlatError(msg:String) extends FlatResult[Nothing]
+	  case class FlatOk[A](result:A) extends FlatResult[A]
 
-	  def get: State[StateInfo, StateInfo] = State{ st => (st, st) }
-	  def put(st:StateInfo): State[StateInfo, Unit] = State{ _ => (st, ())}
+	  implicit def flatResultFunctor: Functor[FlatResult] = new Functor[FlatResult] {
+		override def map[A, B](fa: FlatResult[A])(f: A => B): FlatResult[B] = fa match {
+			case FlatError(s) => FlatError(s)
+			case FlatOk(a)    => FlatOk(f(a))
+		}
+	  }
 
-	  type FlatState[A] = State[StateInfo,A]
+	  implicit def flatResultApplicative: ApplicativeError[FlatResult, String] = new ApplicativeError[FlatResult, String] {
+		  override def ap[A, B](ff: FlatResult[A => B])(fa: FlatResult[A]): FlatResult[B] = ff match {
+			  case FlatOk(f) => fa match {
+				  case FlatOk(a)    => FlatOk(f(a))
+				  case FlatError(s) => FlatError(s)
+			  }
+			  case FlatError(s) => FlatError(s)
+		  }
+		  override def pure[A](a:A):FlatResult[A] = FlatOk(a)
+		  override def raiseError[A](e:String):FlatResult[A] = FlatError(e)
+		  override def handleErrorWith[A](fa: FlatResult[A])(f:String => FlatResult[A]) : FlatResult[A] = fa match {
+			  case FlatError(s) => f(s)
+			  case FlatOk(a)    => FlatOk(a)
+		  }
+	  }
+
+	  implicit def flatResultMonadError(implicit app:ApplicativeError[FlatResult, String]): MonadError[FlatResult, String] = new MonadError[FlatResult, String] {
+		override def flatMap[A, B](fa: FlatResult[A])(f: A => FlatResult[B]): FlatResult[B] = fa match {
+			case FlatOk(a)    => f(a)
+			case FlatError(s) => FlatError(s)
+		}
+		override def handleErrorWith[A](fa: FlatResult[A])(f: String => FlatResult[A]): FlatResult[A] = app.handleErrorWith(fa)(f)
+		override def pure[A](x: A): FlatResult[A] = app.pure(x)
+		override def raiseError[A](e: String): FlatResult[A] = app.raiseError(e)
+		override def tailRecM[A, B](a: A)(f: A => FlatResult[Either[A,B]]): FlatResult[B] = f(a) match {
+			case FlatError(msg)   => FlatError(msg)
+			case FlatOk(Right(b)) => FlatOk(b)
+			case FlatOk(Left(a))  => tailRecM(a)(f)
+		}
+	  }
+
+	  def get: StateT[FlatResult, StateInfo, StateInfo] = StateT{ st => FlatOk(st, st) }
+	  def put(st:StateInfo): StateT[FlatResult, StateInfo, Unit] = StateT{ _ => FlatOk(st, ())}
+
+	  type FlatState[A] = StateT[FlatResult, StateInfo,A]
 	
 	  def flatBlock(a:Block)(implicit m:Monad[FlatState]):FlatState[Block] = a match {
 		  case Block(blk_stmts) => for {
@@ -125,7 +166,7 @@ public class Test {
 		  } yield Block(blk_stmts) // TODO
 	  }
 
-	  def flatStmt(a:Stmt)(implicit m:Monad[FlatState]):FlatState[List[Stmt]] =  a match {
+	  def flatStmt(a:Stmt)(implicit m:MonadError[FlatState, String]):FlatState[List[Stmt]] =  a match {
 		  case StmtBlock(blk) => for { f_blk <- flatBlock(blk) } yield List(StmtBlock(f_blk))
 		  case IfThen(exp, stmt) => for {
 			  stmts_exp <- liftAll(exp);
@@ -152,6 +193,14 @@ public class Test {
 				}
 			  }
 		  } yield r
+		  case Assert(exp, msg) => for {
+			  stmts_exp <- liftAll(exp);
+			  r <- stmts_exp match {
+				  case (Nil, _) => m.pure(List(Assert(exp, msg)))
+				  case (stmts, expFinal) => m.pure(stmts ++ List(Assert(expFinal, msg)))
+			  }
+		  } yield r
+		  
 		  // TODO: more cases
 	  }
 
@@ -162,7 +211,7 @@ public class Test {
 		* @param exp input expression
 		* @return a list of simple assignment statements, and the flattened exprssion.
 		*/
-	  def liftAll(exp:Exp)(implicit m:Monad[FlatState]):FlatState[(List[Stmt], Exp)] = {
+	  def liftAll(exp:Exp)(implicit m:MonadError[FlatState, String]):FlatState[(List[Stmt], Exp)] = {
 		  def go(exp:Exp, acc:List[Stmt]):FlatState[(List[Stmt], Exp)] = naOps.nestedAssignment(exp) match {
 			  case None => m.pure((acc,exp))
 			  case Some((e, ctxt)) => for {
@@ -182,7 +231,7 @@ public class Test {
 		* @param m
 		* @return a pair of name (lhs variable) and statement (the generated statement lhs = nested_assignment)
 		*/
-	  def mkAssignStmt(exp:Exp)(implicit m:Monad[FlatState]):FlatState[(Name, Stmt)] = exp match {
+	  def mkAssignStmt(exp:Exp)(implicit m:MonadError[FlatState, String]):FlatState[(Name, Stmt)] = exp match {
 		  case PostDecrement(ExpName(n)) => for {
 			  fresh_name <- rename(n)
 		  } yield (fresh_name, ExpStmt(Assign(NameLhs(fresh_name), EqualA, exp)))
@@ -198,10 +247,11 @@ public class Test {
 		  case Assign(NameLhs(n), op, rhs) => for {
 			  fresh_name <- rename(n)
 		  } yield (fresh_name, ExpStmt(Assign(NameLhs(fresh_name), EqualA, exp)))
+		  case _ => m.raiseError(s"mkAssignStmt: Failed to create statement from expression ${exp.toString}")
 		// TODO other cases
 	  }
 
-	  def rename(n:Name)(implicit m:Monad[FlatState]):FlatState[Name] = n match {
+	  def rename(n:Name)(implicit m:MonadError[FlatState,String]):FlatState[Name] = n match {
 		  case Name(Nil) => m.pure(n) // should we signal a failure here?
 		  case Name(ids) => { 
 			  val inits = ids.init
