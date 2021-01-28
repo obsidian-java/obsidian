@@ -1,7 +1,11 @@
 package com.github.luzhuomi.obsidian
 
+import cats._
+import cats.implicits._
+import cats.data.State
 import com.github.luzhuomi.scalangj.Syntax._
 import com.github.luzhuomi.scalangj.Syntax
+
 
 
 /**
@@ -102,13 +106,112 @@ public class Test {
   */
 
   object Flatten {
+	  case class StateInfo(
+		  currNum:Int,
+		  nameSecret:String
+	  )
+
+	  val initStateInfo= StateInfo(0,"_is__flattened_")
+
+
+	  def get: State[StateInfo, StateInfo] = State{ st => (st, st) }
+	  def put(st:StateInfo): State[StateInfo, Unit] = State{ _ => (st, ())}
+
+	  type FlatState[A] = State[StateInfo,A]
+	
+	  def flatBlock(a:Block)(implicit m:Monad[FlatState]):FlatState[Block] = a match {
+		  case Block(blk_stmts) => for {
+			  _ <- m.pure(())
+		  } yield Block(blk_stmts) // TODO
+	  }
+
+	  def flatStmt(a:Stmt)(implicit m:Monad[FlatState]):FlatState[List[Stmt]] =  a match {
+		  case StmtBlock(blk) => for { f_blk <- flatBlock(blk) } yield List(StmtBlock(f_blk))
+		  case IfThen(exp, stmt) => for {
+			  stmts_exp <- liftAll(exp);
+			  r <- stmts_exp match {
+				case (Nil,_) => { // nothing to be flattened in exp
+					stmt match {
+						case StmtBlock(blk) => for {
+							f_blk <- flatBlock(blk) 
+						} yield List(IfThen(exp, StmtBlock(f_blk)))
+				  		case others => for { 
+							f_stmts <- flatStmt(stmt) 
+						} yield List(IfThen(exp, StmtBlock(Block(f_stmts.map(BlockStmt_(_))))))
+					}
+				}
+				case (stmts,expFinal) => { // something flattened in exp
+					stmt match {
+						case StmtBlock(blk) => for { 
+							f_blk <- flatBlock(blk) 
+						} yield stmts++List(IfThen(expFinal, StmtBlock(f_blk)))
+				  		case _ => for {
+							f_stmts <- flatStmt(stmt) 
+						} yield stmts++List(IfThen(expFinal, StmtBlock(Block( f_stmts.map(BlockStmt_(_))))))
+					}
+				}
+			  }
+		  } yield r
+		  // TODO: more cases
+	  }
+
+	  /**
+		* liftAll - lift all nested assignment expression from the input expression, turns them into simple assignment statements of shape (x = nested_assignment). 
+		*   applying lhs xs back to their repsective context to form the flattened expression
+		*
+		* @param exp input expression
+		* @return a list of simple assignment statements, and the flattened exprssion.
+		*/
+	  def liftAll(exp:Exp)(implicit m:Monad[FlatState]):FlatState[(List[Stmt], Exp)] = {
+		  def go(exp:Exp, acc:List[Stmt]):FlatState[(List[Stmt], Exp)] = naOps.nestedAssignment(exp) match {
+			  case None => m.pure((acc,exp))
+			  case Some((e, ctxt)) => for {
+				  n_stmt <- mkAssignStmt(e)(m);
+				  r <- go(ctxt(ExpName(n_stmt._1)), acc++List(n_stmt._2))
+			  } yield r
+		  }
+		  go(exp,List())
+	  }
+
+	  /**
+		* mkAssignStmt - turn an nested assignment / increment statement into an assignment statement whose lhs is a fresh variable
+		*
+		*  Note that this is a partial function. It only accepts exp that are nested assignment. c.f. nestedAssignment for Exp.
+		* 
+		* @param exp
+		* @param m
+		* @return a pair of name (lhs variable) and statement (the generated statement lhs = nested_assignment)
+		*/
+	  def mkAssignStmt(exp:Exp)(implicit m:Monad[FlatState]):FlatState[(Name, Stmt)] = exp match {
+		  case PostDecrement(ExpName(n)) => for {
+			  fresh_name <- rename(n)
+		  } yield (fresh_name, ExpStmt(Assign(NameLhs(fresh_name), EqualA, exp)))
+		  case PostIncrement(ExpName(n)) => for {
+			  fresh_name <- rename(n)
+		  } yield (fresh_name, ExpStmt(Assign(NameLhs(fresh_name), EqualA, exp)))
+		case Assign(NameLhs(n), op, rhs) => m.pure((n, Empty)) // TODO other cases
+	  }
+
+	  def rename(n:Name)(implicit m:Monad[FlatState]):FlatState[Name] = n match {
+		  case Name(Nil) => m.pure(n) // should we signal a failure here?
+		  case Name(ids) => { 
+			  val inits = ids.init
+			  ids.last match {
+				  case Ident(s) => for {
+					  st <- get
+					  _ <- put(st.copy(currNum=st.currNum+1))
+				  } yield Name(inits++List(Ident(s"${s}${st.nameSecret}${st.currNum}")))
+			  }
+			}
+		}
+
 	  trait NestedAssignment[A] {
 		  /**
 			* nestedAssign: return the left most inner most nested assignment if it exists
 			*
 			* @param a
 			* @return an optional pair consists of the nested assignment and the context 
-			*   a context is A with an expression place hodler
+			*   a context is A with an expression place holder
 			*/
 		  def nestedAssignment(a:A):Option[(Exp, Exp => A)]
 	  }
@@ -147,15 +250,15 @@ public class Test {
 					case Some((e0, expCtxt)) => Some((e0, e1=>PostIncrement(e1)))
 				}
 				case PostDecrement(exp) => naOps.nestedAssignment(exp) match {
-					case None => None
+					case None => Some((e, x => x))
 					case Some((e0, expCtxt)) => Some((e0, e1=>PostDecrement(e1)))
 				}
 				case PreIncrement(exp) => naOps.nestedAssignment(exp) match {
-					case None => None
+					case None => Some((e, x => x))
 					case Some((e0, expCtxt)) => Some((e0, e1=>PreIncrement(e1)))
 				}
 				case PreDecrement(exp) => naOps.nestedAssignment(exp) match {
-					case None => None
+					case None => Some((e, x => x))
 					case Some((e0, expCtxt)) => Some((e0, e1=>PreDecrement(e1)))
 				}
 				case PrePlus(exp) => naOps.nestedAssignment(exp) match {
@@ -201,7 +304,7 @@ public class Test {
 				}
 				case Assign(lhs, op, rhs) => naOps.nestedAssignment(lhs) match {
 					case None => naOps.nestedAssignment(rhs) match {
-						case None => None
+						case None => Some((e, x => x))
 						case Some((rhs_n, rhs_ctxt)) => Some((rhs_n, e=>Assign(lhs, op, rhs_ctxt(e))))
 					}
 					case Some((lhs_n, lhs_ctxt)) => Some((lhs_n, e=>Assign(lhs_ctxt(e), op, rhs)))
