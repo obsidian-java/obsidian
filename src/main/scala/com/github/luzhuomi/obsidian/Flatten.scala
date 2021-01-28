@@ -142,24 +142,172 @@ public class Test {
 					case Some((exp, idxCtxt)) => Some((exp, e1=>ArrayAccess(idxCtxt(e1))))
 				}
 				case ExpName(name) => None
+				case PostIncrement(exp) => naOps.nestedAssignment(exp) match {
+					case None => None
+					case Some((e0, expCtxt)) => Some((e0, e1=>PostIncrement(e1)))
+				}
 				case PostDecrement(exp) => naOps.nestedAssignment(exp) match {
 					case None => None
-					case Some((exp, expCtxt)) => Some((exp, e1=>PostDecrement(e1)))
+					case Some((e0, expCtxt)) => Some((e0, e1=>PostDecrement(e1)))
 				}
-
+				case PreIncrement(exp) => naOps.nestedAssignment(exp) match {
+					case None => None
+					case Some((e0, expCtxt)) => Some((e0, e1=>PreIncrement(e1)))
+				}
+				case PreDecrement(exp) => naOps.nestedAssignment(exp) match {
+					case None => None
+					case Some((e0, expCtxt)) => Some((e0, e1=>PreDecrement(e1)))
+				}
+				case PrePlus(exp) => naOps.nestedAssignment(exp) match {
+					case None => None
+					case Some((e0, expCtxt)) => Some((e0, e1=>PrePlus(e1)))
+				}
+				case PreMinus(exp) => naOps.nestedAssignment(exp) match {
+					case None => None
+					case Some((e0, expCtxt)) => Some((e0, e1=>PreMinus(e1)))
+				} 
+				case PreBitCompl(exp) => naOps.nestedAssignment(exp) match {
+					case None => None
+					case Some((e0, expCtxt)) => Some((e0, e1=>PreBitCompl(e1)))
+				} 
+				case PreNot(exp) => naOps.nestedAssignment(exp) match {
+					case None => None
+					case Some((e0, expCtxt)) => Some((e0, e1=>PreNot(e1)))
+				}
+				case Cast(ty,exp) => naOps.nestedAssignment(exp) match {
+					case None => None
+					case Some((e0, expCtxt)) => Some((e0, e1=>Cast(ty,e1)))
+				}
+				case BinOp(e1, op, e2) => naOps.nestedAssignment(e1) match {
+					case None => naOps.nestedAssignment(e2) match {
+						case None => None
+						case Some((e2p, e2ctxt)) => Some((e2p, e => BinOp(e1, op, e2ctxt(e))))
+					}
+					case Some((e1p, e1ctxt)) => Some((e1p, e => BinOp(e1ctxt(e), op, e2)))
+				}
+				case InstanceOf(exp, ref_type) => naOps.nestedAssignment(exp) match {
+					case None => None 
+					case Some((ep, ectxt)) => Some((ep, e=>InstanceOf(ectxt(e), ref_type)))
+				}
+				case Cond(cond, true_exp, false_exp) => naOps.nestedAssignment(cond) match {
+					case None => naOps.nestedAssignment(true_exp) match {
+						case None => naOps.nestedAssignment(false_exp) match {
+							case None => None
+							case Some((false_exp_n, false_exp_ctxt)) => Some((false_exp_n, e=>Cond(cond, true_exp, false_exp_ctxt(e))))
+						}
+						case Some((true_exp_n, true_exp_ctxt)) => Some((true_exp_n, e=>Cond(cond, true_exp_ctxt(e), false_exp)))
+					}
+					case Some((cond_n, cond_ctxt)) => Some((cond_n, e=>Cond(cond_ctxt(e), true_exp, false_exp)))
+				}
+				case Assign(lhs, op, rhs) => naOps.nestedAssignment(lhs) match {
+					case None => naOps.nestedAssignment(rhs) match {
+						case None => None
+						case Some((rhs_n, rhs_ctxt)) => Some((rhs_n, e=>Assign(lhs, op, rhs_ctxt(e))))
+					}
+					case Some((lhs_n, lhs_ctxt)) => Some((lhs_n, e=>Assign(lhs_ctxt(e), op, rhs)))
+				}
+				case Lambda(params, body) => None // we don't need to check further, coz all unbound variables in lambda body must be final
+				case MethodRef(name, id) => None
 			}
 
 	  }
+	  implicit def LhsNEstedAssignmentInstance:NestedAssignment[Lhs] = new NestedAssignment[Lhs] {
+		  override def nestedAssignment(a: Syntax.Lhs): Option[(Syntax.Exp, Syntax.Exp => Syntax.Lhs)] = a match {
+			  case NameLhs(name) => None
+			  case FieldLhs(field_access) => naOps.nestedAssignment(field_access) match {
+				  case None => None
+				  case Some((field_access_p, field_access_ctxt)) => Some((field_access_p, e=>FieldLhs(field_access_ctxt(e))))
+			  }
+			  case ArrayLhs(array_idx) => naOps.nestedAssignment(array_idx) match {
+				  case None => None
+				  case Some((array_idx_p, array_idx_ctx)) => Some((array_idx_p, e => ArrayLhs(array_idx_ctx(e))))
+			  }
+		  }
+	  }
+
+	  implicit def FieldAccessAssignmentInstance:NestedAssignment[FieldAccess] = new NestedAssignment[FieldAccess] {
+		  override def nestedAssignment(a: Syntax.FieldAccess): Option[(Syntax.Exp, Syntax.Exp => Syntax.FieldAccess)] = a match {
+			  case PrimaryFieldAccess(e, id) => naOps.nestedAssignment(e) match {
+				  case None => None 
+				  case Some((e_p, ectxt)) => Some((e_p, e => PrimaryFieldAccess(ectxt(e), id)))
+			  }
+			  case SuperFieldAccess(id) => None
+			  case ClassFieldAccess(name, id) => None
+		  }
+	  }
 
 	  implicit def ArrayInitNestedAssignmentInstance:NestedAssignment[ArrayInit] = new NestedAssignment[ArrayInit] {
-		  override def nestedAssignment(a: Syntax.ArrayInit): Option[(Syntax.Exp, Syntax.Exp => Syntax.ArrayInit)] = None //TODO: FixMe
+		  override def nestedAssignment(a: Syntax.ArrayInit): Option[(Syntax.Exp, Syntax.Exp => Syntax.ArrayInit)] = a match {
+			  case ArrayInit(var_inits) => naOps.nestedAssignment(var_inits) match {
+				  case None => None 
+				  case Some((exp, ctxt)) => Some((exp, e => ArrayInit(ctxt(e))))
+			  }
+		  }
+	  }
+
+	  implicit def VarInitNestedAssignmentInstance:NestedAssignment[VarInit] = new NestedAssignment[VarInit] {
+		  override def nestedAssignment(a: Syntax.VarInit): Option[(Syntax.Exp, Syntax.Exp => Syntax.VarInit)] = a match {
+			  case InitExp(exp) => naOps.nestedAssignment(exp) match {
+				  case None => None
+				  case Some((e, ctxt)) => Some((e, e=>InitExp(ctxt(e))))
+			  }
+			  case InitArray(array_init) => naOps.nestedAssignment(array_init) match {
+				  case None => None
+				  case Some((e, ctxt)) => Some((e, e=>InitArray(ctxt(e))))
+			  }
+		  }
 	  }
 
 	  implicit def MethodInvocationNestedAssignmentInstance:NestedAssignment[MethodInvocation] = new NestedAssignment[MethodInvocation] {
-		  override def nestedAssignment(a: Syntax.MethodInvocation): Option[(Syntax.Exp, Syntax.Exp => Syntax.MethodInvocation)] = None // TODO: FixMe
+		  override def nestedAssignment(a: Syntax.MethodInvocation): Option[(Syntax.Exp, Syntax.Exp => Syntax.MethodInvocation)] = a match {
+			  case MethodCall(name, args) => naOps.nestedAssignment(args) match {
+				  case None => None 
+				  case Some((exp, ctxt)) => Some((exp, e => MethodCall(name, ctxt(e))))
+			  }
+			  case PrimaryMethodCall(e, ref_types, id, args) => naOps.nestedAssignment(e) match {
+				  case None => naOps.nestedAssignment(args) match {
+					  case None => None 
+					  case Some((exp, ctxt)) => Some((exp, e1=> PrimaryMethodCall(e, ref_types, id, ctxt(e1))))
+				  }
+				  case Some((exp, ctxt)) => Some((exp, e1 => PrimaryMethodCall(ctxt(e1), ref_types, id, args)))
+			  }
+			  case SuperMethodCall(ref_types, id, args) => naOps.nestedAssignment(args) match {
+				  case None => None 
+				  case Some((exp, ctxt)) => Some((exp, e => SuperMethodCall(ref_types, id, ctxt(e))))
+			  }
+			  case ClassMethodCall(name, ref_types, id, args) => naOps.nestedAssignment(args) match {
+				  case None => None 
+				  case Some((exp, ctxt)) => Some((exp, e => ClassMethodCall(name, ref_types, id, ctxt(e))))
+			  }
+			  case TypeMethodCall(name, ref_types, id, args) => naOps.nestedAssignment(args) match {
+				  case None => None 
+				  case Some((exp, ctxt)) => Some((exp, e => TypeMethodCall(name, ref_types, id, ctxt(e))))
+			  }
+		  }
 	  }
 	  
 	  implicit def ArrayIndexNestedAssignmentInstance:NestedAssignment[ArrayIndex] = new NestedAssignment[ArrayIndex] {
-		  override def nestedAssignment(a: Syntax.ArrayIndex): Option[(Syntax.Exp, Syntax.Exp => Syntax.ArrayIndex)] = None // TODO: FixMe
+		  override def nestedAssignment(a: Syntax.ArrayIndex): Option[(Syntax.Exp, Syntax.Exp => Syntax.ArrayIndex)] = a match {
+			  case ArrayIndex(e, es) => naOps.nestedAssignment(e) match {
+				  case None => naOps.nestedAssignment(es) match {
+					  case None => None
+					  case Some((exp, ctxt)) => Some((exp, x => ArrayIndex(e, ctxt(x))))
+				  }
+				  case Some((exp, ctxt)) => Some((exp, x => ArrayIndex(ctxt(e), es)))
+			  }
+		  }
+	  }
+
+	  implicit def ListNestedAssignmentInstance[A](implicit na:NestedAssignment[A]):NestedAssignment[List[A]] = new NestedAssignment[List[A]] {
+		  override def nestedAssignment(a: List[A]): Option[(Syntax.Exp, Syntax.Exp => List[A])] = a match {
+			  case Nil => None 
+			  case (x::xs) => na.nestedAssignment(x) match {
+				  case None => nestedAssignment(xs) match {
+					  case None => None 
+					  case Some((exp, ctxt)) => Some((exp, e=>(x::ctxt(e))))
+				  }
+				  case Some((exp, ctxt)) => Some ((exp, e=>(ctxt(e)::xs)))
+			  }
+		  }
 	  }
   }
