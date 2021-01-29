@@ -200,8 +200,27 @@ public class Test {
 				  case (stmts, expFinal) => m.pure(stmts ++ List(Assert(expFinal, msg)))
 			  }
 		  } yield r
+		  case Continue(id) => m.pure(List(Continue(id)))
+		  case BasicFor(init, loop_cond, post_update, stmt) => m.pure(List()) // TODO
 		  
 		  // TODO: more cases
+	  }
+
+
+	  
+
+
+	  def liftAll(exps:List[Exp])(implicit m:MonadError[FlatState, String]):FlatState[(List[Stmt], List[Exp])] = {
+		  def go(stmts_exps_acc:(List[Stmt], List[Exp]), exp:Exp):FlatState[(List[Stmt], List[Exp])] = { 
+			  val stmts_acc = stmts_exps_acc._1
+			  val exps_acc = stmts_exps_acc._2 
+			  for {
+				  stmts_exp <- liftAll(exp)
+			  } yield (stmts_acc ++ stmts_exp._1, exps_acc ++ List(stmts_exp._2))
+		  }
+		  val empty_stmts:List[Stmt] = List()
+		  val empty_exps:List[Exp] = List()
+		  exps.foldM((empty_stmts,empty_exps))(go)(m)
 	  }
 
 	  /**
@@ -377,7 +396,7 @@ public class Test {
 			}
 
 	  }
-	  implicit def LhsNEstedAssignmentInstance:NestedAssignment[Lhs] = new NestedAssignment[Lhs] {
+	  implicit def LhsNestedAssignmentInstance:NestedAssignment[Lhs] = new NestedAssignment[Lhs] {
 		  override def nestedAssignment(a: Syntax.Lhs): Option[(Syntax.Exp, Syntax.Exp => Syntax.Lhs)] = a match {
 			  case NameLhs(name) => None
 			  case FieldLhs(field_access) => naOps.nestedAssignment(field_access) match {
