@@ -169,7 +169,7 @@ public class Test {
 	  def flatStmt(a:Stmt)(implicit m:MonadError[FlatState, String]):FlatState[List[Stmt]] =  a match {
 		  case StmtBlock(blk) => for { f_blk <- flatBlock(blk) } yield List(StmtBlock(f_blk))
 		  case IfThen(exp, stmt) => for {
-			  stmts_exp <- liftAll(exp);
+			  stmts_exp <- laOps.liftAll(exp);
 			  r <- stmts_exp match {
 				case (Nil,_) => { // nothing to be flattened in exp
 					stmt match {
@@ -194,52 +194,116 @@ public class Test {
 			  }
 		  } yield r
 		  case Assert(exp, msg) => for {
-			  stmts_exp <- liftAll(exp);
+			  stmts_exp <- laOps.liftAll(exp);
 			  r <- stmts_exp match {
 				  case (Nil, _) => m.pure(List(Assert(exp, msg)))
 				  case (stmts, expFinal) => m.pure(stmts ++ List(Assert(expFinal, msg)))
 			  }
 		  } yield r
 		  case Continue(id) => m.pure(List(Continue(id)))
-		  case BasicFor(init, loop_cond, post_update, stmt) => m.pure(List()) // TODO
+		  case BasicFor(init, loop_cond, post_update, stmt) => for {
+			  stmts_init <- laOps.liftAll(init)
+			  stmts_loop_cond <- laOps.liftAll(loop_cond)
+			  // TODO // where to put the stmts_loop_cond._1?
+		  } yield List()
 		  
 		  // TODO: more cases
 	  }
 
 
-	  
 
-
-	  def liftAll(exps:List[Exp])(implicit m:MonadError[FlatState, String]):FlatState[(List[Stmt], List[Exp])] = {
-		  def go(stmts_exps_acc:(List[Stmt], List[Exp]), exp:Exp):FlatState[(List[Stmt], List[Exp])] = { 
-			  val stmts_acc = stmts_exps_acc._1
-			  val exps_acc = stmts_exps_acc._2 
-			  for {
-				  stmts_exp <- liftAll(exp)
-			  } yield (stmts_acc ++ stmts_exp._1, exps_acc ++ List(stmts_exp._2))
-		  }
-		  val empty_stmts:List[Stmt] = List()
-		  val empty_exps:List[Exp] = List()
-		  exps.foldM((empty_stmts,empty_exps))(go)(m)
-	  }
-
-	  /**
-		* liftAll - lift all nested assignment expression from the input expression, turns them into simple assignment statements of shape (x = nested_assignment). 
-		*   applying lhs xs back to their repsective context to form the flattened expression
+	  trait LiftAll[A] {
+		/**
+		* liftAll - lift all nested assignment expression from the input construct, turns them into simple assignment statements of shape (x = nested_assignment). 
+		*   applying lhs xs back to their repsective context to form the flattened construct
 		*
-		* @param exp input expression
-		* @return a list of simple assignment statements, and the flattened exprssion.
+		* @param a input language  construct, e.g. an expression
+		* @return a list of simple assignment statements, and the flattened expression or other construct.
 		*/
-	  def liftAll(exp:Exp)(implicit m:MonadError[FlatState, String]):FlatState[(List[Stmt], Exp)] = {
-		  def go(exp:Exp, acc:List[Stmt]):FlatState[(List[Stmt], Exp)] = naOps.nestedAssignment(exp) match {
-			  case None => m.pure((acc,exp))
-			  case Some((e, ctxt)) => for {
-				  n_stmt <- mkAssignStmt(e)(m);
-				  r <- go(ctxt(ExpName(n_stmt._1)), acc++List(n_stmt._2))
-			  } yield r
-		  }
-		  go(exp,List())
+		  def liftAll(a:A)(implicit m:MonadError[FlatState, String]):FlatState[(List[Stmt], A)]
 	  }
+
+	  object laOps {
+		  def liftAll[A](a:A)(implicit la:LiftAll[A], m:MonadError[FlatState, String]):FlatState[(List[Stmt], A)] = {
+			  la.liftAll(a)(m)
+		  }
+	  }
+
+	  implicit def ListLiftAllInstance[A](implicit la:LiftAll[A]):LiftAll[List[A]] = new LiftAll[List[A]] {
+		  override def liftAll(as: List[A])(implicit m: MonadError[FlatState,String]): FlatState[(List[Syntax.Stmt], List[A])] = {
+			def go(stmts_as_acc:(List[Stmt], List[A]), x:A):FlatState[(List[Stmt], List[A])] = { 
+				val stmts_acc = stmts_as_acc._1
+				val exps_acc = stmts_as_acc._2 
+				for {
+					stmts_exp <- la.liftAll(x)
+				} yield (stmts_acc ++ stmts_exp._1, exps_acc ++ List(stmts_exp._2))
+			}
+		  val empty_stmts:List[Stmt] = List()
+		  val empty_exps:List[A] = List()
+		  as.foldM((empty_stmts,empty_exps))(go)(m)
+		  }
+	  }
+
+	  implicit def OptionLiftAllInstance[A](implicit la:LiftAll[A]):LiftAll[Option[A]] = new LiftAll[Option[A]] {
+		  override def liftAll(a: Option[A])(implicit m: MonadError[FlatState,String]): FlatState[(List[Syntax.Stmt], Option[A])] = a match {
+			  case None => m.pure((List(), None))
+			  case Some(x) => for {
+				  stmts_y <- la.liftAll(x) 
+			  } yield (stmts_y._1, Some(stmts_y._2))
+		  }
+	  }
+	
+	  implicit def ExpLiftAllInstance:LiftAll[Exp] = new LiftAll[Exp] {
+		  override def liftAll(a: Syntax.Exp)(implicit m: MonadError[FlatState,String]): FlatState[(List[Syntax.Stmt], Syntax.Exp)] = {
+			def go(exp:Exp, acc:List[Stmt]):FlatState[(List[Stmt], Exp)] = naOps.nestedAssignment(exp) match {
+				case None => m.pure((acc,exp))
+				case Some((e, ctxt)) => for {
+					n_stmt <- mkAssignStmt(e)(m);
+					r <- go(ctxt(ExpName(n_stmt._1)), acc++List(n_stmt._2))
+				} yield r
+			}
+			go(a,List())
+		}
+	  }
+
+	  implicit def ForInitLiftAllInstance:LiftAll[ForInit] = new LiftAll[ForInit] {
+		  override def liftAll(a: Syntax.ForInit)(implicit m: MonadError[FlatState,String]): FlatState[(List[Syntax.Stmt], Syntax.ForInit)] = a match {
+			  case ForInitExps(exps) => for { 
+				  stmts_exps <- laOps.liftAll(exps) 
+			  } yield (stmts_exps._1, ForInitExps(stmts_exps._2))
+			  case ForLocalVars(modifiers, ty, var_decls) => for {
+				  stmts_var_decls <- laOps.liftAll(var_decls)
+			  } yield (stmts_var_decls._1, ForLocalVars(modifiers, ty, stmts_var_decls._2))
+		  }
+	  }
+
+	  implicit def VarDeclLiftAllInstance:LiftAll[VarDecl] = new LiftAll[VarDecl] {
+		  override def liftAll(a: Syntax.VarDecl)(implicit m: MonadError[FlatState,String]): FlatState[(List[Syntax.Stmt], Syntax.VarDecl)] = a match {
+			  case VarDecl(id, var_init) => for {
+				  stmts_var_init <- laOps.liftAll(var_init) 
+			  } yield (stmts_var_init._1, VarDecl(id, stmts_var_init._2))
+		  }
+	  }
+
+	  implicit def VarInitLiftAllInstance:LiftAll[VarInit] = new LiftAll[VarInit] {
+		  override def liftAll(a: Syntax.VarInit)(implicit m: MonadError[FlatState,String]): FlatState[(List[Syntax.Stmt], Syntax.VarInit)] = a match {
+			  case InitArray(array_init) => for {
+				  stmts_array_init <- laOps.liftAll(array_init)
+			  } yield (stmts_array_init._1, InitArray(stmts_array_init._2))
+			  case InitExp(exp) => for {
+				  stmts_exp <- laOps.liftAll(exp) 
+			  } yield (stmts_exp._1, InitExp(stmts_exp._2))
+		  }
+	  }
+
+	  implicit def ArrayInitLiftAllnstance:LiftAll[ArrayInit] = new LiftAll[ArrayInit] {
+		  override def liftAll(a: Syntax.ArrayInit)(implicit m: MonadError[FlatState,String]): FlatState[(List[Syntax.Stmt], Syntax.ArrayInit)] = a match {
+			  case ArrayInit(var_inits) => for {
+				  stmts_var_inits <- laOps.liftAll(var_inits)
+			  } yield (stmts_var_inits._1, ArrayInit(stmts_var_inits._2))
+		  }
+	  }
+
 
 	  /**
 		* mkAssignStmt - turn an nested assignment / increment statement into an assignment statement whose lhs is a fresh variable
