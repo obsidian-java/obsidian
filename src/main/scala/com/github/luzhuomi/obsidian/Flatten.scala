@@ -106,12 +106,20 @@ public class Test {
   */
 
   object Flatten {
+	  /**
+		* StateInfo - the state object for flattening monad
+		*
+		* @param currNum - the running number for creating fresh variable names
+		* @param nameSecret - the secret string to create fresh variable names
+		* @param renaming - the mapping from renamed variable to original name
+		*/
 	  case class StateInfo(
 		  currNum:Int,
-		  nameSecret:String
+		  nameSecret:String,
+		  renamed:Map[Name,Name] 
 	  )
 
-	  val initStateInfo= StateInfo(0,"_is__flattened_")
+	  val initStateInfo= StateInfo(0,"_is__flattened_", Map())
 
 	  sealed trait FlatResult[+A]
 	  case class FlatError(msg:String) extends FlatResult[Nothing]
@@ -206,6 +214,11 @@ public class Test {
 			  stmts_loop_cond <- laOps.liftAll(loop_cond)
 			  // TODO // where to put the stmts_loop_cond._1?
 		  } yield List()
+
+		  case While(exp, stmt) => for {
+			  stmts_exp <- laOps.liftAll(exp)
+			  f_stmts <- flatStmt(stmt)
+		  } yield List() // TODO
 		  
 		  // TODO: more cases
 	  }
@@ -341,8 +354,15 @@ public class Test {
 			  ids.last match {
 				  case Ident(s) => for {
 					  st <- get
-					  _ <- put(st.copy(currNum=st.currNum+1))
-				  } yield Name(inits++List(Ident(s"${s}${st.nameSecret}${st.currNum}")))
+					  np <- {
+						  val nextNum = st.currNum+1
+						  val newName =  Name(inits++List(Ident(s"${s}${st.nameSecret}${st.currNum}")))
+						  val renamed1 = st.renamed + (newName -> n)
+						  for {
+							_ <- put(st.copy(currNum=nextNum, renamed = renamed1)) // insert the new name to the mappnig
+						  } yield newName
+					  }
+				  } yield np
 			  }
 			}
 		}
