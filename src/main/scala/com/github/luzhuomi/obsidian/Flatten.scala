@@ -5,6 +5,7 @@ import cats.implicits._
 import cats.data.StateT
 import com.github.luzhuomi.scalangj.Syntax._
 import com.github.luzhuomi.scalangj.Syntax
+import com.github.luzhuomi.obsidian.ASTUtils._
 
 
 
@@ -111,15 +112,17 @@ public class Test {
 		*
 		* @param currNum - the running number for creating fresh variable names
 		* @param nameSecret - the secret string to create fresh variable names
+		* @param typeEnv - a mini type mapping for numerical local variables that are renamed.
 		* @param renaming - the mapping from renamed variable to original name
 		*/
 	  case class StateInfo(
 		  currNum:Int,
 		  nameSecret:String,
+		  typeEnv:Map[Name,(List[Modifier],Type)],
 		  renamed:Map[Name,Name] 
 	  )
 
-	  val initStateInfo= StateInfo(0,"_is__flattened_", Map())
+	  val initStateInfo= StateInfo(0,"_is__flattened_", Map(), Map())
 
 	  sealed trait FlatResult[+A]
 	  case class FlatError(msg:String) extends FlatResult[Nothing]
@@ -175,7 +178,7 @@ public class Test {
 	  }
 
 	  def flatStmt(a:Stmt)(implicit m:MonadError[FlatState, String]):FlatState[List[Stmt]] =  a match {
-		  case StmtBlock(blk) => for { f_blk <- flatBlock(blk) } yield List(StmtBlock(f_blk))
+
 		  case IfThen(exp, stmt) => for {
 			  stmts_exp <- laOps.liftAll(exp);
 			  r <- stmts_exp match {
@@ -208,17 +211,90 @@ public class Test {
 				  case (stmts, expFinal) => m.pure(stmts ++ List(Assert(expFinal, msg)))
 			  }
 		  } yield r
+		  case BasicFor(init, loop_cond, post_update, stmt) => { 
+			  // we move the post update expressions into the body before apply flattening
+			  val post_update_stmts:List[Stmt] = post_update match {
+				  case None => List()
+				  case Some(exps) => exps.map(ExpStmt(_))
+			  }
+			  val block_stmts_p:List[BlockStmt] = stmt match { // appending post update statement
+				  case StmtBlock(Block(block_stmts)) => block_stmts ++  post_update_stmts.map(BlockStmt_(_)) 
+				  case _ => List(BlockStmt_(stmt)) ++ post_update_stmts.map(BlockStmt_(_))
+			  }
+			  for {
+				stmts_init <- laOps.liftAll(init) // TODO: update the type envronment?
+				stmts_loop_cond <- laOps.liftAll(loop_cond)
+				f_blk <- flatBlock(Block(block_stmts_p)) // the new body append with the post update statement
+		
+		  		} yield {
+					val stmtp = appBlockStmts(StmtBlock(f_blk), stmts_loop_cond._1.map(BlockStmt_(_))) // append the flattened stmts from the cond exp to the body
+					stmts_init._1 ++ stmts_loop_cond._1 ++ List(BasicFor(stmts_init._2, stmts_loop_cond._2, None, stmtp))
+				}
+		  }
+		  case Break(id) => m.pure(List(Break(id)))
 		  case Continue(id) => m.pure(List(Continue(id)))
-		  case BasicFor(init, loop_cond, post_update, stmt) => for {
-			  stmts_init <- laOps.liftAll(init)
-			  stmts_loop_cond <- laOps.liftAll(loop_cond)
-			  // TODO // where to put the stmts_loop_cond._1?
-		  } yield List()
+		  case Do(stmt@StmtBlock(blk), exp) => for {
+			  f_blk     <- flatBlock(blk)
+			  stmts_exp <- laOps.liftAll(exp)
+		  } yield {
+			  val stmtp = appBlockStmts(StmtBlock(f_blk), stmts_exp._1.map(BlockStmt_(_)))
+			  List(Do(stmtp, stmts_exp._2))
+		  }
+		  case Do(stmt, exp) => for {
+			  f_stmts   <- flatStmt(stmt)
+			  stmts_exp <- laOps.liftAll(exp) 
+		  } yield {
+			  val stmtsp = StmtBlock(Block((f_stmts ++ stmts_exp._1).map(BlockStmt_(_))))
+			  List(Do(stmtsp, stmts_exp._2))
+		  }
+		  case Empty => m.pure(List(Empty))
+		  case EnhancedFor(modifiers, ty, id, exp, stmt@StmtBlock(blk)) => for {
+			  _ <- addVarDeclsToTypeEnv(List(VarDecl(VarId(id), None)), modifiers, ty)
+			  stmts_exp <- laOps.liftAll(exp) 
+			  f_blk     <- flatBlock(blk)
+		  } yield {
+			  val stmtp = appBlockStmts(StmtBlock(f_blk), stmts_exp._1.map(BlockStmt_(_)))
+			  stmts_exp._1 ++ List(EnhancedFor(modifiers, ty, id, stmts_exp._2, stmtp))
+		  }
+		  case EnhancedFor(modifiers, ty, id, exp, stmt) => for {
+			  _ <- addVarDeclsToTypeEnv(List(VarDecl(VarId(id), None)), modifiers, ty)
+			  stmts_exp <- laOps.liftAll(exp)
+			  f_stmts   <- flatStmt(stmt) 
+		  } yield {
+			  val stmtsp  = StmtBlock(Block((f_stmts ++ stmts_exp._1).map(BlockStmt_(_))))
+			  stmts_exp._1 ++ List(EnhancedFor(modifiers, ty, id, stmts_exp._2, stmtsp))
+		  }
+		  case ExpStmt(exp) => exp match {
+			  case ArrayAccess(ArrayIndex(e, es)) => for {
+				  stmts_e  <- laOps.liftAll(e)
+				  stmts_es <- laOps.liftAll(es)  
+			  } yield stmts_e._1 ++ stmts_es._1 ++ List(ExpStmt(ArrayAccess(ArrayIndex(stmts_e._2, stmts_es._2))))
+			  case Cast(ty, exp) => m.pure(List(ExpStmt(exp)))
+			  case ArrayCreate(ty, exps, num_dims) => for {
+				  stmts_exps <- laOps.liftAll(exps)
+			  } yield stmts_exps._1 ++ List(ExpStmt(ArrayCreate(ty, stmts_exps._2, num_dims)))
+			  case ArrayCreateInit(ty, size, init) => for {
+				  stmts_init <- laOps.liftAll(init) 
+			  } yield stmts_init._1 ++ List(ExpStmt(ArrayCreateInit(ty,size, stmts_init._2)))
+		  }
+		  
+		  case StmtBlock(blk) => for { f_blk <- flatBlock(blk) } yield List(StmtBlock(f_blk))
+		  case Switch(exp, blocks) => m.pure(List()) // TODO
+		  case While(exp, stmt@StmtBlock(blk)) => for {
+			  stmts_exp <- laOps.liftAll(exp) // the flattened stmts from exp need to be placed before the while loop and at the end of the while loop body
+			  f_blk     <- flatBlock(blk) 
+		  } yield {
+			  val stmtp = appBlockStmts(StmtBlock(f_blk), stmts_exp._1.map(BlockStmt_(_)))
+			  stmts_exp._1 ++ List(While(stmts_exp._2, stmtp))
+		  }
 
 		  case While(exp, stmt) => for {
-			  stmts_exp <- laOps.liftAll(exp)
-			  f_stmts <- flatStmt(stmt)
-		  } yield List() // TODO
+			  stmts_exp <- laOps.liftAll(exp) 
+			  f_stmts   <- flatStmt(stmt) 
+		  } yield {
+			  val stmtsp = StmtBlock(Block((f_stmts ++ stmts_exp._1).map(BlockStmt_(_))))
+			  stmts_exp._1 ++ List(While(stmts_exp._2, stmtsp))
+		  }
 		  
 		  // TODO: more cases
 	  }
@@ -285,6 +361,7 @@ public class Test {
 				  stmts_exps <- laOps.liftAll(exps) 
 			  } yield (stmts_exps._1, ForInitExps(stmts_exps._2))
 			  case ForLocalVars(modifiers, ty, var_decls) => for {
+				  _ <- addVarDeclsToTypeEnv(var_decls, modifiers, ty) // update the type environment
 				  stmts_var_decls <- laOps.liftAll(var_decls)
 			  } yield (stmts_var_decls._1, ForLocalVars(modifiers, ty, stmts_var_decls._2))
 		  }
@@ -317,6 +394,17 @@ public class Test {
 		  }
 	  }
 
+	  def addVarDeclsToTypeEnv(var_decls:List[VarDecl], mods:List[Modifier], ty:Type):FlatState[Unit] = for {
+		  st <- get
+		  _  <- put(st.copy(
+			  typeEnv=var_decls.foldLeft(st.typeEnv)( (tyEnv, var_decl) => var_decl match {
+				  case VarDecl(vdid,_) => vdid match {
+					  case VarId(id) => tyEnv + (Name(List(id)) -> (mods, ty))
+					  case _ => tyEnv
+				  }
+			  }) 
+		  ))
+	  } yield ()
 
 	  /**
 		* mkAssignStmt - turn an nested assignment / increment statement into an assignment statement whose lhs is a fresh variable

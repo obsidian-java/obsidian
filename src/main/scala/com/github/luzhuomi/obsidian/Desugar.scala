@@ -131,12 +131,6 @@ object Desugar {
     }
   }
 
-  def appBlockStmts(stmt: Stmt, blkStmts: List[BlockStmt]): Stmt =
-    stmt match {
-      case StmtBlock(Block(blkStmts_)) =>
-        StmtBlock(Block(blkStmts_ ++ blkStmts))
-      case _ => StmtBlock(Block(BlockStmt_(stmt) :: blkStmts))
-    }
 
   implicit def stmtDSGInstance: DSG[Stmt] = {
     new DSG[Stmt] {

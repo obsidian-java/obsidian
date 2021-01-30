@@ -44,5 +44,12 @@ object ASTUtils {
         case ArrayLhs(array_idx) => ArrayAccess(array_idx)
     }
 
+    def appBlockStmts(stmt: Stmt, blkStmts: List[BlockStmt]): Stmt = stmt match {
+        case StmtBlock(Block(blkStmts_)) =>
+            StmtBlock(Block(blkStmts_ ++ blkStmts))
+        case _ => StmtBlock(Block(BlockStmt_(stmt) :: blkStmts))
+    }
+
+
 
 }
