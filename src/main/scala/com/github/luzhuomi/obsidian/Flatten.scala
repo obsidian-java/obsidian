@@ -303,6 +303,7 @@ public class Test {
 			  case MethodInv(methodInv) => for {
 				  stmts_methodInv <- laOps.liftAll(methodInv) 
 			  } yield stmts_methodInv._1 ++ List(ExpStmt(MethodInv(stmts_methodInv._2)))
+			  case MethodRef(name, id) => m.pure(List(ExpStmt(exp)))
 			  case PostIncrement(exp) => for {
 				  stmts_exp <- laOps.liftAll(exp)
 			  } yield stmts_exp._1 ++  List(ExpStmt(PostIncrement(stmts_exp._2)))
@@ -315,6 +316,18 @@ public class Test {
 			  case PreDecrement(exp) => for {
 				  stmts_exp <- laOps.liftAll(exp)
 			  } yield stmts_exp._1 ++  List(ExpStmt(PreDecrement(stmts_exp._2)))
+			  case PreBitCompl(exp) => for {
+				  stmts_exp <- laOps.liftAll(exp) 
+			  } yield stmts_exp._1 ++ List(ExpStmt(PreBitCompl(stmts_exp._2)))
+			  case PreMinus(exp) => for {
+				  stmts_exp <- laOps.liftAll(exp)
+			  } yield stmts_exp._1 ++ List(ExpStmt(PreMinus(stmts_exp._2)))
+			  case PreNot(exp) => for {
+				  stmts_exp <- laOps.liftAll(exp)
+			  } yield stmts_exp._1 ++ List(ExpStmt(PreNot(stmts_exp._2)))
+			  case PrePlus(exp) => for {
+				  stmts_exp <- laOps.liftAll(exp)
+			  } yield stmts_exp._1 ++ List(ExpStmt(PrePlus(stmts_exp._2)))
 			  
 			
 		  }
