@@ -303,6 +303,19 @@ public class Test {
 			  case MethodInv(methodInv) => for {
 				  stmts_methodInv <- laOps.liftAll(methodInv) 
 			  } yield stmts_methodInv._1 ++ List(ExpStmt(MethodInv(stmts_methodInv._2)))
+			  case PostIncrement(exp) => for {
+				  stmts_exp <- laOps.liftAll(exp)
+			  } yield stmts_exp._1 ++  List(ExpStmt(PostIncrement(stmts_exp._2)))
+			  case PostDecrement(exp) => for {
+				  stmts_exp <- laOps.liftAll(exp)
+			  } yield stmts_exp._1 ++  List(ExpStmt(PostDecrement(stmts_exp._2)))
+			  case PreIncrement(exp) => for {
+				  stmts_exp <- laOps.liftAll(exp)
+			  } yield stmts_exp._1 ++  List(ExpStmt(PreIncrement(stmts_exp._2)))
+			  case PreDecrement(exp) => for {
+				  stmts_exp <- laOps.liftAll(exp)
+			  } yield stmts_exp._1 ++  List(ExpStmt(PreDecrement(stmts_exp._2)))
+			  
 			
 		  }
 		  
@@ -461,6 +474,12 @@ public class Test {
 				  stmts_e <- laOps.liftAll(e)
 				  stmts_args <- laOps.liftAll(args)
 			  } yield (stmts_e._1 ++ stmts_args._1, PrimaryMethodCall(stmts_e._2, ref_types, id, stmts_args._2))
+			  case SuperMethodCall(ref_types, id, args) => for {
+				  stmts_args <- laOps.liftAll(args)
+			  } yield (stmts_args._1, SuperMethodCall(ref_types, id, stmts_args._2))
+			  case TypeMethodCall(name, ref_types, id, args) => for {
+				  stmts_args <- laOps.liftAll(args)
+			  } yield (stmts_args._1, TypeMethodCall(name, ref_types, id, stmts_args._2) )
 		  }
 	  }
 
