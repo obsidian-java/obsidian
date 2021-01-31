@@ -170,11 +170,26 @@ public class Test {
 	  def put(st:StateInfo): StateT[FlatResult, StateInfo, Unit] = StateT{ _ => FlatOk(st, ())}
 
 	  type FlatState[A] = StateT[FlatResult, StateInfo,A]
+
+	  def flatMethodDecl(a:MethodDecl)(implicit m:Monad[FlatState]):FlatState[MethodDecl] = a match { 
+		  case MethodDecl(modifier, type_params, ty, id, formal_params, ex_types, exp, body) => for {
+			  // TODO add params to type environment
+			  f_body <- flatMethodBody(body)
+		  } yield MethodDecl(modifier, type_params, ty, id, formal_params, ex_types, exp, f_body)
+	  }
+
+	  def flatMethodBody(a:MethodBody)(implicit m:Monad[FlatState]):FlatState[MethodBody] = a match { 
+		  case MethodBody(None) => m.pure(a)
+		  case MethodBody(Some(blk)) => for {
+			  f_blk <- flatBlock(blk)
+			  // TODO add the declaration for the renamed variables.
+		  } yield MethodBody(Some(f_blk))
+	  }
 	
 	  def flatBlock(a:Block)(implicit m:Monad[FlatState]):FlatState[Block] = a match {
 		  case Block(blk_stmts) => for {
-			  _ <- m.pure(())
-		  } yield Block(blk_stmts) // TODO
+			  f_blk_stmts <- blk_stmts.traverse(flatBlockStmt(_))
+		  } yield Block(f_blk_stmts.flatMap(x => x)) 
 	  }
 
 	  def flatStmt(a:Stmt)(implicit m:MonadError[FlatState, String]):FlatState[List[Stmt]] =  a match {
@@ -204,6 +219,74 @@ public class Test {
 				}
 			  }
 		  } yield r
+
+		  case IfThenElse(exp, then_stmt, else_stmt) => for {
+			  stmts_exp <- laOps.liftAll(exp)
+			  r <- stmts_exp match {
+				  case (Nil, _) => { // nothing to be flattened in exp 
+					(then_stmt, else_stmt) match {
+						case (StmtBlock(then_blk), StmtBlock(else_blk)) => for {
+							f_then_blk <- flatBlock(then_blk)
+							f_else_blk <- flatBlock(else_blk)
+						} yield List(IfThenElse(exp, StmtBlock(f_then_blk), StmtBlock(f_else_blk)))
+						case (StmtBlock(then_blk), _) => for {
+							f_then_blk <- flatBlock(then_blk) 
+							f_stmts    <- flatStmt(else_stmt) 
+						} yield { 
+							val f_else_blk = Block(f_stmts.map(BlockStmt_(_)))
+							List(IfThenElse(exp, StmtBlock(f_then_blk), StmtBlock(f_else_blk))) 
+						}
+						case (_, StmtBlock(else_blk)) => for {
+							f_stmts    <- flatStmt(then_stmt)
+							f_else_blk <- flatBlock(else_blk)
+						} yield {
+							val f_then_blk = Block(f_stmts.map(BlockStmt_(_)))
+							List(IfThenElse(exp, StmtBlock(f_then_blk), StmtBlock(f_else_blk)))
+						}
+						case (_, _) => for {
+							f_then_stmts <- flatStmt(then_stmt)
+							f_else_stmts <- flatStmt(else_stmt)
+						} yield {
+							val f_then_blk = Block(f_then_stmts.map(BlockStmt_(_)))
+							val f_else_blk = Block(f_else_stmts.map(BlockStmt_(_)))
+							List(IfThenElse(exp, StmtBlock(f_then_blk), StmtBlock(f_else_blk)))
+						}
+					}
+				  }
+				  case (stmts, expFinal) => {
+					(then_stmt, else_stmt) match {
+						case (StmtBlock(then_blk), StmtBlock(else_blk)) => for {
+							f_then_blk <- flatBlock(then_blk)
+							f_else_blk <- flatBlock(else_blk)
+						} yield stmts ++ List(IfThenElse(expFinal, StmtBlock(f_then_blk), StmtBlock(f_else_blk)))
+						case (StmtBlock(then_blk), _) => for {
+							f_then_blk <- flatBlock(then_blk) 
+							f_stmts    <- flatStmt(else_stmt) 
+						} yield { 
+							val f_else_blk = Block(f_stmts.map(BlockStmt_(_)))
+							stmts ++ List(IfThenElse(expFinal, StmtBlock(f_then_blk), StmtBlock(f_else_blk))) 
+						}
+						case (_, StmtBlock(else_blk)) => for {
+							f_stmts    <- flatStmt(then_stmt)
+							f_else_blk <- flatBlock(else_blk)
+						} yield {
+							val f_then_blk = Block(f_stmts.map(BlockStmt_(_)))
+							stmts ++ List(IfThenElse(expFinal, StmtBlock(f_then_blk), StmtBlock(f_else_blk)))
+						}
+						case (_, _) => for {
+							f_then_stmts <- flatStmt(then_stmt)
+							f_else_stmts <- flatStmt(else_stmt)
+						} yield {
+							val f_then_blk = Block(f_then_stmts.map(BlockStmt_(_)))
+							val f_else_blk = Block(f_else_stmts.map(BlockStmt_(_)))
+							stmts ++ List(IfThenElse(expFinal, StmtBlock(f_then_blk), StmtBlock(f_else_blk)))
+						}
+					}
+				  
+				  }
+			  }
+		  } yield r
+
 		  case Assert(exp, msg) => for {
 			  stmts_exp <- laOps.liftAll(exp);
 			  r <- stmts_exp match {
@@ -211,6 +294,7 @@ public class Test {
 				  case (stmts, expFinal) => m.pure(stmts ++ List(Assert(expFinal, msg)))
 			  }
 		  } yield r
+
 		  case BasicFor(init, loop_cond, post_update, stmt) => { 
 			  // we move the post update expressions into the body before apply flattening
 			  val post_update_stmts:List[Stmt] = post_update match {
@@ -231,8 +315,11 @@ public class Test {
 					stmts_init._1 ++ stmts_loop_cond._1 ++ List(BasicFor(stmts_init._2, stmts_loop_cond._2, None, stmtp))
 				}
 		  }
+
 		  case Break(id) => m.pure(List(Break(id)))
+
 		  case Continue(id) => m.pure(List(Continue(id)))
+
 		  case Do(stmt@StmtBlock(blk), exp) => for {
 			  f_blk     <- flatBlock(blk)
 			  stmts_exp <- laOps.liftAll(exp)
@@ -240,6 +327,7 @@ public class Test {
 			  val stmtp = appBlockStmts(StmtBlock(f_blk), stmts_exp._1.map(BlockStmt_(_)))
 			  List(Do(stmtp, stmts_exp._2))
 		  }
+
 		  case Do(stmt, exp) => for {
 			  f_stmts   <- flatStmt(stmt)
 			  stmts_exp <- laOps.liftAll(exp) 
@@ -247,7 +335,9 @@ public class Test {
 			  val stmtsp = StmtBlock(Block((f_stmts ++ stmts_exp._1).map(BlockStmt_(_))))
 			  List(Do(stmtsp, stmts_exp._2))
 		  }
+
 		  case Empty => m.pure(List(Empty))
+
 		  case EnhancedFor(modifiers, ty, id, exp, stmt@StmtBlock(blk)) => for {
 			  _ <- addVarDeclsToTypeEnv(List(VarDecl(VarId(id), None)), modifiers, ty)
 			  stmts_exp <- laOps.liftAll(exp) 
@@ -256,6 +346,7 @@ public class Test {
 			  val stmtp = appBlockStmts(StmtBlock(f_blk), stmts_exp._1.map(BlockStmt_(_)))
 			  stmts_exp._1 ++ List(EnhancedFor(modifiers, ty, id, stmts_exp._2, stmtp))
 		  }
+
 		  case EnhancedFor(modifiers, ty, id, exp, stmt) => for {
 			  _ <- addVarDeclsToTypeEnv(List(VarDecl(VarId(id), None)), modifiers, ty)
 			  stmts_exp <- laOps.liftAll(exp)
@@ -264,76 +355,137 @@ public class Test {
 			  val stmtsp  = StmtBlock(Block((f_stmts ++ stmts_exp._1).map(BlockStmt_(_))))
 			  stmts_exp._1 ++ List(EnhancedFor(modifiers, ty, id, stmts_exp._2, stmtsp))
 		  }
+
 		  case ExpStmt(exp) => exp match {
 			  case ArrayAccess(ArrayIndex(e, es)) => for {
 				  stmts_e  <- laOps.liftAll(e)
 				  stmts_es <- laOps.liftAll(es)  
 			  } yield stmts_e._1 ++ stmts_es._1 ++ List(ExpStmt(ArrayAccess(ArrayIndex(stmts_e._2, stmts_es._2))))
+
 			  case Cast(ty, exp) => m.pure(List(ExpStmt(exp)))
+
 			  case ArrayCreate(ty, exps, num_dims) => for {
 				  stmts_exps <- laOps.liftAll(exps)
 			  } yield stmts_exps._1 ++ List(ExpStmt(ArrayCreate(ty, stmts_exps._2, num_dims)))
+
 			  case ArrayCreateInit(ty, size, init) => for {
 				  stmts_init <- laOps.liftAll(init) 
 			  } yield stmts_init._1 ++ List(ExpStmt(ArrayCreateInit(ty,size, stmts_init._2)))
+			  
 			  case Assign(lhs, op, rhs) => for {
 				  stmts_lhs <- laOps.liftAll(lhs)
 				  stmts_rhs <- laOps.liftAll(rhs) 
 			  } yield stmts_lhs._1 ++ stmts_rhs._1 ++ List(ExpStmt(Assign(stmts_lhs._2, op, stmts_rhs._2)))
+			  
 			  case BinOp(e1, op, e2) => for {
 				  stmts_e1 <- laOps.liftAll(e1) 
 				  stmts_e2 <- laOps.liftAll(e2)
 			  } yield stmts_e1._1 ++ stmts_e2._1 ++ List(ExpStmt(BinOp(stmts_e1._2, op, stmts_e2._2)))
+			  
 			  case ClassLit(ty) => m.pure(List(ExpStmt(exp)))
+			  
 			  case Cond(cond, true_exp, false_exp) => for {
 				  stmts_cond <- laOps.liftAll(cond)
 				  stmts_true_exp <- laOps.liftAll(true_exp) 
 				  stmts_false_exp <- laOps.liftAll(false_exp)
 			  } yield stmts_cond._1 ++ stmts_true_exp._1 ++ stmts_false_exp._1 ++ List(ExpStmt(Cond(stmts_cond._2, stmts_true_exp._2, stmts_false_exp._2)))
+			  
 			  case ExpName(name) => m.pure(List(ExpStmt(exp)))
+			  
 			  case FieldAccess_(access) => m.pure(List(ExpStmt(exp)))
+			  
 			  case InstanceCreation(type_args, type_decl, args, body) => for {
 				  stmts_args <- laOps.liftAll(args)
 			  } yield stmts_args._1 ++ List(ExpStmt(InstanceCreation(type_args, type_decl, stmts_args._2, body)))
+			 
 			  case InstanceOf(e, ref_type) => for {
 				  stmts_e <- laOps.liftAll(e) 
 			  } yield stmts_e._1 ++ List(ExpStmt(InstanceOf(stmts_e._2, ref_type)))
+			  
 			  case Lambda(params, body) => m.pure(List(ExpStmt(exp)))
+			  
 			  case Lit(lit) => m.pure(List(ExpStmt(exp)))
+			  
 			  case MethodInv(methodInv) => for {
 				  stmts_methodInv <- laOps.liftAll(methodInv) 
 			  } yield stmts_methodInv._1 ++ List(ExpStmt(MethodInv(stmts_methodInv._2)))
+			  
 			  case MethodRef(name, id) => m.pure(List(ExpStmt(exp)))
+			  
 			  case PostIncrement(exp) => for {
 				  stmts_exp <- laOps.liftAll(exp)
 			  } yield stmts_exp._1 ++  List(ExpStmt(PostIncrement(stmts_exp._2)))
+			  
 			  case PostDecrement(exp) => for {
 				  stmts_exp <- laOps.liftAll(exp)
 			  } yield stmts_exp._1 ++  List(ExpStmt(PostDecrement(stmts_exp._2)))
+			  
 			  case PreIncrement(exp) => for {
 				  stmts_exp <- laOps.liftAll(exp)
 			  } yield stmts_exp._1 ++  List(ExpStmt(PreIncrement(stmts_exp._2)))
+			  
 			  case PreDecrement(exp) => for {
 				  stmts_exp <- laOps.liftAll(exp)
 			  } yield stmts_exp._1 ++  List(ExpStmt(PreDecrement(stmts_exp._2)))
+			  
 			  case PreBitCompl(exp) => for {
 				  stmts_exp <- laOps.liftAll(exp) 
 			  } yield stmts_exp._1 ++ List(ExpStmt(PreBitCompl(stmts_exp._2)))
+			  
 			  case PreMinus(exp) => for {
 				  stmts_exp <- laOps.liftAll(exp)
 			  } yield stmts_exp._1 ++ List(ExpStmt(PreMinus(stmts_exp._2)))
+			  
 			  case PreNot(exp) => for {
 				  stmts_exp <- laOps.liftAll(exp)
 			  } yield stmts_exp._1 ++ List(ExpStmt(PreNot(stmts_exp._2)))
+			  
 			  case PrePlus(exp) => for {
 				  stmts_exp <- laOps.liftAll(exp)
 			  } yield stmts_exp._1 ++ List(ExpStmt(PrePlus(stmts_exp._2)))
 			  
-			
+			  case QualInstanceCreation(exp, type_args, id, args, body) => for {
+				  stmts_exp <- laOps.liftAll(exp)
+				  stmts_args <- laOps.liftAll(args)
+			  } yield stmts_exp._1 ++ stmts_args._1 ++ List(ExpStmt(QualInstanceCreation(stmts_exp._2, type_args, id, stmts_args._2, body)))
+			  
+			  case ThisClass(name) => m.pure(List(ExpStmt(exp)))
+			  
+			  case This => m.pure(List(ExpStmt(exp)))
 		  }
 		  
 		  case StmtBlock(blk) => for { f_blk <- flatBlock(blk) } yield List(StmtBlock(f_blk))
-		  case Switch(exp, blocks) => m.pure(List()) // TODO
+		  
+		  case Switch(exp, blocks) => for {
+			  stmts_exp <- laOps.liftAll(exp) 
+			  flat_blocks <- blocks.traverse(flatSwitchBlock(_))
+		  } yield stmts_exp._1 ++  List(Switch(stmts_exp._2, flat_blocks))
+		  
+		  case Labeled(id, stmt) => for {
+			f_stmts <- flatStmt(stmt)
+		  } yield {
+			  f_stmts match {
+				  case Nil => Nil
+				  case (s::ss) => Labeled(id,s)::ss
+			  }
+		  }
+		  
+		  case Return(exp) => for {
+			  stmts_exp <- laOps.liftAll(exp)
+		  } yield stmts_exp._1 ++ List(Return(stmts_exp._2))
+
+		  case Throw(exp) => for {
+			  stmts_exp <- laOps.liftAll(exp)
+		  } yield stmts_exp._1 ++ List(Throw(stmts_exp._2))
+
+		  case Synchronized(exp, blk) => m.raiseError("Flattening failed: Synchronized statement is not supported.")
+		  
+		  case Try(try_blk, catches, finally_blk) => for {
+			  f_try_blk <- flatBlock(try_blk)
+			  f_catches <- catches.traverse(flatCatch(_))
+			  f_finally_blk <- finally_blk.traverse(flatBlock(_))
+		  } yield List(Try(f_try_blk, f_catches, f_finally_blk))
+ 
 		  case While(exp, stmt@StmtBlock(blk)) => for {
 			  stmts_exp <- laOps.liftAll(exp) // the flattened stmts from exp need to be placed before the while loop and at the end of the while loop body
 			  f_blk     <- flatBlock(blk) 
@@ -349,11 +501,30 @@ public class Test {
 			  val stmtsp = StmtBlock(Block((f_stmts ++ stmts_exp._1).map(BlockStmt_(_))))
 			  stmts_exp._1 ++ List(While(stmts_exp._2, stmtsp))
 		  }
-		  
-		  // TODO: more cases
 	  }
 
+	  def flatSwitchBlock(switch_block:SwitchBlock)(implicit m:Monad[FlatState]):FlatState[SwitchBlock] = switch_block match {
+		  case SwitchBlock(label, blk_stmts) => for {
+			  f_blk_stmts <- blk_stmts.traverse(flatBlockStmt(_))
+		  } yield SwitchBlock(label, f_blk_stmts.flatMap(x => x))
+	  }
 
+	  def flatBlockStmt(blk_stmt:BlockStmt)(implicit m:Monad[FlatState]):FlatState[List[BlockStmt]] = blk_stmt match {
+		  case BlockStmt_(stmt) => for {
+			  f_stmts <- flatStmt(stmt)
+		  } yield f_stmts.map(BlockStmt_(_))
+		  case LocalClass(class_decl) => m.pure(List(blk_stmt))
+		  case LocalVars(modifiers, ty, var_decls) => for {
+			  _ <- addVarDeclsToTypeEnv(var_decls, modifiers, ty)
+			  stmts_var_decls <- laOps.liftAll(var_decls)
+		  } yield stmts_var_decls._1.map(BlockStmt_(_)) ++ List(LocalVars(modifiers, ty, stmts_var_decls._2))
+	  }
+
+	  def flatCatch(c:Catch)(implicit m:Monad[FlatState]):FlatState[Catch] = c match {
+		  case Catch(params, blk) => for {
+			  f_blk <- flatBlock(blk)
+		  } yield Catch(params,f_blk)
+	  } 
 
 	  trait LiftAll[A] {
 		/**
@@ -495,6 +666,7 @@ public class Test {
 			  } yield (stmts_args._1, TypeMethodCall(name, ref_types, id, stmts_args._2) )
 		  }
 	  }
+
 
 	  def addVarDeclsToTypeEnv(var_decls:List[VarDecl], mods:List[Modifier], ty:Type):FlatState[Unit] = for {
 		  st <- get
