@@ -276,6 +276,30 @@ public class Test {
 			  case ArrayCreateInit(ty, size, init) => for {
 				  stmts_init <- laOps.liftAll(init) 
 			  } yield stmts_init._1 ++ List(ExpStmt(ArrayCreateInit(ty,size, stmts_init._2)))
+			  case Assign(lhs, op, rhs) => for {
+				  stmts_lhs <- laOps.liftAll(lhs)
+				  stmts_rhs <- laOps.liftAll(rhs) 
+			  } yield stmts_lhs._1 ++ stmts_rhs._1 ++ List(ExpStmt(Assign(stmts_lhs._2, op, stmts_rhs._2)))
+			  case BinOp(e1, op, e2) => for {
+				  stmts_e1 <- laOps.liftAll(e1) 
+				  stmts_e2 <- laOps.liftAll(e2)
+			  } yield stmts_e1._1 ++ stmts_e2._1 ++ List(ExpStmt(BinOp(stmts_e1._2, op, stmts_e2._2)))
+			  case ClassLit(ty) => m.pure(List(ExpStmt(exp)))
+			  case Cond(cond, true_exp, false_exp) => for {
+				  stmts_cond <- laOps.liftAll(cond)
+				  stmts_true_exp <- laOps.liftAll(true_exp) 
+				  stmts_false_exp <- laOps.liftAll(false_exp)
+			  } yield stmts_cond._1 ++ stmts_true_exp._1 ++ stmts_false_exp._1 ++ List(ExpStmt(Cond(stmts_cond._2, stmts_true_exp._2, stmts_false_exp._2)))
+			  case ExpName(name) => m.pure(List(ExpStmt(exp)))
+			  case FieldAccess_(access) => m.pure(List(ExpStmt(exp)))
+			  case InstanceCreation(type_args, type_decl, args, body) => for {
+				  stmts_args <- laOps.liftAll(args)
+			  } yield stmts_args._1 ++ List(ExpStmt(InstanceCreation(type_args, type_decl, stmts_args._2, body)))
+			  case InstanceOf(e, ref_type) => for {
+				  stmts_e <- laOps.liftAll(e) 
+			  } yield stmts_e._1 ++ List(ExpStmt(InstanceOf(stmts_e._2, ref_type)))
+			  
+			
 		  }
 		  
 		  case StmtBlock(blk) => for { f_blk <- flatBlock(blk) } yield List(StmtBlock(f_blk))
@@ -386,11 +410,30 @@ public class Test {
 		  }
 	  }
 
-	  implicit def ArrayInitLiftAllnstance:LiftAll[ArrayInit] = new LiftAll[ArrayInit] {
+	  implicit def ArrayInitLiftAllInstance:LiftAll[ArrayInit] = new LiftAll[ArrayInit] {
 		  override def liftAll(a: Syntax.ArrayInit)(implicit m: MonadError[FlatState,String]): FlatState[(List[Syntax.Stmt], Syntax.ArrayInit)] = a match {
 			  case ArrayInit(var_inits) => for {
 				  stmts_var_inits <- laOps.liftAll(var_inits)
 			  } yield (stmts_var_inits._1, ArrayInit(stmts_var_inits._2))
+		  }
+	  }
+
+	  implicit def LhsLiftAllInstance:LiftAll[Lhs] = new LiftAll[Lhs] {
+		  override def liftAll(a: Syntax.Lhs)(implicit m: MonadError[FlatState,String]): FlatState[(List[Syntax.Stmt], Syntax.Lhs)] = a match {
+			  case NameLhs(name) => m.pure((List(), a))
+			  case ArrayLhs(array_idx) => for {
+				  stmts_array_idx <- laOps.liftAll(array_idx)
+			  } yield (stmts_array_idx._1, ArrayLhs(stmts_array_idx._2))
+			  case FieldLhs(field_access) => m.pure(List(), a)
+		  }
+	  }
+
+	  implicit def ArrayIndexLiftAllInstance:LiftAll[ArrayIndex] = new LiftAll[ArrayIndex] {
+		  override def liftAll(a: Syntax.ArrayIndex)(implicit m: MonadError[FlatState,String]): FlatState[(List[Syntax.Stmt], Syntax.ArrayIndex)] = a match {
+			  case ArrayIndex(e, es) => for {
+				  stmts_e <- laOps.liftAll(e) 
+				  stmts_es <- laOps.liftAll(es)
+			  } yield (stmts_e._1 ++ stmts_es._1, ArrayIndex(stmts_e._2, stmts_es._2))
 		  }
 	  }
 
