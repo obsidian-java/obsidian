@@ -298,7 +298,11 @@ public class Test {
 			  case InstanceOf(e, ref_type) => for {
 				  stmts_e <- laOps.liftAll(e) 
 			  } yield stmts_e._1 ++ List(ExpStmt(InstanceOf(stmts_e._2, ref_type)))
-			  
+			  case Lambda(params, body) => m.pure(List(ExpStmt(exp)))
+			  case Lit(lit) => m.pure(List(ExpStmt(exp)))
+			  case MethodInv(methodInv) => for {
+				  stmts_methodInv <- laOps.liftAll(methodInv) 
+			  } yield stmts_methodInv._1 ++ List(ExpStmt(MethodInv(stmts_methodInv._2)))
 			
 		  }
 		  
@@ -434,6 +438,29 @@ public class Test {
 				  stmts_e <- laOps.liftAll(e) 
 				  stmts_es <- laOps.liftAll(es)
 			  } yield (stmts_e._1 ++ stmts_es._1, ArrayIndex(stmts_e._2, stmts_es._2))
+		  }
+	  }
+
+	  implicit def MethodInvLiftAllInstance:LiftAll[MethodInv] = new LiftAll[MethodInv] {
+		  override def liftAll(a: Syntax.MethodInv)(implicit m: MonadError[FlatState,String]): FlatState[(List[Syntax.Stmt], Syntax.MethodInv)] = a match {
+			  case MethodInv(methodInv) => for {
+				  stmts_methodInv <- laOps.liftAll(methodInv) 
+			  } yield (stmts_methodInv._1, MethodInv(stmts_methodInv._2))
+		  }
+	  }
+
+	  implicit def MethodInvocationLiftAllInstance:LiftAll[MethodInvocation] = new LiftAll[MethodInvocation] {
+		  override def liftAll(a: Syntax.MethodInvocation)(implicit m: MonadError[FlatState,String]): FlatState[(List[Syntax.Stmt], Syntax.MethodInvocation)] = a match {
+			  case ClassMethodCall(name, ref_types, id, args) => for {
+				  stmts_args <- laOps.liftAll(args) 
+			  } yield (stmts_args._1, ClassMethodCall(name, ref_types, id, stmts_args._2)) 
+			  case MethodCall(name, args) => for {
+				  stmts_args <- laOps.liftAll(args)
+			  } yield (stmts_args._1, MethodCall(name, stmts_args._2))
+			  case PrimaryMethodCall(e, ref_types, id, args) => for {
+				  stmts_e <- laOps.liftAll(e)
+				  stmts_args <- laOps.liftAll(args)
+			  } yield (stmts_e._1 ++ stmts_args._1, PrimaryMethodCall(stmts_e._2, ref_types, id, stmts_args._2))
 		  }
 	  }
 
