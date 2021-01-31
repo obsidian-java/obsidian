@@ -171,20 +171,38 @@ public class Test {
 
 	  type FlatState[A] = StateT[FlatResult, StateInfo,A]
 
-	  def flatMethodDecl(a:MethodDecl)(implicit m:Monad[FlatState]):FlatState[MethodDecl] = a match { 
+	  def flatMethodDecl(a:MethodDecl)(implicit m:MonadError[FlatState, String]):FlatState[MethodDecl] = a match { 
 		  case MethodDecl(modifier, type_params, ty, id, formal_params, ex_types, exp, body) => for {
-			  // TODO add params to type environment
+			  _      <- formal_params.traverse_(addFormalParamToTypeEnv(_))
 			  f_body <- flatMethodBody(body)
 		  } yield MethodDecl(modifier, type_params, ty, id, formal_params, ex_types, exp, f_body)
 	  }
 
-	  def flatMethodBody(a:MethodBody)(implicit m:Monad[FlatState]):FlatState[MethodBody] = a match { 
+	  def flatMethodBody(a:MethodBody)(implicit m:MonadError[FlatState, String]):FlatState[MethodBody] = a match { 
 		  case MethodBody(None) => m.pure(a)
 		  case MethodBody(Some(blk)) => for {
-			  f_blk <- flatBlock(blk)
+			  f_blk          <- flatBlock(blk)
+			  temp_var_decls <- tempVarDecls()
 			  // TODO add the declaration for the renamed variables.
 		  } yield MethodBody(Some(f_blk))
 	  }
+
+	  def tempVarDecls()(implicit m:MonadError[FlatState, String]):FlatState[List[BlockStmt]] = for {
+		  st <- get
+		  r  <- {
+			  val tyEnv = st.typeEnv
+			  def go(nn:(Name,Name))(implicit m:MonadError[FlatState, String]):FlatState[BlockStmt] = nn match {
+				  case (new_name@Name(ids), ori_name) => tyEnv.get(ori_name) match {
+					  case None => m.raiseError(s"Flatten failed: unable to identify the type of ${ori_name}!")
+					  case Some((mods,ty)) => ids match {
+						  case Nil => m.raiseError(s"Flatten failed: unable to extract ID from new name ${new_name}!")
+						  case _   => m.pure(LocalVars(mods,ty,List(VarDecl(VarId(ids.last), None))))
+						}
+					}
+				}
+				st.renamed.toList.traverse(go)
+			}
+		} yield r 
 	
 	  def flatBlock(a:Block)(implicit m:Monad[FlatState]):FlatState[Block] = a match {
 		  case Block(blk_stmts) => for {
@@ -668,7 +686,17 @@ public class Test {
 	  }
 
 
-	  def addVarDeclsToTypeEnv(var_decls:List[VarDecl], mods:List[Modifier], ty:Type):FlatState[Unit] = for {
+	  def addFormalParamToTypeEnv(formal_param:FormalParam)(implicit m: MonadError[FlatState,String]):FlatState[Unit] = formal_param match {
+		  case FormalParam(modifiers, ty, has_arity, VarId(id)) => for {
+			st <- get
+			_  <- put(st.copy(
+				typeEnv=st.typeEnv + (Name(List(id)) -> (modifiers, ty))
+			))
+		  } yield ()
+		  case FormalParam(modifiers, ty, has_arity, _) => m.pure(()) // we skip array args since they can be ++/--
+		}
+
+	  def addVarDeclsToTypeEnv(var_decls:List[VarDecl], mods:List[Modifier], ty:Type)(implicit m: MonadError[FlatState,String]):FlatState[Unit] = for {
 		  st <- get
 		  _  <- put(st.copy(
 			  typeEnv=var_decls.foldLeft(st.typeEnv)( (tyEnv, var_decl) => var_decl match {
