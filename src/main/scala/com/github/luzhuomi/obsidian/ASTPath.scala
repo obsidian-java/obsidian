@@ -66,10 +66,10 @@ object ASTPath {
         }
     }
 
-    implicit def methodQueryableInstance:Queryable[MethodDecl] = {
-        new Queryable[MethodDecl] {
+    implicit def memberQueryableInstance:Queryable[MemberDecl] = {
+        new Queryable[MemberDecl] {
             override def query(
-                a : MethodDecl, p : ASTPath 
+                a : MemberDecl, p : ASTPath 
             ):Option[BlockStmt] = a match {
                 case MethodDecl( modifiers,
                     type_params,
@@ -80,6 +80,7 @@ object ASTPath {
                     exp,
                     body
                 ) => queryOps.query(body,p)
+                case _ => None // we only care about method 
             }
         }
     }
