@@ -2,6 +2,7 @@ package com.github.luzhuomi.obsidian
 
 import com.github.luzhuomi.scalangj.Parser._
 import com.github.luzhuomi.scalangj.Pretty._
+import com.github.luzhuomi.scalangj.Syntax._
 
 
 object Main extends App {
@@ -27,9 +28,11 @@ public class Fib
     }
 }
     """
+    def run(cu:CompilationUnit):CompilationUnit = cu // TODO
+
     val eCU = parseCompilationUnit(STRING)
     eCU match {
         case Left(error_msg) => println(error_msg)
-        case Right(cu) => println(prettyPrint(cu)) 
+        case Right(cu) => println(prettyPrint(run(cu))) 
     }
 }
