@@ -66,7 +66,7 @@ int get (int x) {
               val result = queryOps.query(methodDecl, path)
               assert((!result.isEmpty) && (result.get == bStmt ))
           } 
-          
+          case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")          
       }
   }
 }
@@ -113,6 +113,7 @@ int get (int x) {
               val result = queryOps.query(methodDecl, path)
               assert((!result.isEmpty) && (result.get == bStmt ))
           } 
+          case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")
       }
   }
 }
@@ -158,7 +159,8 @@ int get (int x) {
               val path = List(2,0,0,1,0,0,3)
               val result = queryOps.query(methodDecl, path)
               assert((!result.isEmpty) && (result.get == bStmt ))
-          } 
+          }
+          case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")
       }
   }
 }
@@ -205,6 +207,7 @@ int get (int x) {
               val result = queryOps.query(methodDecl, path)
               assert((!result.isEmpty) && (result.get == bStmt ))
           } 
+          case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")
       }
   }
 }
