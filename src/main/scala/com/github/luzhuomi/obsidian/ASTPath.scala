@@ -20,11 +20,11 @@ import com.github.luzhuomi.scalangj.Syntax._
   *     else 
   *     {            // 2,0,0,1   * a block stmt
   *        while (i < x)   // 2,0,0,1,0 
-  *        {               // 2,0,1,1,0,0
-  *           int t = f1 + f2;   // 2,0,1,1,0,0,0
-  *           f1 = f2;           // 2,0,1,1,0,0,1
-  *           f2 = t;            // 2,0,1,1,0,0,2
-  *           i = i + 1;         // 2,0,1,1,0,0,3 
+  *        {               // 2,0,0,1,0,0
+  *           int t = f1 + f2;   // 2,0,0,1,0,0,0
+  *           f1 = f2;           // 2,0,0,1,0,0,1
+  *           f2 = t;            // 2,0,0,1,0,0,2
+  *           i = i + 1;         // 2,0,0,1,0,0,3 
   *        }
   *        lpos = i;       // 2,0,0,1,1
   *        r = f2;         // 2,0,0,1,2
@@ -71,7 +71,7 @@ object ASTPath {
             override def query(
                 a : MemberDecl, p : ASTPath 
             ):Option[BlockStmt] = a match {
-                case MethodDecl( modifiers,
+                case method@MethodDecl( modifiers,
                     type_params,
                     ty,
                     id,
@@ -81,6 +81,25 @@ object ASTPath {
                     body
                 ) => queryOps.query(body,p)
                 case _ => None // we only care about method 
+            }
+        }
+    }
+
+
+    implicit def methodDeclQueryableInstance:Queryable[MethodDecl] = {
+        new Queryable[MethodDecl] {
+            override def query(
+                a : MethodDecl, p : ASTPath 
+            ):Option[BlockStmt] = a match {
+                case MethodDecl( modifiers,
+                    type_params,
+                    ty,
+                    id,
+                    formal_params,
+                    ex_types,
+                    exp,
+                    body
+                ) => queryOps.query(body,p)
             }
         }
     }
@@ -127,8 +146,11 @@ object ASTPath {
             override def query(a:Stmt, p:ASTPath): Option[BlockStmt] = p match {
                 case Nil => Some(BlockStmt_(a))
                 case (i::q) => a match {
-                    case StmtBlock(blk) if (i == 0) => queryOps.query(blk, q)
-                    case StmtBlock(blk) => None
+                    // case StmtBlock(blk) if (i == 0) => queryOps.query(blk, q)
+                    // case StmtBlock(blk) => None
+                    // StmtBlock does not consume a path, it will be consumed by the nested block
+                    // refer to test case TestMethodASTPathQuery3
+                    case StmtBlock(blk) => queryOps.query(blk, p)
                     case IfThen(e, stmt) if i == 0 => queryOps.query(stmt, q)
                     case IfThen(e, stmt) => None
                     case IfThenElse(e, th, el) if i == 0 => queryOps.query(th, q) 
