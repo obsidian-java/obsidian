@@ -456,7 +456,7 @@ object CFG {
     override def getWrapperId = wrapperId
   }
 
-  val labPref = "myLabel"
+  // val labPref = "myLabel"
   val initStateInfo = StateInfo(
     rootPath,
     Map[NodeId, Node](),

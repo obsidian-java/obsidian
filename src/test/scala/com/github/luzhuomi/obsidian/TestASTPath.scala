@@ -8,7 +8,7 @@ import com.github.luzhuomi.obsidian.ASTPath._
 
 import org.scalatest.{FunSuite, Matchers}
 
-class TestMethodASTPathQuery1 extends FunSuite with Matchers {
+class TestASTPath1 extends FunSuite with Matchers {
     /**
       * public static void main() {
           System.out.println("Hello World!");
@@ -18,14 +18,14 @@ class TestMethodASTPathQuery1 extends FunSuite with Matchers {
     val METHOD:MemberDecl = MethodDecl(List(Public, Static),List(),None,Ident("main"),List(),List(),None,MethodBody(Some(Block(List(BlockStmt_(ExpStmt(MethodInv(MethodCall(Name(List(Ident("System"), Ident("out"), Ident("println"))),List(Lit(StringLit("Hello World!"))))))))))))
     val STATEMENT:BlockStmt = BlockStmt_(ExpStmt(MethodInv(MethodCall(Name(List(Ident("System"), Ident("out"), Ident("println"))),List(Lit(StringLit("Hello World!")))))))
     val path = List(0)
-    test("TestMethodASTPathQuery1") {
+    test("TestASTPath1") {
         val result:Option[BlockStmt] = queryOps.query(METHOD,path)
         assert((!result.isEmpty) && (result.get == STATEMENT))
     }
 }
 
 
-class TestMethodASTPathQuery2 extends FunSuite with Matchers {
+class TestASTPath2 extends FunSuite with Matchers {
   val METHODSTRING = """
 int get (int x) {
   int i = lpos;  // 0
@@ -59,7 +59,7 @@ int get (int x) {
   val STMTSTRNG = "int r = -1;"
   val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTRING)).get.get
   val bStmt:BlockStmt = blockStmt.apply(new Lexer.Scanner(STMTSTRNG)).get
-  test("TestMethodASTPathQuery2") {
+  test("TestASTPath2") {
       methoddecl match {
           case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
               val path = List(1)
@@ -72,7 +72,7 @@ int get (int x) {
 }
 
 
-class TestMethodASTPathQuery3 extends FunSuite with Matchers {
+class TestASTPath3 extends FunSuite with Matchers {
   val METHODSTRING = """
 int get (int x) {
   int i = lpos;  // 0
@@ -106,7 +106,7 @@ int get (int x) {
   val STMTSTRNG = "throw  new Exception();"
   val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTRING)).get.get
   val bStmt:BlockStmt = blockStmt.apply(new Lexer.Scanner(STMTSTRNG)).get
-  test("TestMethodASTPathQuery3") {
+  test("TestASTPath3") {
       methoddecl match {
           case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
               val path = List(2,0,0,0,0)
@@ -119,7 +119,7 @@ int get (int x) {
 }
 
 
-class TestMethodASTPathQuery4 extends FunSuite with Matchers {
+class TestASTPath4 extends FunSuite with Matchers {
   val METHODSTRING = """
 int get (int x) {
   int i = lpos;  // 0
@@ -153,7 +153,7 @@ int get (int x) {
   val STMTSTRNG = "i = i + 1;"
   val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTRING)).get.get
   val bStmt:BlockStmt = blockStmt.apply(new Lexer.Scanner(STMTSTRNG)).get
-  test("TestMethodASTPathQuery4") {
+  test("TestASTPath4") {
       methoddecl match {
           case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
               val path = List(2,0,0,1,0,0,3)
@@ -166,7 +166,7 @@ int get (int x) {
 }
 
 
-class TestMethodASTPathQuery5 extends FunSuite with Matchers {
+class TestASTPath5 extends FunSuite with Matchers {
   val METHODSTRING = """
 int get (int x) {
   int i = lpos;  // 0
@@ -200,7 +200,7 @@ int get (int x) {
   val STMTSTRNG = "println(\"...\");"
   val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTRING)).get.get
   val bStmt:BlockStmt = blockStmt.apply(new Lexer.Scanner(STMTSTRNG)).get
-  test("TestMethodASTPathQuery5") {
+  test("TestASTPath5") {
       methoddecl match {
           case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
               val path = List(2,1,0)

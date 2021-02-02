@@ -149,7 +149,7 @@ object ASTPath {
                     // case StmtBlock(blk) if (i == 0) => queryOps.query(blk, q)
                     // case StmtBlock(blk) => None
                     // StmtBlock does not consume a path, it will be consumed by the nested block
-                    // refer to test case TestMethodASTPathQuery3
+                    // refer to test case TestASTPath3
                     case StmtBlock(blk) => queryOps.query(blk, p)
                     case IfThen(e, stmt) if i == 0 => queryOps.query(stmt, q)
                     case IfThen(e, stmt) => None

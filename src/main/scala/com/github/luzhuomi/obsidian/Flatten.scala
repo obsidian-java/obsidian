@@ -184,7 +184,9 @@ public class Test {
 			  f_blk          <- flatBlock(blk)
 			  temp_var_decls <- tempVarDecls()
 			  // TODO add the declaration for the renamed variables.
-		  } yield MethodBody(Some(f_blk))
+		  } yield f_blk match {
+			  case Block(blk_stmts) => 	MethodBody(Some(Block(temp_var_decls ++ blk_stmts)))
+		  }
 	  }
 
 	  def tempVarDecls()(implicit m:MonadError[FlatState, String]):FlatState[List[BlockStmt]] = for {
