@@ -33,7 +33,7 @@ public static void main (String[] args)
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
               flatMethodDecl(methodDecl).run(Flatten.initStateInfo) match {
-                  case FlatError(_) => fail()
+                  case FlatError(message) => fail(message)
                   case FlatOk((st, f_methodDecl)) => {
                       val result:Decl = MemberDecl_(f_methodDecl)
                       // println(prettyPrint(result))
@@ -72,7 +72,7 @@ public static void main (String[] args)
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
               flatMethodDecl(methodDecl).run(Flatten.initStateInfo) match {
-                  case FlatError(_) => fail()
+                  case FlatError(message) => fail(message)
                   case FlatOk((st, f_methodDecl)) => {
                       val result:Decl = MemberDecl_(f_methodDecl)
                       // println(prettyPrint(result))
@@ -89,8 +89,9 @@ public static void main (String[] args)
 class TestFlatten3 extends FunSuite with Matchers {
     val METHODSTR = """
 public static void main(String [] args) {
-	int x = 0;
-	System.out.println(++x + ++x);
+    int x = 0;
+    int y = 1;
+	System.out.println(x = (y = (x++) + 1));
 }
     """
     val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
@@ -98,19 +99,22 @@ public static void main(String [] args) {
 public static void main (String[] args)
 {
   int x_is__flattened_0;
-  int x_is__flattened_1;
+  int y_is__flattened_1;
+  int x_is__flattened_2;
   int x = 0;
-  x_is__flattened_0 = ++x;
-  x_is__flattened_1 = ++x;
-  System.out.println((x_is__flattened_0 + x_is__flattened_1));
-}    
+  int y = 1;
+  x_is__flattened_0 = x++;
+  y_is__flattened_1 = y = x_is__flattened_0 + 1;
+  x_is__flattened_2 = x = y_is__flattened_1;
+  System.out.println(x_is__flattened_2);
+} 
     """
     val f_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(F_METHODSTR)).get.get 
     test("TestFlatten3") {
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
               flatMethodDecl(methodDecl).run(Flatten.initStateInfo) match {
-                  case FlatError(_) => fail()
+                  case FlatError(message) => fail(message)
                   case FlatOk((st, f_methodDecl)) => {
                       val result:Decl = MemberDecl_(f_methodDecl)
                       // println(prettyPrint(result))
