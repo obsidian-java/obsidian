@@ -11,7 +11,7 @@ import com.github.luzhuomi.obsidian.Desugar._
 import org.scalatest.{FunSuite, Matchers}
 
 
-class TestDesguar1 extends FunSuite with Matchers {
+class TestDesugar1 extends FunSuite with Matchers {
     val METHODSTR = """
  public static void main(String [] args) {
 	int x = 0;
@@ -39,7 +39,7 @@ public static void main (String[] args)
 
 
 
-class TestDesguar2 extends FunSuite with Matchers {
+class TestDesugar2 extends FunSuite with Matchers {
     val METHODSTR = """
  public static void main(String [] args) {
 	int x = 0;
@@ -49,7 +49,7 @@ class TestDesguar2 extends FunSuite with Matchers {
     val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
     val D_METHODSTR = """
 public static void main (String[] args)
-{ int x = 0; if (x > 0) { x = x + 1; } else   ; }
+{ int x = 0;  x = x + 1;  }
     """
     val d_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(D_METHODSTR)).get.get
     test ("TestDesugar2") {

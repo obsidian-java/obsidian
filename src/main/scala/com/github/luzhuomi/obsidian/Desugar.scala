@@ -336,6 +336,28 @@ object Desugar {
               )))            
           }
           // TODO: what about case like x = (y = y + 1)?
+          /**
+            * x = (y = y + 1); ==>
+            * {
+            *   y = y + 1;
+            *   x = y;
+            * }
+            */
+          case ExpStmt(Assign(lhs1,op1,Assign(NameLhs(name),op2,rhs))) => {
+            val i = ExpStmt(Assign(NameLhs(name), op2, rhs))
+            val a = ExpStmt(Assign(lhs1, op1, ExpName(name)))
+            StmtBlock(Block(List(
+              BlockStmt_(i), BlockStmt_(a)
+            )))
+          }
+          /**
+            * x--; ==>
+            * x = x - 1;
+            */
+          case ExpStmt(PostDecrement(ExpName(name))) => ExpStmt(Assign(NameLhs(name), EqualA, BinOp(ExpName(name), Sub, Lit(IntLit(1)))))
+          case ExpStmt(PreDecrement(ExpName(name))) => ExpStmt(Assign(NameLhs(name), EqualA, BinOp(ExpName(name), Sub, Lit(IntLit(1)))))
+          case ExpStmt(PostIncrement(ExpName(name))) => ExpStmt(Assign(NameLhs(name), EqualA, BinOp(ExpName(name), Add, Lit(IntLit(1)))))
+          case ExpStmt(PreIncrement(ExpName(name))) => ExpStmt(Assign(NameLhs(name), EqualA, BinOp(ExpName(name), Add, Lit(IntLit(1)))))
           case ExpStmt(exp) => ExpStmt(dsgOps.desugar(exp))
           case IfThen(exp, stmt) => // if then is desugar if then else with else branch empty
             IfThenElse(dsgOps.desugar(exp), dsgOps.desugar(stmt), Empty)
@@ -351,7 +373,7 @@ object Desugar {
           case Switch(exp, blocks) => Switch(dsgOps.desugar(exp), blocks.map(dsgOps.desugar(_)))
           case Synchronized(exp, blk) => Synchronized(dsgOps.desugar(exp), dsgOps.desugar(blk))
           case Throw(exp) => Throw(dsgOps.desugar(exp))
-          // TODO: collapse catches into 1 catch with if else and instance of
+          // collapse catches into 1 catch with if else and instance of
           //       add an empty finally block if it is None
           case Try(try_blk, catches, finally_blk) => {
             val catches_p = catches.map(c => dsgOps.desugar(c))
