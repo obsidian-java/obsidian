@@ -172,13 +172,13 @@ object Desugar {
               case None => dsgOps.desugar(stmt)
               case Some(exps) => {
                 val post_update_blkstmts = exps.map(exp => {
-                  BlockStmt_(ExpStmt(dsgOps.desugar(exp)))
+                  BlockStmt_(desugar(ExpStmt(exp)))
                 })
                 appBlockStmts(stmt, post_update_blkstmts)
               }
             }
-            val loop = While(dsgOps.desugar(cond), dsgOps.desugar(stmt))
-            StmtBlock(Block(pre ++ List(BlockStmt_(stmt_post_update))))
+            val loop = While(dsgOps.desugar(cond), stmt_post_update)
+            StmtBlock(Block(pre ++ List(BlockStmt_(loop))))
           }
           case Break(id)    => Break(id)
           case Continue(id) => Continue(id)
