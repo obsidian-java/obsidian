@@ -91,3 +91,31 @@ public static void main (String[] args)
         }
     }
 }
+
+
+
+class TestDesugar4 extends FunSuite with Matchers {
+    val METHODSTR = """
+ public static void main(String [] args) {
+	int x = 0;
+	for (int i = 0; i < x; i++) { System.out.println(i); };
+}      
+    """
+    val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
+    val D_METHODSTR = """
+public static void main (String[] args)
+{ int x = 0; { int i = 0; while (i < x) { System.out.println(i); i = i + 1; } } ; }
+    """
+    val d_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(D_METHODSTR)).get.get
+    test ("TestDesugar4") {
+        methoddecl match {
+            case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
+                val desugared = dsgOps.desugar(methodDecl) 
+                val result:Decl = MemberDecl_(desugared)
+                println(prettyPrint(result))
+                assert(result == d_methoddecl)
+            }
+            case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")           
+        }
+    }
+}
