@@ -196,8 +196,8 @@ object Desugar {
             * Enhanced For with primitive type arrays is desugared to BasicFor
             *  for (t x: exp) { stmt } ===> for (int i = 0; i < exp.length; i++) { t x = exp3[i]; stmt }
             */
-          case EnhancedFor(modifiers, ty @ PrimType_(_), id, exp, stmt) => {
-            val i = Ident(s"idx_loop${id.toString()}")
+          case EnhancedFor(modifiers, ty @ PrimType_(_), id@Ident(n), exp, stmt) => {
+            val i = Ident(s"idx_loop_${n}")
             val var_decls = List(
               VarDecl(VarId(i), Some(InitExp(Lit(IntLit(0)))))
             )
@@ -206,7 +206,10 @@ object Desugar {
               BinOp(
                 ExpName(Name(i :: Nil)),
                 LThan,
-                dotField(exp, Ident("length"))
+                exp match { 
+                  case ExpName(Name(ids)) => ExpName(Name(ids ++ List(Ident("length")))) // a.i is tread as name (id "a", id "length"), refer to test case TestDesugar4 
+                  case _ => dotField(exp, Ident("length"))
+                }
               )
             )
             val exp3 = Some(List(PostIncrement(ExpName(Name(i :: Nil)))))
