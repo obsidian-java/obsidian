@@ -233,7 +233,7 @@ object Desugar {
             )
             dsgOps.desugar(basicFor)
           }
-          case EnhancedFor(modifiers, ty @ RefType_(t), id, exp, stmt) => {
+          case EnhancedFor(modifiers, ty @ RefType_(t), id@Ident(n), exp, stmt) => {
             /**
             *  Enhanced For with object type arrays is desguared into While
             *   for (T x: exp) { stmt }  ===>
@@ -242,7 +242,7 @@ object Desugar {
             *     while (l.hasNext()) { T x = l.next(); stmt }
             *   }
             */
-            val l = Ident(s"itr_loop_l_${id.toString()}")
+            val l = Ident(s"itr_loop_l_${n}")
             val iteratorTy = RefType_(
               ClassRefType(
                 ClassType(
@@ -263,7 +263,11 @@ object Desugar {
                   Some(
                     InitExp(
                       MethodInv(
-                        PrimaryMethodCall(exp, Nil, Ident("iterator"), Nil)
+                        exp match {
+                          case ExpName(Name(ids)) => MethodCall(Name(ids ++ List(Ident("iterator"))), Nil)
+                          case _ =>  PrimaryMethodCall(exp, Nil, Ident("iterator"), Nil)
+                        }
+                        
                       )
                     )
                   )
@@ -276,28 +280,16 @@ object Desugar {
                 Some(
                   InitExp(
                     MethodInv(
-                      PrimaryMethodCall(
-                        ExpName(Name(l :: Nil)),
-                        Nil,
-                        Ident("next"),
-                        Nil
-                      )
+                      MethodCall(Name(l :: List(Ident("next"))), Nil)
                     )
                   )
                 )
               )
             )
             val while_stmt:Stmt = While(
-              MethodInv(
-                PrimaryMethodCall(
-                  (ExpName(Name(l :: Nil))),
-                  Nil,
-                  Ident("hasNext"),
-                  Nil
-                )
-              ),
+              MethodInv(MethodCall(Name(l :: List(Ident("hasNext"))), Nil)),             
               prpDecl(modifiers, ty, txDecl, stmt)
-            )
+              )
             val blk = Block(
               List(iteratorDecl, BlockStmt_(dsgOps.desugar(while_stmt)))
             )
@@ -411,11 +403,14 @@ object Desugar {
     *         Ex2 ex2 = (Ex2) ex;
     *         stmt2;
     *      } else {
-    *         throw ex;
+    *         throw ex; 
     *      }
     *   }
     * }
-    *
+    * 
+    * Note that we have to throw most general Exception, which can be caught by the outer try - catch block 
+    * The outer catch block can still catch a more specific exception, despite the exception has been up-casted.
+    * 
     * @param catches
     * @return
     */

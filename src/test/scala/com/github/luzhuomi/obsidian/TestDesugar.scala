@@ -142,17 +142,160 @@ public static void main(String [] args) {
     val D_METHODSTR = """
 public static void main (String[] args)
 {
-  int[] a = { 0, 1, 2, 3, 4 };
+  ArrayList<Integer> a = new ArrayList<Integer>()
+  ;
   {
-    int idx_loop_i = 0;
-    while (idx_loop_i < a.length)
-    { int i = a[idx_loop_i]; System.out.println(i); idx_loop_i = idx_loop_i + 1; }
+    java.util.Iterator<Integer> itr_loop_l_i = a.iterator();
+    while (itr_loop_l_i.hasNext())
+    { Integer i = itr_loop_l_i.next(); System.out.println(i.toString()); }
   }
   ;
 }
+
     """
     val d_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(D_METHODSTR)).get.get
     test ("TestDesugar5") {
+        methoddecl match {
+            case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
+                val desugared = dsgOps.desugar(methodDecl) 
+                val result:Decl = MemberDecl_(desugared)
+                // println(prettyPrint(result))
+                assert(result == d_methoddecl)
+            }
+            case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")           
+        }
+    }
+}
+
+
+class TestDesugar6 extends FunSuite with Matchers {
+    val METHODSTR = """
+public static void main(String [] args) {
+    int x = 0;
+    int y = 1;
+	x = y--;
+}      
+    """
+    val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
+    val D_METHODSTR = """
+public static void main (String[] args)
+{ int x = 0; int y = 1; { x = y; y = y - 1; } }
+
+
+    """
+    val d_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(D_METHODSTR)).get.get
+    test ("TestDesugar6") {
+        methoddecl match {
+            case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
+                val desugared = dsgOps.desugar(methodDecl) 
+                val result:Decl = MemberDecl_(desugared)
+                // println(prettyPrint(result))
+                assert(result == d_methoddecl)
+            }
+            case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")           
+        }
+    }
+}
+
+
+
+
+class TestDesugar7 extends FunSuite with Matchers {
+    val METHODSTR = """
+public static void main(String [] args) {
+    int x = 0;
+    int y = 1;
+	x = ++y;
+}      
+    """
+    val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
+    val D_METHODSTR = """
+public static void main (String[] args)
+{ int x = 0; int y = 1; {  y = y + 1; x = y; } }
+
+
+    """
+    val d_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(D_METHODSTR)).get.get
+    test ("TestDesugar7") {
+        methoddecl match {
+            case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
+                val desugared = dsgOps.desugar(methodDecl) 
+                val result:Decl = MemberDecl_(desugared)
+                // println(prettyPrint(result))
+                assert(result == d_methoddecl)
+            }
+            case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")           
+        }
+    }
+}
+
+
+
+class TestDesugar8 extends FunSuite with Matchers {
+    val METHODSTR = """
+public static void main(String [] args) {
+    int x = 0;
+    int y = 1;
+	x = y = y + 1;
+}      
+    """
+    val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
+    val D_METHODSTR = """
+public static void main (String[] args)
+{ int x = 0; int y = 1; {  y = y + 1; x = y; } }
+
+
+    """
+    val d_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(D_METHODSTR)).get.get
+    test ("TestDesugar8") {
+        methoddecl match {
+            case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
+                val desugared = dsgOps.desugar(methodDecl) 
+                val result:Decl = MemberDecl_(desugared)
+                // println(prettyPrint(result))
+                assert(result == d_methoddecl)
+            }
+            case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")           
+        }
+    }
+}
+
+
+
+class TestDesugar9 extends FunSuite with Matchers {
+    val METHODSTR = """
+public static void main(String [] args) {
+    int x = 0;
+    try { 
+        x = x / 0 ;
+    }
+    catch (ArrayIndexOutOfBoundsException e) {
+        System.out.println("arrayout of bound");
+    }
+}      
+    """
+    val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
+    val D_METHODSTR = """
+public static void main (String[] args)
+{
+  int x = 0;
+  try
+  { x = x / 0; }
+  catch (Exception exception_desugured)
+  {
+    if (exception_desugured instanceof ArrayIndexOutOfBoundsException)
+    {
+      ArrayIndexOutOfBoundsException e = (ArrayIndexOutOfBoundsException) exception_desugured;
+      System.out.println("arrayout of bound");
+    }
+    else
+      throw exception_desugured;
+  }
+  finally {  }
+}
+    """
+    val d_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(D_METHODSTR)).get.get
+    test ("TestDesugar9") {
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
                 val desugared = dsgOps.desugar(methodDecl) 
