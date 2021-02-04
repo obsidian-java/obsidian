@@ -416,7 +416,7 @@ object Desugar {
     */
   def mergeCatches(catches:List[Catch]):Catch = {
     val exceptionTy:RefType = ClassRefType(ClassType(List((Ident("Exception"), Nil))))
-    val ex_top:Ident = Ident("exception_desugured")
+    val ex_top:Ident = Ident("exception_desugared")
     val params_top:FormalParam = FormalParam(Nil, RefType_(exceptionTy), false, VarId(ex_top))
     val conds:List[Exp] = catches.map(
       c => c match {

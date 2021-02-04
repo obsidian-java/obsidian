@@ -281,15 +281,15 @@ public static void main (String[] args)
   int x = 0;
   try
   { x = x / 0; }
-  catch (Exception exception_desugured)
+  catch (Exception exception_desugared)
   {
-    if (exception_desugured instanceof ArrayIndexOutOfBoundsException)
+    if (exception_desugared instanceof ArrayIndexOutOfBoundsException)
     {
-      ArrayIndexOutOfBoundsException e = (ArrayIndexOutOfBoundsException) exception_desugured;
+      ArrayIndexOutOfBoundsException e = (ArrayIndexOutOfBoundsException) exception_desugared;
       System.out.println("arrayout of bound");
     }
     else
-      throw exception_desugured;
+      throw exception_desugared;
   }
   finally {  }
 }
