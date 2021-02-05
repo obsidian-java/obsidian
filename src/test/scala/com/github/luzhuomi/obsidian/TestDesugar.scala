@@ -300,10 +300,39 @@ public static void main (String[] args)
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
                 val desugared = dsgOps.desugar(methodDecl) 
                 val result:Decl = MemberDecl_(desugared)
-                println(prettyPrint(result))
+                // println(prettyPrint(result))
                 assert(result == d_methoddecl)
             }
             case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")           
         }
     }
 }
+
+
+
+class TestDesugar10 extends FunSuite with Matchers {
+    val METHODSTR = """
+ public static void main(String [] args) {
+	int x = 0;
+	x += 1;
+}      
+    """
+    val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
+    val D_METHODSTR = """
+public static void main (String[] args)
+{ int x = 0;  x = x + 1;  }
+    """
+    val d_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(D_METHODSTR)).get.get
+    test ("TestDesugar10") {
+        methoddecl match {
+            case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
+                val desugared = dsgOps.desugar(methodDecl) 
+                val result:Decl = MemberDecl_(desugared)
+                // println(prettyPrint(result))
+                assert(result == d_methoddecl)
+            }
+            case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")           
+        }
+    }
+}
+
