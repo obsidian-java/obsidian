@@ -111,7 +111,7 @@ package com.github.luzhuomi.obsidian
   * l_c, l_b |- stmt1; stmt2 => stmt1'; stmt2';
   * 
   * l_c, l_b |- stmt => stmt' 
-  * ----------------------------------------(Label)  do we need this case?
+  * ----------------------------------------(Label)  do we need this case, yes we need, but l' will be ignored by Java, no break or continue statement can refer to l'
   * l_c, l_b |- l' : stmt => l' : stmt'
   * 
   * l_c, l_b |- stmt1 => stmt1'
@@ -274,7 +274,9 @@ object Label {
         case Switch(exp, blocks) => for {
           l_blocks <- blocks.traverse(labelOps.label(_, Some(id), labelC))
         } yield Labeled(id, Switch(exp, l_blocks))
-        case _ => m.raiseError("Labelling failed. A labeled statement should be a loop or a switch statement, but some other type of statement is given.")
+        case _ => for {
+          l_stmt <- labelOps.label(stmt, labelB, labelC) 
+        } yield Labeled(id, l_stmt)
       }
       case BasicFor(init, loop_cond, post_update, stmt) => for {
         id <- newLabel
