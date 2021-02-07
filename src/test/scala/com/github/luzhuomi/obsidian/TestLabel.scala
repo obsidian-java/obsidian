@@ -136,3 +136,59 @@ public static void main (String[] args)
         }
     }
 }
+
+
+
+class TestLabel4 extends FunSuite with Matchers {
+    val METHODSTR = """
+public static void main(String [] args) {
+	int x = 0;
+	switch (x) {
+        case 1: 
+            x++;
+            break;
+        case 2:
+            x--;
+            break;
+        default:
+            System.out.println(x);
+    };
+}
+    """
+    val L_METHODSTR = """
+public static void main (String[] args)
+{
+  int x = 0;
+  obsLbl_0: switch (x)
+  {
+    case 1:
+      x++;
+      break obsLbl_0;
+    case 2:
+      x--;
+      break obsLbl_0;
+    default:
+      System.out.println(x);
+  }
+  ;
+}
+    """" 
+    //println(classBodyStatement.apply(new Lexer.Scanner(METHODSTR)))
+    val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get 
+    val l_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(L_METHODSTR)).get.get 
+    test("TestLabel4") {
+        methoddecl match {
+            case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
+              labelOps.label(methodDecl,None,None).run(Label.initStateInfo) match {
+                  case LabelError(message) => fail(message)
+                  case LabelOk((st, methDecl)) => {
+                      val result:Decl = MemberDecl_(methDecl)
+                      // println(prettyPrint(result))
+                      assert(result == l_methoddecl)
+                  }
+              }
+            }
+            case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")           
+        }
+    }
+}

@@ -183,7 +183,7 @@ public class Test {
 		  case MethodBody(Some(blk)) => for {
 			  f_blk          <- flatBlock(blk)
 			  temp_var_decls <- tempVarDecls()
-			  // TODO add the declaration for the renamed variables.
+			  // add the declaration for the renamed variables.
 		  } yield f_blk match {
 			  case Block(blk_stmts) => 	MethodBody(Some(Block(temp_var_decls ++ blk_stmts)))
 		  }
@@ -326,7 +326,7 @@ public class Test {
 				  case _ => List(BlockStmt_(stmt)) ++ post_update_stmts.map(BlockStmt_(_))
 			  }
 			  for {
-				stmts_init <- laOps.liftAll(init) // TODO: update the type envronment?
+				stmts_init <- laOps.liftAll(init) 
 				stmts_loop_cond <- laOps.liftAll(loop_cond)
 				f_blk <- flatBlock(Block(block_stmts_p)) // the new body append with the post update statement
 		
