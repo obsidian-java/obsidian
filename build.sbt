@@ -21,6 +21,6 @@ libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.8" % "test"
 
 libraryDependencies += "org.typelevel" %% "cats-core" % "2.0.0"
 
-libraryDependencies += "com.github.luzhuomi" %% "scalangj" % "0.1.3"  // apache license
+libraryDependencies += "com.github.luzhuomi" %% "scalangj" % "0.1.4"  // apache license
 
 scalacOptions ++= Seq("-feature", "-deprecation", "-Yresolve-term-conflict:package", "-Ypartial-unification" )
