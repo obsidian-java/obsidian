@@ -998,8 +998,28 @@ object CFG {
           ---------------------------------------------
           CFG, path, preds, true |- CFG1, preds, true
           */
-          case Empty => m.pure(())
-
+          case Empty => for {
+            st <- get
+            _  <- if (st.continuable) { 
+              val cfg = st.cfg
+              val preds = st.currPreds
+              val cfg1 = preds.foldLeft(cfg)((g, pred) => {
+                val n = g(pred)
+                g + (pred -> appStmt(n,p))
+              })
+              for {
+                _ <- put(st.copy(cfg=cfg1))
+              } yield ()
+            } else {
+              val cfg = st.cfg
+              val preds = st.currPreds 
+              val node = AssignmentsNode(p, List(p), Nil, Nil, Nil, preds, Nil) 
+              val cfg1 = cfg + (p -> node)
+              for {
+                _ <- put(st.copy(cfg=cfg1, currPreds=List(p), continuable=true))
+              } yield ()
+            }
+          } yield ()
           /*
       CFG1 = CFG update { pred : {succ = path} |  pred <- preds } union { path : { stmt={x = exp}, lVars = lVars ++[x], preds = preds, succ = {} }  }
       --------------------------------------------------------

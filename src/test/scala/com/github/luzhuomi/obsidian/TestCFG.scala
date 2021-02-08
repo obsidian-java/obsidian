@@ -128,3 +128,68 @@ public static void main(String [] args) {
   }
 }
 
+
+class TestCFG3 extends FunSuite with Matchers {
+  val METHODSTR = """
+public static void main(String [] args) {
+	int x = 0;
+	switch (x) {
+        case 1: 
+            x++;
+            break;
+        case 2:
+            x--;
+            break;
+        default:
+            System.out.println(x);
+    }
+    ;
+  return;
+}
+    """
+  val methoddecl: Decl =
+    classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
+
+  val cfg: CFG = Map(List(1) -> SwitchNode(List(1),List(List(1, 0), List(1, 1), List(1, 2), List(1, 3)),List(),List(Ident("x")),List(List(0)),List(List(1, 0), List(1, 1), List(1, 2), List(1, 3)))
+                   , List(1, 1) -> CaseNode(List(1, 1),List(List(1, 1, 0), List(1, 1, 1), List(1, 1, 2)),List(List(1)),List(List(1, 1, 0)))
+                   , List(1, 2) -> DefaultNode(List(1, 2),List(List(1, 2, 0), List(1, 2, 1)),List(List(1)),List(List(1, 2, 0)))
+                   , List(1, 0, 1) -> BreakNode(List(1, 0, 1),List(List(1, 0, 0)),List())
+                   , List(1, 2, 0) -> AssignmentsNode(List(1, 2, 0),List(List(1, 2, 0)),List(),List(),List(Ident("x")),List(List(1, 2)),List())
+                   , List(3) -> ReturnNode(List(3),List(),List(),List(List(2)))
+                   , List(1, 0) -> CaseNode(List(1, 0),List(List(1, 0, 0), List(1, 0, 1), List(1, 0, 2)),List(List(1)),List(List(1, 0, 0)))
+                   , List(1, 0, 0) -> AssignmentsNode(List(1, 0, 0),List(List(1, 0, 0)),List(),List(Ident("x")),List(Ident("x")),List(List(1, 0)),List(List(1, 0, 1)))
+                   , List(0) -> AssignmentsNode(List(0),List(List(0)),List(Ident("x")),List(Ident("args")),List(Ident("x")),List(),List(List(1)))
+                   , List(1, 1, 1) -> BreakNode(List(1, 1, 1),List(List(1, 1, 0)),List())
+                   , List(2) -> AssignmentsNode(List(2),List(List(2)),List(),List(),List(),List(List(1, 2, 0), List(1, 0, 1), List(1, 1, 1)),List(List(3)))
+                   , List(1, 1, 0) -> AssignmentsNode(List(1, 1, 0),List(List(1, 1, 0)),List(),List(Ident("x")),List(Ident("x")),List(List(1, 1)),List(List(1, 1, 1))))
+  test("TestCFG3") {
+    methoddecl match {
+      case MemberDecl_(methodDecl @ MethodDecl(_, _, _, _, _, _, _, _)) => {
+        Label.labelOps
+          .label(methodDecl, None, None)
+          .run(Label.initStateInfo) match {
+          case Label.LabelError(message) => fail(message)
+          case Label.LabelOk((st, methDecl)) => {
+            Flatten.flatMethodDecl(methDecl).run(Flatten.initStateInfo) match {
+              case Flatten.FlatError(message) => fail(message)
+              case Flatten.FlatOk((st, f_methdDecl)) => {
+                val d_methodDecl = Desugar.dsgOps.desugar(f_methdDecl)
+                cfgOps.buildCFG(d_methodDecl, List()).run(initStateInfo) match {
+                    case CFGError(message) => fail(message)
+                    case CFGOk((st, unit)) => {
+                        assert(st.cfg == cfg)
+                    }
+                }
+              }
+            }
+          }
+        }
+      }
+      case _ =>
+        fail(
+          "It is supposed to be a MethodDecl member, but some other type is encountered."
+        )
+    }
+  }
+}
+
