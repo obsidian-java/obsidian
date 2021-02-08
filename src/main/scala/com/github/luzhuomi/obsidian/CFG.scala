@@ -927,7 +927,10 @@ object CFG {
                 val preds0 = st.currPreds
                 val contNodes0 = st.contNodes
                 val breakNodes0 = st.breakNodes
-                val childNodeId = childOf(currNodeId,0)
+                val childNodeId = stmt match {
+                  case StmtBlock(_) => childOf(childOf(currNodeId,0),0)
+                  case _ => childOf(currNodeId,0)
+                }
                 val cfgNode =
                   WhileNode(currNodeId, childNodeId, lhs, rhs, preds0, List(childNodeId))
                 val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {

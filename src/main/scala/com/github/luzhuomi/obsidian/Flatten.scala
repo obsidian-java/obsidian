@@ -175,7 +175,25 @@ public class Test {
 		  case MethodDecl(modifier, type_params, ty, id, formal_params, ex_types, exp, body) => for {
 			  _      <- formal_params.traverse_(addFormalParamToTypeEnv(_))
 			  f_body <- flatMethodBody(body)
-		  } yield MethodDecl(modifier, type_params, ty, id, formal_params, ex_types, exp, f_body)
+		  } yield ty match { 
+			  // append an return statement if the last statement of the method is not a return statement and the return type
+			  // of the method is void
+			  case Some(_) => MethodDecl(modifier, type_params, ty, id, formal_params, ex_types, exp, f_body)
+			  case None => // void type 
+			  {
+				  val f_body_p = f_body match {
+					  case MethodBody(Some(Block(stmts))) if (stmts.isEmpty) => MethodBody(Some(Block(List(BlockStmt_(Return(None))))))
+					  case MethodBody(Some(Block(stmts))) => {
+						stmts.last match {
+							case BlockStmt_(Return(_)) => MethodBody(Some(Block(stmts)))
+							case _ => MethodBody(Some(Block(stmts ++ List(BlockStmt_(Return(None))))))
+						}
+					  }
+					  case MethodBody(None) => MethodBody(Some(Block(List(BlockStmt_(Return(None))))))
+				  }
+				  MethodDecl(modifier, type_params, ty, id, formal_params, ex_types, exp, f_body_p)
+			  }
+		  }
 	  }
 
 	  def flatMethodBody(a:MethodBody)(implicit m:MonadError[FlatState, String]):FlatState[MethodBody] = a match { 

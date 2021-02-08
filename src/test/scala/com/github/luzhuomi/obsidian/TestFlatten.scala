@@ -26,6 +26,7 @@ public static void main (String[] args)
   x_is__flattened_0 = x++;
   x_is__flattened_1 = x++;
   System.out.println((x_is__flattened_0 + x_is__flattened_1));
+  return;
 }    
     """
     val f_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(F_METHODSTR)).get.get 
@@ -65,6 +66,7 @@ public static void main (String[] args)
   x_is__flattened_0 = ++x;
   x_is__flattened_1 = ++x;
   System.out.println((x_is__flattened_0 + x_is__flattened_1));
+  return;
 }    
     """
     val f_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(F_METHODSTR)).get.get 
@@ -107,6 +109,7 @@ public static void main (String[] args)
   y_is__flattened_1 = y = x_is__flattened_0 + 1;
   x_is__flattened_2 = x = y_is__flattened_1;
   System.out.println(x_is__flattened_2);
+  return;
 } 
     """
     val f_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(F_METHODSTR)).get.get 
