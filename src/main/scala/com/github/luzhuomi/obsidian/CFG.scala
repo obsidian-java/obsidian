@@ -949,26 +949,32 @@ object CFG {
                     val preds2 = st1.currPreds
                     val contNodes2 = st1.contNodes
                     val cfg2 = st1.cfg
-                    val cfg2p = (preds2++contNodes2(currNodeId).toList).foldLeft(cfg2)((g, pred) => {
+                    val conts2:List[NodeId] = contNodes2.get(currNodeId) match {
+                      case None => Nil
+                      case Some(ids) => ids
+                    }
+                    val cfg2p = (preds2++conts2).foldLeft(cfg2)((g, pred) => {
                       val n = g(pred)
                       g + (pred -> appSucc(n, currNodeId))
                     })
                     val breakNodes2 = st1.breakNodes
                     val currNode = cfg2p(currNodeId)
-                    val cfg2pp = cfg2p + (currNodeId -> 
-                      appPreds(cfg2p(currNodeId), preds2 ++ contNodes2(currNodeId).toList))
-                    val cfg3 = contNodes2(currNodeId).toList.foldLeft(cfg2pp)(
-                      (g, l) => { // update the break and cont immediately
+                    val cfg2pp = cfg2p + (currNodeId -> appPreds(cfg2p(currNodeId), preds2 ++ conts2))
+                    val cfg3 = conts2.foldLeft(cfg2pp)((g, l) => { // update the break and cont immediately
                         val n = g(l)
                         g + (l -> appSucc(n,currNodeId))
                       }
                     )
                     val cfg3p = cfg3
+                    val breaks2 = breakNodes2.get(currNodeId) match {
+                      case None => Nil
+                      case Some(ids) => ids
+                    }
                     for {
                       _ <- put(
                         st1.copy(
                           cfg = cfg3p,
-                          currPreds = List(currNodeId) ++ breakNodes2(currNodeId).toList,
+                          currPreds = List(currNodeId) ++ breaks2,
                           continuable = false
                         )
                       )

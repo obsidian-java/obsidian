@@ -27,6 +27,12 @@ class TestCFG1 extends FunSuite with Matchers {
     """
   val methoddecl: Decl =
     classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
+
+  val cfg: CFG = Map(List(3, 0, 0) -> AssignmentsNode(List(3, 0, 0),List(List(3, 0, 0)),List(Ident("t")),List(Ident("f1"), Ident("f2")),List(Ident("t")),List(List(3)),List(List(3, 0, 1)))
+                   , List(3) -> WhileNode(List(3),List(3, 0),List(Ident("i"), Ident("n")),List(),List(List(0), List(3, 0, 1)),List(List(3, 0), List(3, 0, 0), List(4)))
+                   , List(3, 0, 1) -> AssignmentsNode(List(3, 0, 1),List(List(3, 0, 1), List(3, 0, 2), List(3, 0, 3)),List(),List(Ident("f1"), Ident("f2"), Ident("i")),List(Ident("f2"), Ident("t"), Ident("i")),List(List(3, 0, 0)),List(List(3)))
+                   , List(0) -> AssignmentsNode(List(0),List(List(0), List(1), List(2)),List(Ident("f1"), Ident("f2"), Ident("i")),List(Ident("f2"), Ident("i"), Ident("n")),List(Ident("f1")),List(),List(List(3)))
+                   , List(4) -> ReturnNode(List(4),List(),List(Ident("f2")),List(List(3))))
   test("TestCFG1") {
     methoddecl match {
       case MemberDecl_(methodDecl @ MethodDecl(_, _, _, _, _, _, _, _)) => {
@@ -42,8 +48,8 @@ class TestCFG1 extends FunSuite with Matchers {
                 cfgOps.buildCFG(d_methodDecl, List()).run(initStateInfo) match {
                     case CFGError(message) => fail(message)
                     case CFGOk((st, unit)) => {
-                        println(st.cfg)
-                        fail()
+                        // println(st.cfg)
+                        assert(st.cfg == cfg)
                     }
                 }
               }
