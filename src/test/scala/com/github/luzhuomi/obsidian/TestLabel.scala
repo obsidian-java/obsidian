@@ -366,3 +366,39 @@ public static void main (String[] args)
         }
     }
 }
+
+
+
+class TestLabel9 extends FunSuite with Matchers {
+    val METHODSTR = """
+public static void main (String[] args)
+{
+  int x = 10;
+  for (int i = 0; i < x; i++) {
+      System.out.println(i);
+  }
+}
+    """
+    val L_METHODSTR = """
+public static void main (String[] args)
+{ int x = 10; obsLbl_0: for (int i = 0 ; i < x ; i++) { System.out.println(i); } }
+    """" 
+    //println(classBodyStatement.apply(new Lexer.Scanner(METHODSTR)))
+    val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get 
+    val l_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(L_METHODSTR)).get.get 
+    test("TestLabel9") {
+        methoddecl match {
+            case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
+              labelOps.label(methodDecl,None,None).run(Label.initStateInfo) match {
+                  case LabelError(message) => fail(message)
+                  case LabelOk((st, methDecl)) => {
+                      val result:Decl = MemberDecl_(methDecl)
+                      // println(prettyPrint(result))
+                      assert(result == l_methoddecl)
+                  }
+              }
+            }
+            case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")           
+        }
+    }
+}

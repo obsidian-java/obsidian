@@ -193,3 +193,109 @@ public static void main(String [] args) {
   }
 }
 
+
+
+class TestCFG4 extends FunSuite with Matchers {
+  val METHODSTR = """
+public static void main (String[] args)
+{
+  int x = 10;
+  for (int i = 0; i < x; i++) {
+      System.out.println(i);
+  }
+  return;
+}
+    """
+  val methoddecl: Decl =
+    classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
+
+  val cfg: CFG = Map(List(1, 1) -> WhileNode(List(1, 1),List(1, 1, 0, 0),List(Ident("i"), Ident("x")),List(),List(List(1, 0), List(1, 1, 0, 0)),List(List(1, 1, 0, 0)))
+                   , List(1, 2) -> AssignmentsNode(List(1, 2),List(List(1, 2)),List(),List(),List(),List(List(1, 1)),List(List(2)))
+                   , List(1, 1, 0, 0) -> AssignmentsNode(List(1, 1, 0, 0),List(List(1, 1, 0, 0), List(1, 1, 0, 1)),List(),List(Ident("i")),List(Ident("i"), Ident("i")),List(List(1, 1)),List(List(1, 1)))
+                   , List(1, 0) -> AssignmentsNode(List(1, 0),List(List(1, 0)),List(Ident("i")),List(),List(Ident("i")),List(List(0)),List(List(1, 1)))
+                   , List(0) -> AssignmentsNode(List(0),List(List(0)),List(Ident("x")),List(Ident("args")),List(Ident("x")),List(),List(List(1, 0)))
+                   , List(2) -> ReturnNode(List(2),List(),List(),List(List(1, 2)))) 
+  test("TestCFG4") {
+    methoddecl match {
+      case MemberDecl_(methodDecl @ MethodDecl(_, _, _, _, _, _, _, _)) => {
+        Label.labelOps
+          .label(methodDecl, None, None)
+          .run(Label.initStateInfo) match {
+          case Label.LabelError(message) => fail(message)
+          case Label.LabelOk((st, methDecl)) => {
+            Flatten.flatMethodDecl(methDecl).run(Flatten.initStateInfo) match {
+              case Flatten.FlatError(message) => fail(message)
+              case Flatten.FlatOk((st, f_methdDecl)) => {
+                val d_methodDecl = Desugar.dsgOps.desugar(f_methdDecl)
+                cfgOps.buildCFG(d_methodDecl, List()).run(initStateInfo) match {
+                    case CFGError(message) => fail(message)
+                    case CFGOk((st, unit)) => {
+                        assert(st.cfg == cfg)
+                    }
+                }
+              }
+            }
+          }
+        }
+      }
+      case _ =>
+        fail(
+          "It is supposed to be a MethodDecl member, but some other type is encountered."
+        )
+    }
+  }
+}
+
+/*
+class TestCFG5 extends FunSuite with Matchers {
+  val METHODSTR = """
+public static void main(String [] args) {
+    int x = 0;
+    try { 
+        x = x / 0 ;
+    }
+    catch (ArrayIndexOutOfBoundsException e) {
+        System.out.println("arrayout of bound");
+    }
+} 
+  """
+  val methoddecl: Decl =
+    classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
+
+  val cfg: CFG = Map(List(1, 1) -> WhileNode(List(1, 1),List(1, 1, 0, 0),List(Ident("i"), Ident("x")),List(),List(List(1, 0), List(1, 1, 0, 0)),List(List(1, 1, 0, 0)))
+                   , List(1, 2) -> AssignmentsNode(List(1, 2),List(List(1, 2)),List(),List(),List(),List(List(1, 1)),List(List(2)))
+                   , List(1, 1, 0, 0) -> AssignmentsNode(List(1, 1, 0, 0),List(List(1, 1, 0, 0), List(1, 1, 0, 1)),List(),List(Ident("i")),List(Ident("i"), Ident("i")),List(List(1, 1)),List(List(1, 1)))
+                   , List(1, 0) -> AssignmentsNode(List(1, 0),List(List(1, 0)),List(Ident("i")),List(),List(Ident("i")),List(List(0)),List(List(1, 1)))
+                   , List(0) -> AssignmentsNode(List(0),List(List(0)),List(Ident("x")),List(Ident("args")),List(Ident("x")),List(),List(List(1, 0)))
+                   , List(2) -> ReturnNode(List(2),List(),List(),List(List(1, 2)))) 
+  test("TestCFG5") {
+    methoddecl match {
+      case MemberDecl_(methodDecl @ MethodDecl(_, _, _, _, _, _, _, _)) => {
+        Label.labelOps
+          .label(methodDecl, None, None)
+          .run(Label.initStateInfo) match {
+          case Label.LabelError(message) => fail(message)
+          case Label.LabelOk((st, methDecl)) => {
+            Flatten.flatMethodDecl(methDecl).run(Flatten.initStateInfo) match {
+              case Flatten.FlatError(message) => fail(message)
+              case Flatten.FlatOk((st, f_methdDecl)) => {
+                val d_methodDecl = Desugar.dsgOps.desugar(f_methdDecl)
+                cfgOps.buildCFG(d_methodDecl, List()).run(initStateInfo) match {
+                    case CFGError(message) => fail(message)
+                    case CFGOk((st, unit)) => {
+                        assert(st.cfg == cfg)
+                    }
+                }
+              }
+            }
+          }
+        }
+      }
+      case _ =>
+        fail(
+          "It is supposed to be a MethodDecl member, but some other type is encountered."
+        )
+    }
+  }
+}
+*/
