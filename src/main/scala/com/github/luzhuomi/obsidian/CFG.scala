@@ -988,24 +988,28 @@ object CFG {
             } yield ()
           case BasicFor(init, exp2, exp3, stmt) => m.raiseError("Basic For is encountered during CFG construction, which should have been desugared!")
           case EnhancedFor(modifiers, ty, id, exp, stmt) =>m.raiseError("Enhanced For is encountered during CFG construction, which should have been desugared!")
+
+          /*
+          CFG1 = CFG update { pred : stmts=[empty], preds = preds, pred \in preds }
+          ----------------------------------------------------
+          CFG, path, preds, false |- CFG1, preds, true
+
+          CFG1 = CFG update { pred: stmts = stmts ++ [empty], pred \in preds }
+          ---------------------------------------------
+          CFG, path, preds, true |- CFG1, preds, true
+          */
           case Empty => m.pure(())
 
           /*
-      CFG1 = CFG update { pred : {stmts = stmts ++ [x = exp], lVars = lVars ++ [x] } }
-      x \not in {v | v \in lVars pred, pred \in preds }
+      CFG1 = CFG update { pred : {succ = path} |  pred <- preds } union { path : { stmt={x = exp}, lVars = lVars ++[x], preds = preds, succ = {} }  }
       --------------------------------------------------------
-      CFG, max, preds, true |-  x = exp => CFG1, max, [] , true
-
-      max1 = max + 1
-      CFG1 = CFG update { pred : {succ = max} |  pred <- preds } union { max : {x = exp} }
-      --------------------------------------------------------
-      CFG, max, preds, false |- x = exp => CFG1, max1, [], false
+      CFG, path, preds, false |- x = exp => CFG1, {path}, true
 
 
       CFG1 = CFG update { pred: {stmts = stmts ++ [path], lVars = lVars ++[x] } }
       x \not in {v | v \in lVars preds, preds \in preds}
       ----------------------------------------------------------------
-      CFG, path, preds, true |- x = exp => CFG1, 
+      CFG, path, preds, true |- x = exp => CFG1, preds, true
            */
           case s @ ExpStmt(Assign(lhs, EqualA, rhs)) => {
             val xs = HasVarcfgOps.getLVarsFrom(lhs).toSet
