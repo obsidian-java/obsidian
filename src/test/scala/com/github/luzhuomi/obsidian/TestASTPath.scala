@@ -211,3 +211,51 @@ int get (int x) {
       }
   }
 }
+
+
+
+class TestASTPath6 extends FunSuite with Matchers {
+  val METHODSTRING =  """
+public static void main (String[] args)
+{
+  int x = 0; // 0
+  try        // 1
+  { // 1,0
+    x = x / 0; // 1,0,0 
+  }  
+  catch (Exception exception_desugared) 
+  { // 1,1
+    if (exception_desugared instanceof ArrayIndexOutOfBoundsException) // 1,1,0
+    {
+      ArrayIndexOutOfBoundsException e = (ArrayIndexOutOfBoundsException) exception_desugared;
+      System.out.println("arrayout of bound");
+    }
+    else
+      throw exception_desugared;
+  }
+  finally {  }
+}
+    """
+  val STMTSTRNG = """
+  if (exception_desugared instanceof ArrayIndexOutOfBoundsException)
+    {
+      ArrayIndexOutOfBoundsException e = (ArrayIndexOutOfBoundsException) exception_desugared;
+      System.out.println("arrayout of bound");
+    }
+    else
+      throw exception_desugared;
+  """
+  val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTRING)).get.get
+  val bStmt:BlockStmt = blockStmt.apply(new Lexer.Scanner(STMTSTRNG)).get
+  test("TestASTPath6") {
+      methoddecl match {
+          case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
+              val path = List(1,1,0)
+              val result = queryOps.query(methodDecl, path)
+              assert((!result.isEmpty) && (result.get == bStmt ))
+          } 
+          case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")
+      }
+  }
+}
+

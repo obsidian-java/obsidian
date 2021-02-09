@@ -113,6 +113,10 @@ object Desugar {
     new DSG[Block] {
       override def desugar(a: Syntax.Block): Syntax.Block =
         a match {
+          /** empty block is desugared to a block contain an empty statement
+            * { } ==> { ; }
+            */
+          case Block(Nil) => { Block(List(BlockStmt_(Empty))) } 
           case Block(stmts) => {
             val sstmts = stmts.map(stmt => dsgOps.desugar(stmt))
             Block(sstmts)

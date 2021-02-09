@@ -246,7 +246,8 @@ public static void main (String[] args)
   }
 }
 
-/*
+
+
 class TestCFG5 extends FunSuite with Matchers {
   val METHODSTR = """
 public static void main(String [] args) {
@@ -262,12 +263,16 @@ public static void main(String [] args) {
   val methoddecl: Decl =
     classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
 
-  val cfg: CFG = Map(List(1, 1) -> WhileNode(List(1, 1),List(1, 1, 0, 0),List(Ident("i"), Ident("x")),List(),List(List(1, 0), List(1, 1, 0, 0)),List(List(1, 1, 0, 0)))
-                   , List(1, 2) -> AssignmentsNode(List(1, 2),List(List(1, 2)),List(),List(),List(),List(List(1, 1)),List(List(2)))
-                   , List(1, 1, 0, 0) -> AssignmentsNode(List(1, 1, 0, 0),List(List(1, 1, 0, 0), List(1, 1, 0, 1)),List(),List(Ident("i")),List(Ident("i"), Ident("i")),List(List(1, 1)),List(List(1, 1)))
-                   , List(1, 0) -> AssignmentsNode(List(1, 0),List(List(1, 0)),List(Ident("i")),List(),List(Ident("i")),List(List(0)),List(List(1, 1)))
-                   , List(0) -> AssignmentsNode(List(0),List(List(0)),List(Ident("x")),List(Ident("args")),List(Ident("x")),List(),List(List(1, 0)))
-                   , List(2) -> ReturnNode(List(2),List(),List(),List(List(1, 2)))) 
+  val cfg: CFG = Map(List(0) -> AssignmentsNode(List(0),List(List(0)),List(Ident("x")),List(Ident("args")),List(Ident("x")),List(),List())
+                   , List(1) -> TryCatchFinallyNode(List(1),List(1, 0),List(1, 1),List(Ident("exception_desugared")),List(1, 2),List(List(0)),List(List(1, 0), List(1, 0, 0)))
+                   , List(1, 0, 0) -> AssignmentsNode(List(1, 0, 0),List(List(1, 0, 0)),List(),List(Ident("x")),List(Ident("x")),List(List(1)),List(List(1, 2)))
+                   , List(1, 1, 0) -> IfThenElseNode(List(1, 1, 0),List(1, 1, 0, 0),List(1, 1, 0, 1),List(),List(Ident("exception_desugared")),List(),List(List(1, 1, 0, 0, 0), List(1, 1, 0, 1)))
+                   , List(1, 1, 0, 0, 0) -> AssignmentsNode(List(1, 1, 0, 0, 0),List(List(1, 1, 0, 0, 0), List(1, 1, 0, 0, 1)),List(Ident("e")),List(Ident("exception_desugared")),List(Ident("e")),List(List(1, 1, 0)),List(List(1, 2)))
+                   , List(1, 1, 0, 1) -> ThrowNode(List(1, 1, 0, 1),List(),List(Ident("exception_desugared")),List(List(1, 1, 0)),List())
+                   , List(1, 2) -> AssignmentsNode(List(1, 2),List(),List(),List(),List(),List(List(1, 0, 0), List(1, 1, 0, 0, 0)),List(List(2)))
+                   , List(2) -> ReturnNode(List(2),List(),List(),List(List(1, 2)))
+                   )
+
   test("TestCFG5") {
     methoddecl match {
       case MemberDecl_(methodDecl @ MethodDecl(_, _, _, _, _, _, _, _)) => {
@@ -298,4 +303,3 @@ public static void main(String [] args) {
     }
   }
 }
-*/

@@ -116,6 +116,7 @@ object CFG {
     * @param id
     * @param tryNode the location of the try node
     * @param catchNodes the locations of the catch blocks
+    * @param catchLocalVars the exception variables used in the catch block
     * @param finallyNode the locations of the finally blocks
     * @param preds predecessor ids
     * @param succs successor ids
@@ -125,6 +126,7 @@ object CFG {
       id: ASTPath,
       tryNode: NodeId,
       catchNodes: NodeId,
+      catchLocalVars: List[Ident],
       finallyNode: NodeId,
       preds: List[NodeId],
       succs: List[NodeId]
@@ -252,7 +254,7 @@ object CFG {
     case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  SwitchNode(id, caseNodes, lVars, rVars, preds, s) 
     case ReturnNode(id, lVars, rVars, preds) => n
     case ThrowNode(id, lVars, rVars, preds, succs) => ThrowNode(id, lVars, rVars, preds, s)
-    case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, s)
+    case TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, s)
     case WhileNode(id, bodyNode, lVars, rVars, preds, succs) => WhileNode(id, bodyNode, lVars, rVars, preds, s)
     case AssertNode(id, lvars, rvars, preds, succs) => AssertNode(id, lvars, rvars,  preds, s) 
     case BreakNode(id, preds, succs) => BreakNode(id, preds, s)
@@ -267,7 +269,7 @@ object CFG {
     case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  SwitchNode(id, caseNodes, lVars, rVars, p, succs)  
     case ReturnNode(id, lVars, rVars, preds) => ReturnNode(id, lVars, rVars, p)
     case ThrowNode(id, lVars, rVars, preds, succs) => ThrowNode(id, lVars, rVars, p, succs)
-    case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, p, succs)
+    case TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, p, succs)
     case WhileNode(id, bodyNode, lVars, rVars, preds, succs) => WhileNode(id, bodyNode, lVars, rVars, p, succs)
     case AssertNode(id, lvars, rvars, preds, succs) => AssertNode(id, lvars, rvars, p, succs)  
     case BreakNode(id, preds, succs) => BreakNode(id, p, succs)
@@ -282,7 +284,7 @@ object CFG {
     case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  SwitchNode(id, caseNodes, lv, rVars, preds, succs) 
     case ReturnNode(id, lVars, rVars, preds) => ReturnNode(id, lv, rVars, preds)
     case ThrowNode(id, lVars, rVars, preds, succs) => ThrowNode(id, lv, rVars, preds, succs)
-    case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs)
+    case TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, succs)
     case WhileNode(id, bodyNode, lVars, rVars, preds, succs) => WhileNode(id, bodyNode, lv, rVars, preds, succs)
     case AssertNode(id, lvars, rvars,  preds, succs) => AssertNode(id, lv, rvars,  preds, succs)
     case BreakNode(id, preds, succs) => n
@@ -298,7 +300,7 @@ object CFG {
     case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  SwitchNode(id, caseNodes, lVars, rv, preds, succs) 
     case ReturnNode(id, lVars, rVars, preds) => ReturnNode(id, lVars, rv, preds)
     case ThrowNode(id, lVars, rVars, preds, succs) => ThrowNode(id, lVars, rv, preds, succs)
-    case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs)
+    case TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, succs)
     case WhileNode(id, bodyNode, lVars, rVars, preds, succs) => WhileNode(id, bodyNode, lVars, rv, preds, succs)
     case AssertNode(id, lvars, rvars,  preds, succs) => AssertNode(id, lvars, rv,  preds, succs) 
     case BreakNode(id, preds, succs) => n
@@ -313,7 +315,7 @@ object CFG {
     case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  succs
     case ReturnNode(id, lVars, rVars, preds) => Nil
     case ThrowNode(id, lVars, rVars, preds, succs) => succs
-    case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => succs
+    case TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, succs) => succs
     case WhileNode(id, bodyNode, lVars, rVars, preds, succs) => succs
     case AssertNode(id, lVars, rVars, preds, succs) => succs
     case BreakNode(id, preds, succs) => succs
@@ -328,7 +330,7 @@ object CFG {
     case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  preds
     case ReturnNode(id, lVars, rVars, preds) => preds
     case ThrowNode(id, lVars, rVars, preds, succs) => preds
-    case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => preds
+    case TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, succs) => preds
     case WhileNode(id, bodyNode, lVars, rVars, preds, succs) => preds
     case AssertNode(id, lVars, rVars, preds, succs) => preds
     case BreakNode(id, preds, succs) => preds
@@ -343,7 +345,7 @@ object CFG {
     case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  lVars
     case ReturnNode(id, lVars, rVars, preds) => lVars
     case ThrowNode(id, lVars, rVars, preds, succs) => lVars
-    case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => Nil
+    case TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, succs) => Nil
     case WhileNode(id, bodyNode, lVars, rVars, preds, succs) => lVars
     case AssertNode(id, lVars, rVars, preds, succs) => lVars
     case BreakNode(id, preds, succs) => Nil
@@ -358,7 +360,7 @@ object CFG {
     case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  rVars 
     case ReturnNode(id, lVars, rVars, preds) => rVars
     case ThrowNode(id, lVars, rVars, preds, succs) => rVars
-    case TryCatchFinallyNode(id, tryNode, catchNodes, finallyNode, preds, succs) => Nil
+    case TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, succs) => Nil
     case WhileNode(id, bodyNode, lVars, rVars, preds, succs) => rVars
     case AssertNode(id, lVars, rVars, preds, succs) => rVars
     case BreakNode(id, preds, succs) => Nil
@@ -640,7 +642,7 @@ object CFG {
           a: Block, p:ASTPath
       )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
         a match {
-          case Block(Nil) => {
+          case Block(Nil) => { // TODO: this case is not needed? since empty block is deguared into a block containing an empty statement?
             val lhs = Nil
             val rhs = Nil
             val stmts = Nil
@@ -1309,7 +1311,7 @@ object CFG {
               }
             } yield ()
 
-          case Try(try_blk, List(catch_blk), Some(finally_blk)) => // there should be only one catch block, multiple catch blocks have been desguared into one.
+          case Try(try_blk, List(catch_blk@Catch(params, blk)), Some(finally_blk)) => // there should be only one catch block, multiple catch blocks have been desguared into one.
             for {
               /*
       n = { try_node = tryOf(path), catch_nodes = [ childOf(path, n+1) | n <- (0.. num_catches) ], finally_node = childOf(path, num_catches+1), preds = preds, succs = Nil }
@@ -1329,11 +1331,15 @@ object CFG {
               _ <- {
                 val currNodeId = p
                 val preds0 = st.currPreds
+                val catchVars = HasVarcfgOps.getLVarsFrom(params)
+                println(params)
+                println(catchVars)
                 val n = TryCatchFinallyNode(
                   currNodeId,
                   tryOf(currNodeId),
                   childOf(currNodeId,1),
-                  childOf(currNodeId, 2),
+                  catchVars,
+                  childOf(currNodeId,2),
                   preds0,
                   List(tryOf(currNodeId))
                 )
@@ -1417,27 +1423,13 @@ object CFG {
         a match {
           case Catch(params, blk) =>
             for {
+              _ <- cfgOps.buildCFG(blk,p)
               st <- get
-              _ <- {
-                val lhs = HasVarcfgOps.getLVarsFrom((params))
-                for {
-                  _ <- cfgOps.buildCFG(blk,p)
-                  st2 <- get
-                  _ <- {
-                    val cfg2 = st2.cfg
-                    val n = cfg2(p)
-                    val cfg3 = cfg2 + (p -> appLocalDecls(n, lhs)) // TODO: check whether n is definitely assignments node
-                    for {
-                      _ <- put(
-                        st2.copy(
-                          cfg = cfg3,
-                          catchNodes = st.catchNodes ++ List(p)
-                        )
-                      )
-                    } yield ()
-                  }
-                } yield ()
-              }
+              _ <- put(
+                  st.copy(
+                  catchNodes = st.catchNodes ++ List(childOf(p,0))
+                  )
+              )
             } yield ()
         }
     }
@@ -2125,6 +2117,11 @@ object CFG {
   implicit def getVarsFromFormalParam: HasVar[FormalParam] =
     new HasVar[FormalParam] {
       override def getVarsFrom(fp: FormalParam): List[Ident] =
+        fp match {
+          case FormalParam(modifiers, ty, has_arity, var_decl_id) =>
+            List(idFromVarDeclId(var_decl_id))
+        }
+      override def getLVarsFrom(fp: FormalParam): List[Ident] =
         fp match {
           case FormalParam(modifiers, ty, has_arity, var_decl_id) =>
             List(idFromVarDeclId(var_decl_id))
