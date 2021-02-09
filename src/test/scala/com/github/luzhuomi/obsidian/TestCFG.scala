@@ -248,13 +248,13 @@ public static void main (String[] args)
 
 
 
-class TestCFG5 extends FunSuite with Matchers {
+class TestCFG5 extends FunSuite with Matchers { // probably a bad test case, we can't handle unchecked exception
   val METHODSTR = """
 public static void main(String [] args) {
     int x = 0;
     try { 
         x = x / 0 ;
-    }
+    } 
     catch (ArrayIndexOutOfBoundsException e) {
         System.out.println("arrayout of bound");
     }

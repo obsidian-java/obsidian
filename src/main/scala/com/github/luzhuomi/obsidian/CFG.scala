@@ -1332,8 +1332,6 @@ object CFG {
                 val currNodeId = p
                 val preds0 = st.currPreds
                 val catchVars = HasVarcfgOps.getLVarsFrom(params)
-                println(params)
-                println(catchVars)
                 val n = TryCatchFinallyNode(
                   currNodeId,
                   tryOf(currNodeId),
