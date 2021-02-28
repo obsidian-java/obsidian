@@ -21,272 +21,272 @@ object CFG {
   type CFG = Map[ASTPath, Node]
 
   /**
-    * redesigning the CFG data type. Unlike the C CFG, which has only a single Node type
-    * the Java CFG should have a proper algebraic data type node. Some node has no statement
-    * e.g. If-else, while, try catch finally.
-    */
+   * redesigning the CFG data type. Unlike the C CFG, which has only a single Node type
+   * the Java CFG should have a proper algebraic data type node. Some node has no statement
+   * e.g. If-else, while, try catch finally.
+   */
 
-  sealed trait Node 
+  sealed trait Node
 
   /**
-    * A CFG node contains a sequence of assignment statments
-    *
-    * @param id node ID
-    * @param stmts lits of locations of the enclosed statements
-    * @param lVars variables on the lhs of assignments. Though they can be constructed from stmts, we cache them here for convienence.
-    * @param rVars variables on the rhs of assignments
-    * @param preds predecessor node ids
-    * @param succs successor node ids
-    */
+   * A CFG node contains a sequence of assignment statments
+   *
+   * @param id    node ID
+   * @param stmts lits of locations of the enclosed statements
+   * @param lVars variables on the lhs of assignments. Though they can be constructed from stmts, we cache them here for convienence.
+   * @param rVars variables on the rhs of assignments
+   * @param preds predecessor node ids
+   * @param succs successor node ids
+   */
   case class AssignmentsNode(
-      id: ASTPath,
-      stmts: List[ASTPath],
-      localDecls: List[Ident],
-      lVars: List[Ident],
-      rVars: List[Ident],
-      preds: List[NodeId],
-      succs: List[NodeId]
-  ) extends Node
+                              id: ASTPath,
+                              stmts: List[ASTPath],
+                              localDecls: List[Ident],
+                              lVars: List[Ident],
+                              rVars: List[Ident],
+                              preds: List[NodeId],
+                              succs: List[NodeId]
+                            ) extends Node
 
   /**
-    * A CFG node containing an if-else statement
-    *
-    * @param id
-    * @param thenNode then node id
-    * @param elseNode else node id
-    * @param lVars variables on the lhs of assignments. Though they can be constructed from stmts, we cache them here for convienence.
-    * @param rVars variables on the rhs of assignments
-    * @param preds predecessor ids
-    * @param succs successor ids
-    */
+   * A CFG node containing an if-else statement
+   *
+   * @param id
+   * @param thenNode then node id
+   * @param elseNode else node id
+   * @param lVars    variables on the lhs of assignments. Though they can be constructed from stmts, we cache them here for convienence.
+   * @param rVars    variables on the rhs of assignments
+   * @param preds    predecessor ids
+   * @param succs    successor ids
+   */
   case class IfThenElseNode(
-      id: ASTPath,
-      thenNode: NodeId,
-      elseNode: NodeId,
-      lVars: List[Ident],
-      rVars: List[Ident],
-      preds: List[NodeId],
-      succs: List[NodeId]
-  ) extends Node
+                             id: ASTPath,
+                             thenNode: NodeId,
+                             elseNode: NodeId,
+                             lVars: List[Ident],
+                             rVars: List[Ident],
+                             preds: List[NodeId],
+                             succs: List[NodeId]
+                           ) extends Node
 
 
   /**
-    * A CFG node containing a switch statement
-    *
-    * @param id
-    * @param caseNodes the list of case nodes location
-    * @param lVars
-    * @param rVars
-    * @param preds
-    * @param succs
-    */
+   * A CFG node containing a switch statement
+   *
+   * @param id
+   * @param caseNodes the list of case nodes location
+   * @param lVars
+   * @param rVars
+   * @param preds
+   * @param succs
+   */
 
   case class SwitchNode(
-    id:ASTPath,
-    caseNodes: List[NodeId],
-    lVars: List[Ident],
-    rVars: List[Ident],
-    preds: List[NodeId],
-    succs: List[NodeId]
-  ) extends Node
+                         id: ASTPath,
+                         caseNodes: List[NodeId],
+                         lVars: List[Ident],
+                         rVars: List[Ident],
+                         preds: List[NodeId],
+                         succs: List[NodeId]
+                       ) extends Node
 
 
   /**
-    * A CFG node containing a while loop
-    *
-    * @param id
-    * @param bodyNode the location of the body
-    * @param lVars variables on the lhs of assignments. Though they can be constructed from stmts, we cache them here for convienence.
-    * @param rVars variables on the rhs of assignments
-    * @param preds predecessor ids
-    * @param succs successor ids
-    */
+   * A CFG node containing a while loop
+   *
+   * @param id
+   * @param bodyNode the location of the body
+   * @param lVars    variables on the lhs of assignments. Though they can be constructed from stmts, we cache them here for convienence.
+   * @param rVars    variables on the rhs of assignments
+   * @param preds    predecessor ids
+   * @param succs    successor ids
+   */
   case class WhileNode(
-      id: ASTPath,
-      bodyNode: NodeId,
-      lVars: List[Ident],
-      rVars: List[Ident],
-      preds: List[NodeId],
-      succs: List[NodeId]
-  ) extends Node
+                        id: ASTPath,
+                        bodyNode: NodeId,
+                        lVars: List[Ident],
+                        rVars: List[Ident],
+                        preds: List[NodeId],
+                        succs: List[NodeId]
+                      ) extends Node
 
   /**
-    * A CFG node containing a try catch finally statement
-    *
-    * @param id
-    * @param tryNode the location of the try node
-    * @param catchNodes the locations of the catch blocks
-    * @param catchLocalVars the exception variables used in the catch block
-    * @param finallyNode the locations of the finally blocks
-    * @param preds predecessor ids
-    * @param succs successor ids
-    */
+   * A CFG node containing a try catch finally statement
+   *
+   * @param id
+   * @param tryNode        the location of the try node
+   * @param catchNodes     the locations of the catch blocks
+   * @param catchLocalVars the exception variables used in the catch block
+   * @param finallyNode    the locations of the finally blocks
+   * @param preds          predecessor ids
+   * @param succs          successor ids
+   */
 
   case class TryCatchFinallyNode(
-      id: ASTPath,
-      tryNode: NodeId,
-      catchNodes: NodeId,
-      catchLocalVars: List[Ident],
-      finallyNode: NodeId,
-      preds: List[NodeId],
-      succs: List[NodeId]
-  ) extends Node
+                                  id: ASTPath,
+                                  tryNode: NodeId,
+                                  catchNodes: NodeId,
+                                  catchLocalVars: List[Ident],
+                                  finallyNode: NodeId,
+                                  preds: List[NodeId],
+                                  succs: List[NodeId]
+                                ) extends Node
 
 
   /**
-    * A CFG node containing a return statement
-    *
-    * @param id
-    * @param lVars variables on the lhs of assignments. Though they can be constructed from stmts, we cache them here for convienence.
-    * @param rVars variables on the rhs of assignments
-    * @param preds predecessor ids
-    */
+   * A CFG node containing a return statement
+   *
+   * @param id
+   * @param lVars variables on the lhs of assignments. Though they can be constructed from stmts, we cache them here for convienence.
+   * @param rVars variables on the rhs of assignments
+   * @param preds predecessor ids
+   */
 
   case class ReturnNode(
-      id: ASTPath,
-      lVars: List[Ident],
-      rVars: List[Ident],
-      preds: List[NodeId]
-  ) extends Node
+                         id: ASTPath,
+                         lVars: List[Ident],
+                         rVars: List[Ident],
+                         preds: List[NodeId]
+                       ) extends Node
 
   /**
-    * A CFG node containing a throw statement
-    *
-    * @param id
-    * @param lVars variables on the lhs of assignments. Though they can be constructed from stmts, we cache them here for convienence.
-    * @param rVars variables on the rhs of assignments
-    * @param preds predecessor ids
-    * @param succs successor ids
-    */
+   * A CFG node containing a throw statement
+   *
+   * @param id
+   * @param lVars variables on the lhs of assignments. Though they can be constructed from stmts, we cache them here for convienence.
+   * @param rVars variables on the rhs of assignments
+   * @param preds predecessor ids
+   * @param succs successor ids
+   */
 
   case class ThrowNode(
-      id: ASTPath,
-      lVars: List[Ident],
-      rVars: List[Ident],
-      preds: List[NodeId],
-      succs: List[NodeId]
-  ) extends Node
+                        id: ASTPath,
+                        lVars: List[Ident],
+                        rVars: List[Ident],
+                        preds: List[NodeId],
+                        succs: List[NodeId]
+                      ) extends Node
 
   /**
-    * A CFG node containing an assert statement
-    *
-    * @param id
-    * @param lVars variables on the lhs of assignments. Though they can be constructed from stmts, we cache them here for convienence.
-    * @param rVars variables on the rhs of assignments
-    * @param preds
-    * @param succs
-    */
+   * A CFG node containing an assert statement
+   *
+   * @param id
+   * @param lVars variables on the lhs of assignments. Though they can be constructed from stmts, we cache them here for convienence.
+   * @param rVars variables on the rhs of assignments
+   * @param preds
+   * @param succs
+   */
 
   case class AssertNode(
-    id: ASTPath, 
-    lVars: List[Ident],
-    rVars: List[Ident],
-    preds: List[NodeId],
-    succs: List[NodeId]
-  ) extends Node
+                         id: ASTPath,
+                         lVars: List[Ident],
+                         rVars: List[Ident],
+                         preds: List[NodeId],
+                         succs: List[NodeId]
+                       ) extends Node
 
 
   /**
-    * a CFG mode containing a break statement
-    *
-    * @param id
-    * @param preds
-    * @param succs
-    */
+   * a CFG mode containing a break statement
+   *
+   * @param id
+   * @param preds
+   * @param succs
+   */
 
   case class BreakNode(
-    id: ASTPath,
-    preds: List[NodeId],
-    succs: List[NodeId]
-  ) extends Node
+                        id: ASTPath,
+                        preds: List[NodeId],
+                        succs: List[NodeId]
+                      ) extends Node
 
   /**
-    * a CFG node containing a continue statement
-    *
-    * @param id
-    * @param preds
-    * @param succs
-    */
+   * a CFG node containing a continue statement
+   *
+   * @param id
+   * @param preds
+   * @param succs
+   */
   case class ContNode(
-    id: ASTPath,
-    preds: List[NodeId], 
-    succs: List[NodeId]
-  ) extends Node
+                       id: ASTPath,
+                       preds: List[NodeId],
+                       succs: List[NodeId]
+                     ) extends Node
 
   /**
-    * a CFG node containing a default statement
-    *
-    * @param id
-    * @param stmts
-    * @param preds
-    * @param succs
-    */
+   * a CFG node containing a default statement
+   *
+   * @param id
+   * @param stmts
+   * @param preds
+   * @param succs
+   */
   case class DefaultNode(
-    id: ASTPath,
-    stmts: List[ASTPath],
-    preds: List[NodeId],
-    succs: List[NodeId]
-  ) extends Node
+                          id: ASTPath,
+                          stmts: List[ASTPath],
+                          preds: List[NodeId],
+                          succs: List[NodeId]
+                        ) extends Node
 
 
   /**
-    * A CFG Node containing a case statement
-    *
-    * @param id
-    * @param stmts
-    * @param preds
-    * @param succs
-    */
+   * A CFG Node containing a case statement
+   *
+   * @param id
+   * @param stmts
+   * @param preds
+   * @param succs
+   */
 
   case class CaseNode(
-    id: ASTPath,
-    stmts: List[ASTPath],
-    preds: List[NodeId],
-    succs: List[NodeId]
-  ) extends Node
+                       id: ASTPath,
+                       stmts: List[ASTPath],
+                       preds: List[NodeId],
+                       succs: List[NodeId]
+                     ) extends Node
 
- 
+
   // update functions for nodes
 
-  def setSuccs(n:Node, s:List[NodeId]):Node = n match {
+  def setSuccs(n: Node, s: List[NodeId]): Node = n match {
     case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, s)
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, s)
-    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  SwitchNode(id, caseNodes, lVars, rVars, preds, s) 
+    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) => SwitchNode(id, caseNodes, lVars, rVars, preds, s)
     case ReturnNode(id, lVars, rVars, preds) => n
     case ThrowNode(id, lVars, rVars, preds, succs) => ThrowNode(id, lVars, rVars, preds, s)
     case TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, s)
     case WhileNode(id, bodyNode, lVars, rVars, preds, succs) => WhileNode(id, bodyNode, lVars, rVars, preds, s)
-    case AssertNode(id, lvars, rvars, preds, succs) => AssertNode(id, lvars, rvars,  preds, s) 
+    case AssertNode(id, lvars, rvars, preds, succs) => AssertNode(id, lvars, rvars, preds, s)
     case BreakNode(id, preds, succs) => BreakNode(id, preds, s)
     case ContNode(id, preds, cuccs) => ContNode(id, preds, s)
     case DefaultNode(id, stmts, preds, succs) => DefaultNode(id, stmts, preds, s)
-    case CaseNode(id, stmts, preds, succs) => CaseNode(id, stmts, preds, s) 
+    case CaseNode(id, stmts, preds, succs) => CaseNode(id, stmts, preds, s)
   }
 
-  def setPreds(n:Node, p:List[NodeId]):Node = n match {
-    case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => AssignmentsNode(id, stmts,  localDecls, lVars, rVars, p, succs)
+  def setPreds(n: Node, p: List[NodeId]): Node = n match {
+    case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => AssignmentsNode(id, stmts, localDecls, lVars, rVars, p, succs)
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => IfThenElseNode(id, thenNode, elseNode, lVars, rVars, p, succs)
-    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  SwitchNode(id, caseNodes, lVars, rVars, p, succs)  
+    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) => SwitchNode(id, caseNodes, lVars, rVars, p, succs)
     case ReturnNode(id, lVars, rVars, preds) => ReturnNode(id, lVars, rVars, p)
     case ThrowNode(id, lVars, rVars, preds, succs) => ThrowNode(id, lVars, rVars, p, succs)
     case TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, p, succs)
     case WhileNode(id, bodyNode, lVars, rVars, preds, succs) => WhileNode(id, bodyNode, lVars, rVars, p, succs)
-    case AssertNode(id, lvars, rvars, preds, succs) => AssertNode(id, lvars, rvars, p, succs)  
+    case AssertNode(id, lvars, rvars, preds, succs) => AssertNode(id, lvars, rvars, p, succs)
     case BreakNode(id, preds, succs) => BreakNode(id, p, succs)
     case ContNode(id, preds, succs) => ContNode(id, p, succs)
     case DefaultNode(id, stmts, preds, succs) => DefaultNode(id, stmts, p, succs)
-    case CaseNode(id, stmts, preds, succs) => CaseNode(id, stmts, p, succs) 
+    case CaseNode(id, stmts, preds, succs) => CaseNode(id, stmts, p, succs)
   }
 
-  def setLVars(n:Node, lv:List[Ident]):Node = n match {
-    case AssignmentsNode(id, stmts, localDecls,  lVars, rVars, preds, succs) => AssignmentsNode(id, stmts, localDecls, lv, rVars, preds, succs)
+  def setLVars(n: Node, lv: List[Ident]): Node = n match {
+    case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => AssignmentsNode(id, stmts, localDecls, lv, rVars, preds, succs)
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => IfThenElseNode(id, thenNode, elseNode, lv, rVars, preds, succs)
-    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  SwitchNode(id, caseNodes, lv, rVars, preds, succs) 
+    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) => SwitchNode(id, caseNodes, lv, rVars, preds, succs)
     case ReturnNode(id, lVars, rVars, preds) => ReturnNode(id, lv, rVars, preds)
     case ThrowNode(id, lVars, rVars, preds, succs) => ThrowNode(id, lv, rVars, preds, succs)
     case TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, succs)
     case WhileNode(id, bodyNode, lVars, rVars, preds, succs) => WhileNode(id, bodyNode, lv, rVars, preds, succs)
-    case AssertNode(id, lvars, rvars,  preds, succs) => AssertNode(id, lv, rvars,  preds, succs)
+    case AssertNode(id, lvars, rvars, preds, succs) => AssertNode(id, lv, rvars, preds, succs)
     case BreakNode(id, preds, succs) => n
     case ContNode(id, preds, cuccs) => n
     case DefaultNode(id, stmts, preds, succs) => n
@@ -294,25 +294,25 @@ object CFG {
 
   }
 
-  def setRVars(n:Node, rv:List[Ident]):Node = n match {
-    case AssignmentsNode(id, stmts, localDecls,  lVars, rVars, preds, succs) => AssignmentsNode(id, stmts, localDecls, lVars, rv, preds, succs)
+  def setRVars(n: Node, rv: List[Ident]): Node = n match {
+    case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => AssignmentsNode(id, stmts, localDecls, lVars, rv, preds, succs)
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => IfThenElseNode(id, thenNode, elseNode, lVars, rv, preds, succs)
-    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  SwitchNode(id, caseNodes, lVars, rv, preds, succs) 
+    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) => SwitchNode(id, caseNodes, lVars, rv, preds, succs)
     case ReturnNode(id, lVars, rVars, preds) => ReturnNode(id, lVars, rv, preds)
     case ThrowNode(id, lVars, rVars, preds, succs) => ThrowNode(id, lVars, rv, preds, succs)
     case TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, succs) => TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, succs)
     case WhileNode(id, bodyNode, lVars, rVars, preds, succs) => WhileNode(id, bodyNode, lVars, rv, preds, succs)
-    case AssertNode(id, lvars, rvars,  preds, succs) => AssertNode(id, lvars, rv,  preds, succs) 
+    case AssertNode(id, lvars, rvars, preds, succs) => AssertNode(id, lvars, rv, preds, succs)
     case BreakNode(id, preds, succs) => n
-    case ContNode(id, preds, cuccs) => n  
+    case ContNode(id, preds, cuccs) => n
     case DefaultNode(id, stmts, preds, succs) => n
     case CaseNode(id, stmts, preds, succs) => n
   }
 
-  def getSuccs(n:Node):List[NodeId] = n match {
+  def getSuccs(n: Node): List[NodeId] = n match {
     case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => succs
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => succs
-    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  succs
+    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) => succs
     case ReturnNode(id, lVars, rVars, preds) => Nil
     case ThrowNode(id, lVars, rVars, preds, succs) => succs
     case TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, succs) => succs
@@ -324,10 +324,10 @@ object CFG {
     case CaseNode(id, stmts, preds, succs) => succs
   }
 
-  def getPreds(n:Node):List[NodeId] = n match {
+  def getPreds(n: Node): List[NodeId] = n match {
     case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => preds
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => preds
-    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  preds
+    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) => preds
     case ReturnNode(id, lVars, rVars, preds) => preds
     case ThrowNode(id, lVars, rVars, preds, succs) => preds
     case TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, succs) => preds
@@ -339,10 +339,10 @@ object CFG {
     case CaseNode(id, stmts, preds, succs) => preds
   }
 
-  def getLVars(n:Node):List[Ident] = n match {
+  def getLVars(n: Node): List[Ident] = n match {
     case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => lVars
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => lVars
-    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  lVars
+    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) => lVars
     case ReturnNode(id, lVars, rVars, preds) => lVars
     case ThrowNode(id, lVars, rVars, preds, succs) => lVars
     case TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, succs) => Nil
@@ -354,10 +354,10 @@ object CFG {
     case CaseNode(id, stmts, preds, succs) => Nil
   }
 
-  def getRVars(n:Node):List[Ident] = n match {
-    case AssignmentsNode(id, stmts, localDecls,  lVars, rVars, preds, succs) => rVars
+  def getRVars(n: Node): List[Ident] = n match {
+    case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => rVars
     case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs) => rVars
-    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) =>  rVars 
+    case SwitchNode(id, caseNodes, lVars, rVars, preds, succs) => rVars
     case ReturnNode(id, lVars, rVars, preds) => rVars
     case ThrowNode(id, lVars, rVars, preds, succs) => rVars
     case TryCatchFinallyNode(id, tryNode, catchNodes, catchLocalVars, finallyNode, preds, succs) => Nil
@@ -369,76 +369,80 @@ object CFG {
     case CaseNode(id, stmts, preds, succs) => Nil
   }
 
-  def appSucc(n:Node, succ:NodeId) = setSuccs(n, (getSuccs(n)++List(succ)).toSet.toList)
-  def appPred(n:Node, pred:NodeId) = setPreds(n, (getPreds(n)++List(pred)).toSet.toList)
-  def appPreds(n:Node, preds:List[NodeId]) = setPreds(n, (getPreds(n) ++ preds).toSet.toList)
-  def appLVars(n:Node, lvs:List[Ident]) = setLVars(n, getLVars(n)++lvs)
-  def appRVars(n:Node, rvs:List[Ident]) = setRVars(n, getRVars(n)++rvs)
+  def appSucc(n: Node, succ: NodeId) = setSuccs(n, (getSuccs(n) ++ List(succ)).toSet.toList)
 
-  def appStmt(n:Node, stmt:ASTPath) = n match {
-    case AssignmentsNode(id, stmts, localDecls,  lVars, rVars, preds, succs) => {
+  def appPred(n: Node, pred: NodeId) = setPreds(n, (getPreds(n) ++ List(pred)).toSet.toList)
+
+  def appPreds(n: Node, preds: List[NodeId]) = setPreds(n, (getPreds(n) ++ preds).toSet.toList)
+
+  def appLVars(n: Node, lvs: List[Ident]) = setLVars(n, getLVars(n) ++ lvs)
+
+  def appRVars(n: Node, rvs: List[Ident]) = setRVars(n, getRVars(n) ++ rvs)
+
+  def appStmt(n: Node, stmt: ASTPath) = n match {
+    case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => {
       val stmtSet = stmts.toSet
       if (stmtSet.contains(stmt)) {
         n
       } else {
-        AssignmentsNode(id, stmts++List(stmt), localDecls,  lVars, rVars, preds, succs)
+        AssignmentsNode(id, stmts ++ List(stmt), localDecls, lVars, rVars, preds, succs)
       }
-    } 
+    }
     case _ => n
   }
 
-  def appLocalDecls(n:Node, lds:List[Ident]) = n match {
-    case AssignmentsNode(id, stmts, localDecls,  lVars, rVars, preds, succs) => { 
-      AssignmentsNode(id, stmts, (localDecls++lds).toSet.toList,  lVars, rVars, preds, succs)
+  def appLocalDecls(n: Node, lds: List[Ident]) = n match {
+    case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs) => {
+      AssignmentsNode(id, stmts, (localDecls ++ lds).toSet.toList, lVars, rVars, preds, succs)
     }
     case _ => n
   }
 
   /**
-    * StateInfo, an state datatype for the CFG state monad
-    *
-    * @param currId
-    * @param cfg
-    * @param currPreds
-    * @param continuable
-    * @param contNodes
-    * @param breakNodes
-    * @param caseNodes
-    * @param formalArgs
-    * @param fallThroughCases
-    * @param throwNodes
-    * @param catchNodes
-    * @param labelMap
-    */
+   * StateInfo, an state datatype for the CFG state monad
+   *
+   * @param currId
+   * @param cfg
+   * @param currPreds
+   * @param continuable
+   * @param contNodes
+   * @param breakNodes
+   * @param caseNodes
+   * @param formalArgs
+   * @param fallThroughCases
+   * @param throwNodes
+   * @param catchNodes
+   * @param labelMap
+   */
   case class StateInfo(
-      currId: NodeId, 
-      cfg: CFG,
-      currPreds: List[NodeId],
-      continuable: Boolean, // is this still needed
-      contNodes: Map[NodeId, List[NodeId]], // label node id -> [continue statement id]
-      breakNodes: Map[NodeId, List[NodeId]], // label node id -> [break statement id]
-      caseNodes: List[CaseExp],
-      formalArgs: List[Ident],
-      fallThroughCases: List[Exp],
-      throwNodes: List[NodeId],
-      catchNodes: List[NodeId],
-      
-      labelMap: Map[Ident, NodeId] // mapping source code label to CFG labels
+                        currId: NodeId,
+                        cfg: CFG,
+                        currPreds: List[NodeId],
+                        continuable: Boolean, // is this still needed
+                        contNodes: Map[NodeId, List[NodeId]], // label node id -> [continue statement id]
+                        breakNodes: Map[NodeId, List[NodeId]], // label node id -> [break statement id]
+                        caseNodes: List[CaseExp],
+                        formalArgs: List[Ident],
+                        fallThroughCases: List[Exp],
+                        throwNodes: List[NodeId],
+                        catchNodes: List[NodeId],
 
-  )
+                        labelMap: Map[Ident, NodeId] // mapping source code label to CFG labels
+
+                      )
 
   /**
-    * addpend: 
-    *  add a value associated wtih key to a map,
-    * if the key exits, the value is appended to the existing value list.
-    * otherwise, a new entry added
-    *
-    * @param key the key
-    * @param value the value to be insered
-    * @param m a map from key to list of values
-    * @return an udpated map
-    */
-  def addpend[A,B](key:A, value:B, m:Map[A,List[B]]):Map[A,List[B]] = m.get(key) match {
+   * addpend:
+   * add a value associated wtih key to a map,
+   * if the key exits, the value is appended to the existing value list.
+   * otherwise, a new entry added
+   *
+   * @param key   the key
+   * @param value the value to be insered
+   * @param m     a map from key to list of values
+   * @return an udpated map
+   */
+  def addpend[A, B](key: A, value: B, m: Map[A, List[B]]): Map[A, List[B]] = m.get(key) match {
     case None => m + (key -> List(value))
     case Some(vs) => m + (key -> (vs ++ List(value)))
   }
@@ -446,15 +450,17 @@ object CFG {
   sealed trait CaseExp {
     def getWrapperId(): NodeId
   }
+
   case class DefaultCase(wrapperId: NodeId, rhs: NodeId) extends CaseExp {
     override def getWrapperId = wrapperId
   }
+
   case class ExpCase(
-      condExp: Exp,
-      fallThrough: List[Exp],
-      wrapperId: NodeId,
-      rhs: NodeId
-  ) extends CaseExp {
+                      condExp: Exp,
+                      fallThrough: List[Exp],
+                      wrapperId: NodeId,
+                      rhs: NodeId
+                    ) extends CaseExp {
     override def getWrapperId = wrapperId
   }
 
@@ -475,7 +481,9 @@ object CFG {
   )
 
   sealed trait CFGResult[+A]
+
   case class CFGError(msg: String) extends CFGResult[Nothing]
+
   case class CFGOk[A](result: A) extends CFGResult[A]
 
   implicit def cfgResultFunctor: Functor[CFGResult] =
@@ -483,7 +491,7 @@ object CFG {
       override def map[A, B](fa: CFGResult[A])(f: A => B): CFGResult[B] =
         fa match {
           case CFGError(s) => CFGError(s)
-          case CFGOk(a)    => CFGOk(f(a))
+          case CFGOk(a) => CFGOk(f(a))
         }
     }
 
@@ -491,53 +499,58 @@ object CFG {
   implicit def cfgResultApplicative: ApplicativeError[CFGResult, String] =
     new ApplicativeError[CFGResult, String] {
       override def ap[A, B](
-          ff: CFGResult[A => B]
-      )(fa: CFGResult[A]): CFGResult[B] =
+                             ff: CFGResult[A => B]
+                           )(fa: CFGResult[A]): CFGResult[B] =
         ff match {
           case CFGOk(f) =>
             fa match {
-              case CFGOk(a)    => CFGOk(f(a))
+              case CFGOk(a) => CFGOk(f(a))
               case CFGError(s) => CFGError(s)
             }
           case CFGError(s) => CFGError(s)
         }
 
       override def pure[A](a: A): CFGResult[A] = CFGOk(a)
+
       override def raiseError[A](e: String): CFGResult[A] = CFGError(e)
+
       override def handleErrorWith[A](
-          fa: CFGResult[A]
-      )(f: String => CFGResult[A]): CFGResult[A] =
+                                       fa: CFGResult[A]
+                                     )(f: String => CFGResult[A]): CFGResult[A] =
         fa match {
           case CFGError(s) => f(s)
-          case CFGOk(a)    => CFGOk(a)
+          case CFGOk(a) => CFGOk(a)
         }
     }
 
   implicit def cfgResultMonadError(implicit
-      app: ApplicativeError[CFGResult, String]
-  ): MonadError[CFGResult, String] =
+                                   app: ApplicativeError[CFGResult, String]
+                                  ): MonadError[CFGResult, String] =
     new MonadError[CFGResult, String] {
       override def raiseError[A](e: String): CFGResult[A] = app.raiseError(e)
+
       override def handleErrorWith[A](fa: CFGResult[A])(
-          f: String => CFGResult[A]
+        f: String => CFGResult[A]
       ): CFGResult[A] = app.handleErrorWith(fa)(f)
+
       override def flatMap[A, B](
-          fa: CFGResult[A]
-      )(f: A => CFGResult[B]): CFGResult[B] =
+                                  fa: CFGResult[A]
+                                )(f: A => CFGResult[B]): CFGResult[B] =
         fa match {
-          case CFGOk(a)    => f(a)
+          case CFGOk(a) => f(a)
           case CFGError(s) => CFGError(s)
         }
+
       override def pure[A](a: A): CFGResult[A] = app.pure(a)
 
       @annotation.tailrec
       def tailRecM[A, B](
-          init: A
-      )(fn: A => CFGResult[Either[A, B]]): CFGResult[B] =
+                          init: A
+                        )(fn: A => CFGResult[Either[A, B]]): CFGResult[B] =
         fn(init) match {
-          case CFGError(msg)   => CFGError(msg)
+          case CFGError(msg) => CFGError(msg)
           case CFGOk(Right(b)) => CFGOk(b)
-          case CFGOk(Left(a))  => tailRecM(a)(fn)
+          case CFGOk(Left(a)) => tailRecM(a)(fn)
         }
     }
 
@@ -561,16 +574,16 @@ object CFG {
       no need for Java?
    */
   trait CFGClass[A] {
-    def buildCFG(a: A, p:ASTPath )(implicit
-        m: MonadError[SIState, String]
+    def buildCFG(a: A, p: ASTPath)(implicit
+                                   m: MonadError[SIState, String]
     ): State[StateInfo, Unit]
   }
 
   object cfgOps {
     def buildCFG[A](
-        a: A, p:ASTPath 
-    )(implicit aCFGCl: CFGClass[A]): State[StateInfo, Unit] = {
-      aCFGCl.buildCFG(a,p)
+                     a: A, p: ASTPath
+                   )(implicit aCFGCl: CFGClass[A]): State[StateInfo, Unit] = {
+      aCFGCl.buildCFG(a, p)
     }
   }
 
@@ -586,26 +599,26 @@ object CFG {
 
   def idFromVarDeclId(vdid: VarDeclId): Ident =
     vdid match {
-      case VarId(id)         => id
+      case VarId(id) => id
       case VarDeclArray(vid) => idFromVarDeclId(vid)
     }
 
   implicit def methodCFGInstance: CFGClass[MethodDecl] =
     new CFGClass[MethodDecl] {
       override def buildCFG(
-          a: MethodDecl, p:ASTPath
-      )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
+                             a: MethodDecl, p: ASTPath
+                           )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
         a match {
           case MethodDecl(
-                modifiers,
-                type_params,
-                return_ty,
-                fname,
-                formal_params,
-                ex_types,
-                exp,
-                body
-              ) =>
+          modifiers,
+          type_params,
+          return_ty,
+          fname,
+          formal_params,
+          ex_types,
+          exp,
+          body
+          ) =>
             for {
               fargs <- m.pure(
                 formal_params.map(fp => idFromVarDeclId(fp.var_decl_id))
@@ -625,13 +638,14 @@ object CFG {
             } yield ()
         }
     }
+
   implicit def bodyCFGInstance: CFGClass[MethodBody] =
     new CFGClass[MethodBody] {
       override def buildCFG(
-          a: MethodBody, p:ASTPath
-      )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
+                             a: MethodBody, p: ASTPath
+                           )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
         a match {
-          case MethodBody(None)      => m.pure(())
+          case MethodBody(None) => m.pure(())
           case MethodBody(Some(blk)) => cfgOps.buildCFG(blk, p)
         }
     }
@@ -639,8 +653,8 @@ object CFG {
   implicit def blockCFGInstance: CFGClass[Block] =
     new CFGClass[Block] {
       override def buildCFG(
-          a: Block, p:ASTPath
-      )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
+                             a: Block, p: ASTPath
+                           )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
         a match {
           case Block(Nil) => { // TODO: this case is not needed? since empty block is deguared into a block containing an empty statement?
             val lhs = Nil
@@ -649,13 +663,13 @@ object CFG {
             val localDecls = Nil
             val currNodeId = p
             for {
-              st         <- get;
-              cfg0       <- m.pure(st.cfg);
-              preds0     <- m.pure(st.currPreds);
-              cfgNode    <- m.pure(AssignmentsNode(currNodeId, stmts, localDecls, lhs, rhs, preds0, Nil));
-              cfg1p      <- m.pure(preds0.foldLeft(cfg0)((g, pred) => {
+              st <- get;
+              cfg0 <- m.pure(st.cfg);
+              preds0 <- m.pure(st.currPreds);
+              cfgNode <- m.pure(AssignmentsNode(currNodeId, stmts, localDecls, lhs, rhs, preds0, Nil));
+              cfg1p <- m.pure(preds0.foldLeft(cfg0)((g, pred) => {
                 val n: Node = g(pred)
-                g + (pred -> appSucc(n,currNodeId))
+                g + (pred -> appSucc(n, currNodeId))
               }));
               cfg1 <- m.pure(cfg1p + (currNodeId -> cfgNode));
               _ <- put(
@@ -670,13 +684,15 @@ object CFG {
           case Block(stmts) =>
             for {
               _ <- stmts.zip(0 to stmts.size).traverse_(stmt_idx => stmt_idx match {
-                case (stmt,idx) => {
+                case (stmt, idx) => {
                   cfgOps.buildCFG(stmt, childOf(p, idx))
                 }
               })
               // TOOD: check whether the following hack is still necessary for Java
               _ <-
-                if (stmts.isEmpty) { m.pure(()) }
+                if (stmts.isEmpty) {
+                  m.pure(())
+                }
                 else {
                   stmts.last match {
                     /* the last blockItem is a while. e.g.
@@ -691,9 +707,9 @@ object CFG {
                     }
                     */
                     case BlockStmt_(stmt)
-                        if isWhileStmt(stmt) || isForStmt(stmt) => {
+                      if isWhileStmt(stmt) || isForStmt(stmt) => {
                       val empty: Stmt = Empty
-                      cfgOps.buildCFG(empty, childOf(p,stmts.size))
+                      cfgOps.buildCFG(empty, childOf(p, stmts.size))
                     }
                     case _ => m.pure(())
                   }
@@ -705,13 +721,13 @@ object CFG {
   implicit def blockStmtCFGInstance: CFGClass[BlockStmt] =
     new CFGClass[BlockStmt] {
       override def buildCFG(
-          a: BlockStmt, p:ASTPath
-      )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
+                             a: BlockStmt, p: ASTPath
+                           )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
         a match {
           case LocalClass(_) => m.raiseError("Local Class is not supported.")
           case LocalVars(modifiers, ty, var_decls) =>
             var_decls match {
-              case Nil               => m.pure(())
+              case Nil => m.pure(())
               case (var_decl :: Nil) =>
                 /*
         CFG1 = CFG update { pred : {stmts = stmts ++ [path], lVars = lVars ++ [x] } }
@@ -758,7 +774,7 @@ object CFG {
                       )
                       val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
                         val n: Node = g(pred)
-                        val n1 = appSucc(n,currNodeId)
+                        val n1 = appSucc(n, currNodeId)
                         g + (pred -> n1)
                       })
                       val cfg1 = cfg1p + (currNodeId -> cfgNode)
@@ -778,7 +794,7 @@ object CFG {
                   // if it does not work, we can add sub path to p, such as 0, 1, 2,
                   _ <- buildCFG(LocalVars(modifiers, ty, var_decl :: Nil), p)
                   _ <- buildCFG(LocalVars(modifiers, ty, rest), p)
-                } yield ()
+                      } yield ()
             }
           case BlockStmt_(stmt) => cfgOps.buildCFG(stmt, p)
         }
@@ -787,11 +803,11 @@ object CFG {
   implicit def stmtCFGInstance: CFGClass[Stmt] =
     new CFGClass[Stmt] {
       override def buildCFG(
-          a: Stmt, p: ASTPath
-      )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
+                             a: Stmt, p: ASTPath
+                           )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
         a match {
-          case StmtBlock(blk)                         => cfgOps.buildCFG(blk,p)
-          case IfThen(exp, stmt)                      => buildCFG(IfThenElse(exp, stmt, Empty), p)
+          case StmtBlock(blk) => cfgOps.buildCFG(blk, p)
+          case IfThen(exp, stmt) => buildCFG(IfThenElse(exp, stmt, Empty), p)
           case IfThenElse(exp, true_stmt, false_stmt) =>
             /*
       
@@ -813,7 +829,7 @@ object CFG {
                 val ifElseNode = IfThenElseNode(ifElseNodeId, thenOf(p), elseOf(p), lhs, rhs, preds0, Nil)
                 val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
                   val n = g(pred)
-                  val n1 = appSucc(n,ifElseNodeId)
+                  val n1 = appSucc(n, ifElseNodeId)
                   g + (pred -> n1)
                 })
                 val cfg1 = cfg1p + (ifElseNodeId -> ifElseNode)
@@ -865,11 +881,11 @@ object CFG {
                 val cfg0 = st.cfg
                 val preds0 = st.currPreds
                 val caseNodes0 = st.caseNodes
-                val childNodeIds = (0 to blocks.size).map(idx=>childOf(p,idx)).toList
+                val childNodeIds = (0 to blocks.size).map(idx => childOf(p, idx)).toList
                 val switchNode = SwitchNode(currNodeId, childNodeIds, lhs, rhs, preds0, childNodeIds)
-                val cfg1p = preds0.foldLeft(cfg0)((g,pred) => {
+                val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
                   val n = g(pred)
-                  g + (pred -> appSucc(n,currNodeId))
+                  g + (pred -> appSucc(n, currNodeId))
                 })
                 val cfg1 = cfg1p + (currNodeId -> switchNode)
                 for {
@@ -883,7 +899,7 @@ object CFG {
                     )
                   )
                   _ <- blocks.zip(childNodeIds).traverse_(block_path => block_path match {
-                    case (block, child_path) => for { 
+                    case (block, child_path) => for {
                       st <- get
                       _ <- put(
                         st.copy(currPreds = (List(currNodeId) ++ st.currPreds).toSet.toList)
@@ -898,10 +914,10 @@ object CFG {
                     val caseNodes1 = st1.caseNodes
                     for {
                       _ <- put(st1.copy(
-                          currPreds = preds1 ++ breakNodes1(currNodeId).toList,
-                          caseNodes = caseNodes0,
-                          continuable = false
-                        )
+                        currPreds = preds1 ++ breakNodes1(currNodeId).toList,
+                        caseNodes = caseNodes0,
+                        continuable = false
+                      )
                       )
                     } yield ()
                   }
@@ -920,18 +936,18 @@ object CFG {
             for {
               st <- get
               _ <- {
-                
+
                 val currNodeId = p
                 val lhs = HasVarcfgOps.getVarsFrom(exp)
                 val rhs = HasVarcfgOps.getLVarsFrom(exp)
-                
+
                 val cfg0 = st.cfg
                 val preds0 = st.currPreds
                 val contNodes0 = st.contNodes
                 val breakNodes0 = st.breakNodes
                 val childNodeId = stmt match {
-                  case StmtBlock(_) => childOf(childOf(currNodeId,0),0)
-                  case _ => childOf(currNodeId,0)
+                  case StmtBlock(_) => childOf(childOf(currNodeId, 0), 0)
+                  case _ => childOf(currNodeId, 0)
                 }
                 val cfgNode =
                   WhileNode(currNodeId, childNodeId, lhs, rhs, preds0, List(childNodeId))
@@ -948,17 +964,17 @@ object CFG {
                       continuable = false,
                     )
                   )
-                  _ <- buildCFG(stmt, childOf(p,0))
+                  _ <- buildCFG(stmt, childOf(p, 0))
                   st1 <- get
                   _ <- {
                     val preds2 = st1.currPreds
                     val contNodes2 = st1.contNodes
                     val cfg2 = st1.cfg
-                    val conts2:List[NodeId] = contNodes2.get(currNodeId) match {
+                    val conts2: List[NodeId] = contNodes2.get(currNodeId) match {
                       case None => Nil
                       case Some(ids) => ids
                     }
-                    val cfg2p = (preds2++conts2).foldLeft(cfg2)((g, pred) => {
+                    val cfg2p = (preds2 ++ conts2).foldLeft(cfg2)((g, pred) => {
                       val n = g(pred)
                       g + (pred -> appSucc(n, currNodeId))
                     })
@@ -966,9 +982,9 @@ object CFG {
                     val currNode = cfg2p(currNodeId)
                     val cfg2pp = cfg2p + (currNodeId -> appPreds(cfg2p(currNodeId), preds2 ++ conts2))
                     val cfg3 = conts2.foldLeft(cfg2pp)((g, l) => { // update the break and cont immediately
-                        val n = g(l)
-                        g + (l -> appSucc(n,currNodeId))
-                      }
+                      val n = g(l)
+                      g + (l -> appSucc(n, currNodeId))
+                    }
                     )
                     val cfg3p = cfg3
                     val breaks2 = breakNodes2.get(currNodeId) match {
@@ -989,7 +1005,7 @@ object CFG {
               }
             } yield ()
           case BasicFor(init, exp2, exp3, stmt) => m.raiseError("Basic For is encountered during CFG construction, which should have been desugared!")
-          case EnhancedFor(modifiers, ty, id, exp, stmt) =>m.raiseError("Enhanced For is encountered during CFG construction, which should have been desugared!")
+          case EnhancedFor(modifiers, ty, id, exp, stmt) => m.raiseError("Enhanced For is encountered during CFG construction, which should have been desugared!")
 
           /*
           CFG1 = CFG update { pred : stmts=[empty], preds = preds, pred \in preds }
@@ -1002,23 +1018,23 @@ object CFG {
           */
           case Empty => for {
             st <- get
-            _  <- if (st.continuable) { 
+            _ <- if (st.continuable) {
               val cfg = st.cfg
               val preds = st.currPreds
               val cfg1 = preds.foldLeft(cfg)((g, pred) => {
                 val n = g(pred)
-                g + (pred -> appStmt(n,p))
+                g + (pred -> appStmt(n, p))
               })
               for {
-                _ <- put(st.copy(cfg=cfg1))
+                _ <- put(st.copy(cfg = cfg1))
               } yield ()
             } else {
               val cfg = st.cfg
-              val preds = st.currPreds 
-              val node = AssignmentsNode(p, List(p), Nil, Nil, Nil, preds, Nil) 
+              val preds = st.currPreds
+              val node = AssignmentsNode(p, List(p), Nil, Nil, Nil, preds, Nil)
               val cfg1 = cfg + (p -> node)
               for {
-                _ <- put(st.copy(cfg=cfg1, currPreds=List(p), continuable=true))
+                _ <- put(st.copy(cfg = cfg1, currPreds = List(p), continuable = true))
               } yield ()
             }
           } yield ()
@@ -1033,7 +1049,7 @@ object CFG {
       ----------------------------------------------------------------
       CFG, path, preds, true |- x = exp => CFG1, preds, true
            */
-          case s @ ExpStmt(Assign(lhs, EqualA, rhs)) => {
+          case s@ExpStmt(Assign(lhs, EqualA, rhs)) => {
             val xs = HasVarcfgOps.getLVarsFrom(lhs).toSet
             val ys = HasVarcfgOps.getVarsFrom(rhs)
             for {
@@ -1088,10 +1104,10 @@ object CFG {
       CFG, max, preds, true |- lhs += rhs  => CFG', max', preds', continuable
            */
           case ExpStmt(Assign(lhs, aop, rhs)) => m.raiseError("Accumulative assignment is encountered during CFG construction, which should have been desugared!")
-          case ExpStmt(PostIncrement(exp)) => m.raiseError("PostIncrement is encountered during CFG construction, which should have been desugared!") 
-          case ExpStmt(PostDecrement(exp)) => m.raiseError("PostDecrement is encountered during CFG construction, which should have been desugared!") 
-          case ExpStmt(PreIncrement(exp)) => m.raiseError("PreIncrement is encountered during CFG construction, which should have been desugared!") 
-          case ExpStmt(PreDecrement(exp)) => m.raiseError("PreDecrement is encountered during CFG construction, which should have been desugared!") 
+          case ExpStmt(PostIncrement(exp)) => m.raiseError("PostIncrement is encountered during CFG construction, which should have been desugared!")
+          case ExpStmt(PostDecrement(exp)) => m.raiseError("PostDecrement is encountered during CFG construction, which should have been desugared!")
+          case ExpStmt(PreIncrement(exp)) => m.raiseError("PreIncrement is encountered during CFG construction, which should have been desugared!")
+          case ExpStmt(PreDecrement(exp)) => m.raiseError("PreDecrement is encountered during CFG construction, which should have been desugared!")
           case ExpStmt(e) =>
             for {
               st <- get
@@ -1104,7 +1120,7 @@ object CFG {
                 if (st.continuable) {
                   val cfg1 = preds0.foldLeft(cfg0)((g, pred) => {
                     val n = g(pred)
-                    g + (pred -> appRVars(appLVars(appStmt(n, p),lhs),rhs))
+                    g + (pred -> appRVars(appLVars(appStmt(n, p), lhs), rhs))
                   })
                   put(st.copy(cfg = cfg1, continuable = true))
                 } else {
@@ -1138,7 +1154,7 @@ object CFG {
       --------------------------------------------------------
       CFG, max, preds, false |- assert exp : msg => CFG1, max1, [], false
            */
-          case s @ Assert(exp, msg) =>
+          case s@Assert(exp, msg) =>
             for {
               st <- get
               _ <- {
@@ -1149,7 +1165,7 @@ object CFG {
                 val preds0 = st.currPreds
                 val cfg0 = st.cfg
                 val cfgNode = AssertNode(
-                  p, 
+                  p,
                   lhs,
                   rhs,
                   preds0,
@@ -1157,7 +1173,7 @@ object CFG {
                 )
                 val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
                   val n = g(pred)
-                  g + (pred -> appSucc(n,currNodeId))
+                  g + (pred -> appSucc(n, currNodeId))
                 })
                 val cfg1 = cfg1p + (currNodeId -> cfgNode)
                 for {
@@ -1171,38 +1187,38 @@ object CFG {
                 } yield ()
               }
             } yield ()
-          
+
           case Break(None) => m.raiseError("Break without label is encountered during CFG construction, which should have been eliminated during the labeling step.")
           case Break(Some(id)) =>
             for {
               st <- get
-              _ <-{
-                  val labelMap = st.labelMap
-                  labelMap.get(id) match {
-                    case None => m.raiseError(s"A label (${id}) is associated with now AST Path location during CFG construction. ")
-                    case Some(targetNodeId) => {
-                        val currNodeId = p
-                        val cfg0 = st.cfg
-                        val preds0 = st.currPreds
-                        val cfgNode = BreakNode(p,  preds0, Nil)
-                        val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
-                          val n = g(pred)
-                          g + (pred -> appSucc(n, p))
-                        })
-                        val cfg1 = cfg1p + (currNodeId -> cfgNode)
-                        for {
-                          _ <- put(
-                            st.copy(
-                              cfg = cfg1,
-                              currPreds = Nil,
-                              continuable = false,
-                              breakNodes = addpend(targetNodeId, currNodeId, st.breakNodes)
-                            )
-                          )
-                        } yield ()
-                    }
+              _ <- {
+                val labelMap = st.labelMap
+                labelMap.get(id) match {
+                  case None => m.raiseError(s"A label (${id}) is associated with now AST Path location during CFG construction. ")
+                  case Some(targetNodeId) => {
+                    val currNodeId = p
+                    val cfg0 = st.cfg
+                    val preds0 = st.currPreds
+                    val cfgNode = BreakNode(p, preds0, Nil)
+                    val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
+                      val n = g(pred)
+                      g + (pred -> appSucc(n, p))
+                    })
+                    val cfg1 = cfg1p + (currNodeId -> cfgNode)
+                    for {
+                      _ <- put(
+                        st.copy(
+                          cfg = cfg1,
+                          currPreds = Nil,
+                          continuable = false,
+                          breakNodes = addpend(targetNodeId, currNodeId, st.breakNodes)
+                        )
+                      )
+                    } yield ()
                   }
                 }
+              }
             } yield ()
 
           case Continue(Some(id)) =>
@@ -1252,27 +1268,27 @@ object CFG {
             for {
               st <- get
               _ <- {
-                  val currNodeId = p
-                  val lhs = o_exp.toList.flatMap(HasVarcfgOps.getLVarsFrom(_))
-                  val rhs = o_exp.toList.flatMap(HasVarcfgOps.getVarsFrom(_))
-                  val cfg0 = st.cfg
-                  val preds0 = st.currPreds
-                  val cfgNode = ReturnNode(currNodeId, lhs, rhs, preds0)
-                  val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
-                    val n = g(pred)
-                    g + (pred -> appSucc(n, currNodeId))
-                  })
-                  val cfg1 = cfg1p + (currNodeId -> cfgNode)
-                  for {
-                    _ <- put(
-                      st.copy(
-                        cfg = cfg1,
-                        currPreds = Nil,
-                        continuable = false
-                      )
+                val currNodeId = p
+                val lhs = o_exp.toList.flatMap(HasVarcfgOps.getLVarsFrom(_))
+                val rhs = o_exp.toList.flatMap(HasVarcfgOps.getVarsFrom(_))
+                val cfg0 = st.cfg
+                val preds0 = st.currPreds
+                val cfgNode = ReturnNode(currNodeId, lhs, rhs, preds0)
+                val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
+                  val n = g(pred)
+                  g + (pred -> appSucc(n, currNodeId))
+                })
+                val cfg1 = cfg1p + (currNodeId -> cfgNode)
+                for {
+                  _ <- put(
+                    st.copy(
+                      cfg = cfg1,
+                      currPreds = Nil,
+                      continuable = false
                     )
-                  } yield ()
-                }
+                  )
+                } yield ()
+              }
             } yield ()
           case Synchronized(exp, blk) =>
             m.raiseError("Synronized statement is not suppored by CFG construction.")
@@ -1335,13 +1351,13 @@ object CFG {
                 val n = TryCatchFinallyNode(
                   currNodeId,
                   tryOf(currNodeId),
-                  childOf(currNodeId,1),
+                  childOf(currNodeId, 1),
                   catchVars,
-                  childOf(currNodeId,2),
+                  childOf(currNodeId, 2),
                   preds0,
                   List(tryOf(currNodeId))
                 )
-                val cfg0 = st.cfg + (currNodeId-> n)
+                val cfg0 = st.cfg + (currNodeId -> n)
                 val throwNodes0 = st.throwNodes
                 val catchNodes0 = st.catchNodes
                 for { // building for try block
@@ -1374,7 +1390,7 @@ object CFG {
                               continuable = false
                             )
                           )
-                          _ <- cfgOps.buildCFG(finally_blk,childOf(currNodeId,2))
+                          _ <- cfgOps.buildCFG(finally_blk, childOf(currNodeId, 2))
                           st3 <- get
                           _ <- put(
                             st3.copy(
@@ -1387,10 +1403,10 @@ object CFG {
                       }
                     } yield ()
                   }
-                } yield ()
+                      } yield ()
               }
             } yield ()
-          case Try(try_blk, _, _ ) => m.raiseError("An error is encountered during the CFG construction. try-catch-finally block should have been desugared to have one catch block and one finally block.")
+          case Try(try_blk, _, _) => m.raiseError("An error is encountered during the CFG construction. try-catch-finally block should have been desugared to have one catch block and one finally block.")
           case Labeled(id, stmt) => // label shoudl have same path as its containing statement, for the ease of building the labl map
             for {
               /*
@@ -1408,7 +1424,7 @@ object CFG {
                   continuable = false
                 )
               )
-              _ <- buildCFG(stmt,p)
+              _ <- buildCFG(stmt, p)
             } yield ()
         }
     }
@@ -1416,17 +1432,17 @@ object CFG {
   implicit def catchCFGInstance: CFGClass[Catch] =
     new CFGClass[Catch] {
       override def buildCFG(
-          a: Catch, p: ASTPath
-      )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
+                             a: Catch, p: ASTPath
+                           )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
         a match {
           case Catch(params, blk) =>
             for {
-              _ <- cfgOps.buildCFG(blk,p)
+              _ <- cfgOps.buildCFG(blk, p)
               st <- get
               _ <- put(
-                  st.copy(
-                  catchNodes = st.catchNodes ++ List(childOf(p,0))
-                  )
+                st.copy(
+                  catchNodes = st.catchNodes ++ List(childOf(p, 0))
+                )
               )
             } yield ()
         }
@@ -1435,73 +1451,73 @@ object CFG {
   implicit def switchBlockCFGInstance: CFGClass[SwitchBlock] =
     new CFGClass[SwitchBlock] {
       override def buildCFG(
-          a: SwitchBlock, p:ASTPath
-      )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
+                             a: SwitchBlock, p: ASTPath
+                           )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
         a match {
           case SwitchBlock(Default, blk_stmts) => {
-          /*
-          it seems that we can get rid of the caseNodes
-          CFG0 = CFG update (path -> DefaultNode(path, [childOf(path,0), ..., childOf(path, n-1), preds, [childOf(path,0)]]))
-                    union [ pred -> { succs = succs + [path]}]
-          CFG0, childOf(path,0), preds, continuable, breakNodes, contNodes, caseNodes |- 
-            stmt1 => CFG1, preds1, continuable1, breakNodes1, contNodes1, caseNodes1 
+            /*
+            it seems that we can get rid of the caseNodes
+            CFG0 = CFG update (path -> DefaultNode(path, [childOf(path,0), ..., childOf(path, n-1), preds, [childOf(path,0)]]))
+                      union [ pred -> { succs = succs + [path]}]
+            CFG0, childOf(path,0), preds, continuable, breakNodes, contNodes, caseNodes |-
+              stmt1 => CFG1, preds1, continuable1, breakNodes1, contNodes1, caseNodes1
 
-          CFG1, childOf(path,1), preds1, continable1, breakNodes1, contNodes1, caseNodes1 |- 
-            stmt2 => CFG2, preds2, continuable2, breakNodes2, contNodes2, caseNode2
-          ...
-          ------------------------------------------------------------------------------------------------------------------------------------------------------------------
-          CFG, path,preds, continuable, breakNodes, contNodes, caseNodes |-
-            default: stmt1; ... ; stmtn; => CFG2, max2, preds2 continuable2, breakNodes, contNodes2, caseNodes2 union (max, default)
-          */
+            CFG1, childOf(path,1), preds1, continable1, breakNodes1, contNodes1, caseNodes1 |-
+              stmt2 => CFG2, preds2, continuable2, breakNodes2, contNodes2, caseNode2
+            ...
+            ------------------------------------------------------------------------------------------------------------------------------------------------------------------
+            CFG, path,preds, continuable, breakNodes, contNodes, caseNodes |-
+              default: stmt1; ... ; stmtn; => CFG2, max2, preds2 continuable2, breakNodes, contNodes2, caseNodes2 union (max, default)
+            */
             val children_path = (0 to blk_stmts.size).map(idx => childOf(p, idx)).toList
             for {
               st <- get
               _ <- {
                 val cfgNode = DefaultNode(p, children_path, st.currPreds, Nil) // will update later
-                for { 
+                for {
                   _ <- put(st.copy(
                     cfg = st.cfg + (p -> cfgNode),
                     currPreds = List(p),
                     continuable = false
                   ))
-                  _ <- blk_stmts.zip(children_path).traverse_( bp => bp match { 
-                      case (blk,path) => cfgOps.buildCFG(blk, path)
-                    })
+                  _ <- blk_stmts.zip(children_path).traverse_(bp => bp match {
+                    case (blk, path) => cfgOps.buildCFG(blk, path)
+                  })
                 } yield ()
-              } 
+              }
             } yield ()
           }
           case SwitchBlock(SwitchCase(e), blk_stmts) => {
-          /*
-          it seems that we can get rid of the caseNodes
-          CFG0 = CFG update (path -> CaseNode(path, [childOf(path,0), ..., childOf(path, n-1), preds, [childOf(path,0)]]))
-                    union [ pred -> { succs = succs + [path]}]
-          CFG0, childOf(path,0), preds, continuable, breakNodes, contNodes, caseNodes |- 
-            stmt1 => CFG1, preds1, continuable1, breakNodes1, contNodes1, caseNodes1 
+            /*
+            it seems that we can get rid of the caseNodes
+            CFG0 = CFG update (path -> CaseNode(path, [childOf(path,0), ..., childOf(path, n-1), preds, [childOf(path,0)]]))
+                      union [ pred -> { succs = succs + [path]}]
+            CFG0, childOf(path,0), preds, continuable, breakNodes, contNodes, caseNodes |-
+              stmt1 => CFG1, preds1, continuable1, breakNodes1, contNodes1, caseNodes1
 
-          CFG1, childOf(path,1), preds1, continable1, breakNodes1, contNodes1, caseNodes1 |- 
-            stmt2 => CFG2, preds2, continuable2, breakNodes2, contNodes2, caseNode2
-          ...
-          ------------------------------------------------------------------------------------------------------------------------------------------------------------------
-          CFG, path,preds, continuable, breakNodes, contNodes, caseNodes |-
-            case lit: stmt1; ... ; stmtn; => CFG2, max2, preds2 continuable2, breakNodes, contNodes2, caseNodes2 union (max, default)
-          */              
+            CFG1, childOf(path,1), preds1, continable1, breakNodes1, contNodes1, caseNodes1 |-
+              stmt2 => CFG2, preds2, continuable2, breakNodes2, contNodes2, caseNode2
+            ...
+            ------------------------------------------------------------------------------------------------------------------------------------------------------------------
+            CFG, path,preds, continuable, breakNodes, contNodes, caseNodes |-
+              case lit: stmt1; ... ; stmtn; => CFG2, max2, preds2 continuable2, breakNodes, contNodes2, caseNodes2 union (max, default)
+            */
             val children_path = (0 to blk_stmts.size).map(idx => childOf(p, idx)).toList
             for {
               st <- get
               _ <- {
                 val cfgNode = CaseNode(p, children_path, st.currPreds, Nil) // will update later
-                for { 
+                for {
                   _ <- put(st.copy(
                     cfg = st.cfg + (p -> cfgNode),
                     currPreds = List(p),
                     continuable = false
                   ))
-                  _ <- blk_stmts.zip(children_path).traverse_( bp => bp match { 
-                      case (blk,path) => cfgOps.buildCFG(blk, path)
-                    })
+                  _ <- blk_stmts.zip(children_path).traverse_(bp => bp match {
+                    case (blk, path) => cfgOps.buildCFG(blk, path)
+                  })
                 } yield ()
-              } 
+              }
             } yield ()
           }
         }
@@ -1561,8 +1577,6 @@ object CFG {
   def internalIdent(s: String): Ident = Ident(s)
 
 
-
-
   /*
   def updatePreds(cfg:CFG):CFG = cfg.toList.fodlLeft(cfg)( (g,p) => p match {
     case (l,node) => {
@@ -1587,7 +1601,7 @@ object CFG {
   note that 4 is phantom as succs of the failure etst of (1) at 0, which is not reachable,
   but we need that empty node (and lambda function to be present) for the target code to be valid
    */
-  
+
   /*
   def insertPhantoms(cfg: CFG): CFG = {
     // succ lbl and source lbl
@@ -1622,21 +1636,22 @@ object CFG {
   def formalArgsAsDecls(idents: List[Ident], cfg: CFG): CFG = {
     val entryLabel = List(0)
     cfg.get(entryLabel) match {
-      case None    => cfg
+      case None => cfg
       case Some(n) => cfg + (entryLabel -> appLVars(n, idents))
     }
   }
 
-  
 
   trait HasVar[A] {
     def getVarsFrom(a: A): List[Ident]
+
     def getLVarsFrom(a: A): List[Ident] = List()
   }
 
   object HasVarcfgOps {
     def getVarsFrom[A](a: A)(implicit hv: HasVar[A]): List[Ident] =
       hv.getVarsFrom(a)
+
     def getLVarsFrom[A](a: A)(implicit hv: HasVar[A]): List[Ident] =
       hv.getLVarsFrom(a)
   }
@@ -1649,6 +1664,7 @@ object CFG {
           case VarDecl(var_decl_id, Some(var_init)) =>
             HasVarcfgOps.getVarsFrom(var_init)
         }
+
       override def getLVarsFrom(var_decl: VarDecl): List[Ident] =
         var_decl match {
           case VarDecl(var_decl_id, var_init) =>
@@ -1664,6 +1680,7 @@ object CFG {
           case InitArray(ArrayInit(var_inits)) =>
             var_inits.flatMap(HasVarcfgOps.getVarsFrom(_))
         }
+
       override def getLVarsFrom(var_init: VarInit): List[Ident] =
         var_init match {
           case InitExp(exp) => HasVarcfgOps.getLVarsFrom(exp)
@@ -1676,13 +1693,13 @@ object CFG {
     new HasVar[Exp] {
       override def getLVarsFrom(exp: Exp): List[Ident] =
         exp match {
-          case Lit(lit)                                             => List()
-          case ClassLit(ty)                                         => List()
-          case This                                                 => List()
-          case ThisClass(name)                                      => List()
-          case InstanceCreation(type_args, type_decl, args, body)   => List()
+          case Lit(lit) => List()
+          case ClassLit(ty) => List()
+          case This => List()
+          case ThisClass(name) => List()
+          case InstanceCreation(type_args, type_decl, args, body) => List()
           case QualInstanceCreation(exp, type_args, id, args, body) => List()
-          case ArrayCreate(ty, exps, num_dims)                      => exps.flatMap(getLVarsFrom(_))
+          case ArrayCreate(ty, exps, num_dims) => exps.flatMap(getLVarsFrom(_))
           case ArrayCreateInit(ty, size, init) =>
             init match {
               case ArrayInit(var_inits) =>
@@ -1690,19 +1707,19 @@ object CFG {
             }
           case FieldAccess_(access) => HasVarcfgOps.getLVarsFrom(access)
           case MethodInv(methodInv) => HasVarcfgOps.getLVarsFrom(methodInv)
-          case ArrayAccess(idx)     => HasVarcfgOps.getLVarsFrom(idx)
-          case ExpName(name)        => List()
-          case PostIncrement(exp)   => getLVarsFrom(exp)
-          case PostDecrement(exp)   => getLVarsFrom(exp)
-          case PreIncrement(exp)    => getLVarsFrom(exp)
-          case PreDecrement(exp)    => getLVarsFrom(exp)
-          case PrePlus(exp)         => getLVarsFrom(exp)
-          case PreMinus(exp)        => getLVarsFrom(exp)
-          case PreBitCompl(exp)     => getLVarsFrom(exp)
-          case PreNot(exp)          => getLVarsFrom(exp)
-          case Cast(ty, exp)        => getLVarsFrom(exp)
+          case ArrayAccess(idx) => HasVarcfgOps.getLVarsFrom(idx)
+          case ExpName(name) => List()
+          case PostIncrement(exp) => getLVarsFrom(exp)
+          case PostDecrement(exp) => getLVarsFrom(exp)
+          case PreIncrement(exp) => getLVarsFrom(exp)
+          case PreDecrement(exp) => getLVarsFrom(exp)
+          case PrePlus(exp) => getLVarsFrom(exp)
+          case PreMinus(exp) => getLVarsFrom(exp)
+          case PreBitCompl(exp) => getLVarsFrom(exp)
+          case PreNot(exp) => getLVarsFrom(exp)
+          case Cast(ty, exp) => getLVarsFrom(exp)
 
-          case BinOp(e1, op, e2)       => getLVarsFrom(e1) ++ getLVarsFrom(e2)
+          case BinOp(e1, op, e2) => getLVarsFrom(e1) ++ getLVarsFrom(e2)
           case InstanceOf(e, ref_type) => getLVarsFrom(e)
           case Cond(cond, true_exp, false_exp) =>
             getLVarsFrom(cond) ++ getLVarsFrom(true_exp) ++ getLVarsFrom(
@@ -1720,9 +1737,9 @@ object CFG {
 
       override def getVarsFrom(exp: Exp): List[Ident] =
         exp match {
-          case Lit(lit)        => List()
-          case ClassLit(ty)    => List()
-          case This            => List()
+          case Lit(lit) => List()
+          case ClassLit(ty) => List()
+          case This => List()
           case ThisClass(name) => List()
           case InstanceCreation(type_args, type_decl, args, body) =>
             args.flatMap(HasVarcfgOps.getVarsFrom(_))
@@ -1736,20 +1753,20 @@ object CFG {
               case ArrayInit(var_inits) =>
                 var_inits.flatMap(HasVarcfgOps.getVarsFrom(_))
             }
-          case FieldAccess_(access)    => HasVarcfgOps.getVarsFrom(access)
-          case MethodInv(methodInv)    => HasVarcfgOps.getVarsFrom(methodInv)
-          case ArrayAccess(idx)        => HasVarcfgOps.getVarsFrom(idx)
-          case ExpName(name)           => HasVarcfgOps.getVarsFrom(name)
-          case PostIncrement(exp)      => getVarsFrom(exp)
-          case PostDecrement(exp)      => getVarsFrom(exp)
-          case PreIncrement(exp)       => getVarsFrom(exp)
-          case PreDecrement(exp)       => getVarsFrom(exp)
-          case PrePlus(exp)            => getVarsFrom(exp)
-          case PreMinus(exp)           => getVarsFrom(exp)
-          case PreBitCompl(exp)        => getVarsFrom(exp)
-          case PreNot(exp)             => getVarsFrom(exp)
-          case Cast(ty, exp)           => getVarsFrom(exp)
-          case BinOp(e1, op, e2)       => getVarsFrom(e1) ++ getVarsFrom(e2)
+          case FieldAccess_(access) => HasVarcfgOps.getVarsFrom(access)
+          case MethodInv(methodInv) => HasVarcfgOps.getVarsFrom(methodInv)
+          case ArrayAccess(idx) => HasVarcfgOps.getVarsFrom(idx)
+          case ExpName(name) => HasVarcfgOps.getVarsFrom(name)
+          case PostIncrement(exp) => getVarsFrom(exp)
+          case PostDecrement(exp) => getVarsFrom(exp)
+          case PreIncrement(exp) => getVarsFrom(exp)
+          case PreDecrement(exp) => getVarsFrom(exp)
+          case PrePlus(exp) => getVarsFrom(exp)
+          case PreMinus(exp) => getVarsFrom(exp)
+          case PreBitCompl(exp) => getVarsFrom(exp)
+          case PreNot(exp) => getVarsFrom(exp)
+          case Cast(ty, exp) => getVarsFrom(exp)
+          case BinOp(e1, op, e2) => getVarsFrom(e1) ++ getVarsFrom(e2)
           case InstanceOf(e, ref_type) => getVarsFrom(e)
           case Cond(cond, true_exp, false_exp) =>
             getVarsFrom(cond) ++ getVarsFrom(true_exp) ++ getVarsFrom(false_exp)
@@ -1771,8 +1788,8 @@ object CFG {
         List() // TODO: check whether it should indeed empty
       override def getVarsFrom(field_access: FieldAccess): List[Ident] =
         field_access match {
-          case PrimaryFieldAccess(e, id)  => HasVarcfgOps.getVarsFrom(e)
-          case SuperFieldAccess(id)       => List()
+          case PrimaryFieldAccess(e, id) => HasVarcfgOps.getVarsFrom(e)
+          case SuperFieldAccess(id) => List()
           case ClassFieldAccess(name, id) => List()
         }
     }
@@ -1796,6 +1813,7 @@ object CFG {
           case TypeMethodCall(name, ref_types, id, args) =>
             args.flatMap(HasVarcfgOps.getVarsFrom(_))
         }
+
       override def getLVarsFrom(methodInv: MethodInvocation): List[Ident] =
         methodInv match {
           case MethodCall(name, args) =>
@@ -1822,6 +1840,7 @@ object CFG {
               HasVarcfgOps.getVarsFrom(_)
             )
         }
+
       override def getLVarsFrom(idx: ArrayIndex): List[Ident] =
         idx match {
           case ArrayIndex(e, es) =>
@@ -1841,6 +1860,7 @@ object CFG {
             ) // TODO: double check, is it safe to assume names are not variable?
           case Name(_) => List()
         }
+
       override def getLVarsFrom(n: Name): List[Ident] =
         n match {
           case Name(ids) =>
@@ -1852,10 +1872,11 @@ object CFG {
     new HasVar[Lhs] {
       override def getVarsFrom(lhs: Lhs): List[Ident] =
         lhs match {
-          case NameLhs(name)          => List()
+          case NameLhs(name) => List()
           case FieldLhs(field_access) => HasVarcfgOps.getVarsFrom(field_access)
-          case ArrayLhs(array_idx)    => HasVarcfgOps.getVarsFrom(array_idx)
+          case ArrayLhs(array_idx) => HasVarcfgOps.getVarsFrom(array_idx)
         }
+
       override def getLVarsFrom(lhs: Lhs): List[Ident] =
         lhs match {
           case NameLhs(name) => HasVarcfgOps.getVarsFrom(name)
@@ -1882,12 +1903,13 @@ object CFG {
       override def getVarsFrom(lambExp: LambdaExpression): List[Ident] =
         lambExp match {
           case LambdaExpression_(e) => HasVarcfgOps.getVarsFrom(e)
-          case LambdaBlock(blk)     => HasVarcfgOps.getVarsFrom(blk)
+          case LambdaBlock(blk) => HasVarcfgOps.getVarsFrom(blk)
         }
+
       override def getLVarsFrom(lambExp: LambdaExpression): List[Ident] =
         lambExp match {
           case LambdaExpression_(e) => HasVarcfgOps.getLVarsFrom(e)
-          case LambdaBlock(blk)     => HasVarcfgOps.getLVarsFrom(blk)
+          case LambdaBlock(blk) => HasVarcfgOps.getLVarsFrom(blk)
         }
 
     }
@@ -1920,6 +1942,7 @@ object CFG {
             otherVars.filterNot(localVars)
           }
         }
+
       override def getLVarsFrom(blk: Block): List[Ident] =
         blk match {
           case Block(stmts) => {
@@ -1944,14 +1967,15 @@ object CFG {
     new HasVar[BlockStmt] {
       override def getVarsFrom(blkStmt: BlockStmt): List[Ident] =
         blkStmt match {
-          case BlockStmt_(stmt)       => HasVarcfgOps.getVarsFrom(stmt)
+          case BlockStmt_(stmt) => HasVarcfgOps.getVarsFrom(stmt)
           case LocalClass(class_decl) => List() // TODO:Fixme
           case LocalVars(modifiers, ty, var_decls) =>
             var_decls.flatMap(HasVarcfgOps.getVarsFrom(_))
         }
+
       override def getLVarsFrom(blkStmt: BlockStmt): List[Ident] =
         blkStmt match {
-          case BlockStmt_(stmt)       => HasVarcfgOps.getLVarsFrom(stmt)
+          case BlockStmt_(stmt) => HasVarcfgOps.getLVarsFrom(stmt)
           case LocalClass(class_decl) => List() // TODO:Fixme
           case LocalVars(modifiers, ty, var_decls) =>
             var_decls.flatMap(HasVarcfgOps.getLVarsFrom(_))
@@ -1987,7 +2011,7 @@ object CFG {
           case EnhancedFor(modifiers, ty, id, exp, stmt) => {
             HasVarcfgOps.getVarsFrom(exp) ++ getVarsFrom(stmt)
           }
-          case Empty        => List()
+          case Empty => List()
           case ExpStmt(exp) => HasVarcfgOps.getVarsFrom(exp)
           case Assert(exp, msg) =>
             HasVarcfgOps.getVarsFrom(exp) ++ msg.toList.flatMap(
@@ -1999,7 +2023,7 @@ object CFG {
             )
           case Do(stmt, exp) =>
             getVarsFrom(stmt) ++ HasVarcfgOps.getVarsFrom(exp)
-          case Break(_)    => List()
+          case Break(_) => List()
           case Continue(_) => List()
           case Return(exp) => exp.toList.flatMap(HasVarcfgOps.getVarsFrom(_))
           case Synchronized(exp, blk) =>
@@ -2011,6 +2035,7 @@ object CFG {
             ) ++ finally_blk.toList.flatMap(HasVarcfgOps.getVarsFrom(_))
           case Labeled(id, stmt) => getVarsFrom(stmt)
         }
+
       override def getLVarsFrom(stmt: Stmt): List[Ident] =
         stmt match {
           case StmtBlock(blk) => HasVarcfgOps.getLVarsFrom(blk)
@@ -2036,7 +2061,7 @@ object CFG {
               Set(id)
             )
           }
-          case Empty        => List()
+          case Empty => List()
           case ExpStmt(exp) => HasVarcfgOps.getLVarsFrom(exp)
           case Assert(exp, msg) =>
             HasVarcfgOps.getLVarsFrom(exp) ++ msg.toList.flatMap(
@@ -2048,7 +2073,7 @@ object CFG {
             )
           case Do(stmt, exp) =>
             getLVarsFrom(stmt) ++ HasVarcfgOps.getLVarsFrom(exp)
-          case Break(_)    => List()
+          case Break(_) => List()
           case Continue(_) => List()
           case Return(exp) => exp.toList.flatMap(HasVarcfgOps.getLVarsFrom(_))
           case Synchronized(exp, blk) =>
@@ -2071,6 +2096,7 @@ object CFG {
             HasVarcfgOps.getVarsFrom(blk).filterNot(ps)
           }
         }
+
       override def getLVarsFrom(c: Catch): List[Ident] =
         c match {
           case Catch(params, blk) => {
@@ -2089,6 +2115,7 @@ object CFG {
               HasVarcfgOps.getVarsFrom(_)
             )
         }
+
       override def getLVarsFrom(switch_block: SwitchBlock): List[Ident] =
         switch_block match {
           case SwitchBlock(label, blk_stmts) =>
@@ -2103,12 +2130,13 @@ object CFG {
       override def getVarsFrom(switch_label: SwitchLabel): List[Ident] =
         switch_label match {
           case SwitchCase(exp) => HasVarcfgOps.getVarsFrom(exp)
-          case Default         => List()
+          case Default => List()
         }
+
       override def getLVarsFrom(switch_label: SwitchLabel): List[Ident] =
         switch_label match {
           case SwitchCase(exp) => HasVarcfgOps.getLVarsFrom(exp)
-          case Default         => List()
+          case Default => List()
         }
     }
 
@@ -2119,6 +2147,7 @@ object CFG {
           case FormalParam(modifiers, ty, has_arity, var_decl_id) =>
             List(idFromVarDeclId(var_decl_id))
         }
+
       override def getLVarsFrom(fp: FormalParam): List[Ident] =
         fp match {
           case FormalParam(modifiers, ty, has_arity, var_decl_id) =>
@@ -2134,6 +2163,7 @@ object CFG {
             var_decls.flatMap(HasVarcfgOps.getVarsFrom(_))
           case ForInitExps(es) => es.flatMap(HasVarcfgOps.getVarsFrom(_))
         }
+
       override def getLVarsFrom(for_init: ForInit): List[Ident] =
         for_init match {
           case ForLocalVars(modifiers, ty, var_decls) =>
@@ -2156,33 +2186,33 @@ object CFG {
       // dominating name
       override def getLhsFrom(exp: Exp): List[Lhs] =
         exp match {
-          case Lit(lit)                                             => List()
-          case ClassLit(ty)                                         => List()
-          case This                                                 => List()
-          case ThisClass(name)                                      => List()
-          case InstanceCreation(type_args, type_decl, args, body)   => List()
+          case Lit(lit) => List()
+          case ClassLit(ty) => List()
+          case This => List()
+          case ThisClass(name) => List()
+          case InstanceCreation(type_args, type_decl, args, body) => List()
           case QualInstanceCreation(exp, type_args, id, args, body) => List()
-          case ArrayCreate(ty, exps, num_dims)                      => List()
-          case ArrayCreateInit(ty, size, init)                      => List()
-          case FieldAccess_(access)                                 => List(FieldLhs(access))
-          case MethodInv(methodInv)                                 => List()
-          case ArrayAccess(idx)                                     => List(ArrayLhs(idx))
-          case ExpName(name)                                        => List(NameLhs(name))
-          case PostIncrement(exp)                                   => getLhsFrom(exp)
-          case PostDecrement(exp)                                   => getLhsFrom(exp)
-          case PreIncrement(exp)                                    => getLhsFrom(exp)
-          case PreDecrement(exp)                                    => getLhsFrom(exp)
-          case PrePlus(exp)                                         => getLhsFrom(exp)
-          case PreMinus(exp)                                        => getLhsFrom(exp)
-          case PreBitCompl(exp)                                     => getLhsFrom(exp)
-          case PreNot(exp)                                          => getLhsFrom(exp)
-          case Cast(ty, exp)                                        => getLhsFrom(exp)
-          case BinOp(e1, op, e2)                                    => List()
-          case InstanceOf(e, ref_type)                              => List()
-          case Cond(cond, true_exp, false_exp)                      => List()
-          case Assign(lhs, op, rhs)                                 => List(lhs)
-          case Lambda(params, body)                                 => List()
-          case MethodRef(name, id)                                  => List()
+          case ArrayCreate(ty, exps, num_dims) => List()
+          case ArrayCreateInit(ty, size, init) => List()
+          case FieldAccess_(access) => List(FieldLhs(access))
+          case MethodInv(methodInv) => List()
+          case ArrayAccess(idx) => List(ArrayLhs(idx))
+          case ExpName(name) => List(NameLhs(name))
+          case PostIncrement(exp) => getLhsFrom(exp)
+          case PostDecrement(exp) => getLhsFrom(exp)
+          case PreIncrement(exp) => getLhsFrom(exp)
+          case PreDecrement(exp) => getLhsFrom(exp)
+          case PrePlus(exp) => getLhsFrom(exp)
+          case PreMinus(exp) => getLhsFrom(exp)
+          case PreBitCompl(exp) => getLhsFrom(exp)
+          case PreNot(exp) => getLhsFrom(exp)
+          case Cast(ty, exp) => getLhsFrom(exp)
+          case BinOp(e1, op, e2) => List()
+          case InstanceOf(e, ref_type) => List()
+          case Cond(cond, true_exp, false_exp) => List()
+          case Assign(lhs, op, rhs) => List(lhs)
+          case Lambda(params, body) => List()
+          case MethodRef(name, id) => List()
         }
     }
 
