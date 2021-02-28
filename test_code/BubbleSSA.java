@@ -1,4 +1,3 @@
-import java.util.function.*;
 
 public class BubbleSSA {
     public static void main(String [] argv) {
@@ -8,27 +7,6 @@ public class BubbleSSA {
 			System.out.println(nums[i]);
 		}
     }
-
-	public static class Ctxt {
-		int t;
-		boolean changed;
-		int i;
-		int j;
-	}
-
-	/*
-    public static void bubble(int [] nums) {
-
-		final Ctxt ctxt = new Ctxt();
-
-		Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> bubble0 = raise -> k -> {
-            ctxt.changed = false;
-            ctxt.i = nums.length - 1;
-            return k.apply(null);
-        };
-
-		Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> bubble1 = 
-	*/
 	
 	public static void bubble(int [] nums) {
 
