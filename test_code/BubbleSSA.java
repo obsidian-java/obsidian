@@ -1,6 +1,6 @@
 import java.util.function.*;
 
-public class BubbleO {
+public class BubbleSSA {
     public static void main(String [] argv) {
 		int [] nums = {13, 3, 4, 14, 67, 45, 34};
 		bubble(nums);
