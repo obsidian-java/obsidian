@@ -87,28 +87,67 @@ public class BubbleCPS {
             ctxt.changed_1 = ctxt.changed_0;
     
             return k.apply(null);
-        }
+        };
+
+        Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> k11 = raise -> k -> {
+            ctxt.i_1p = ctxt.i_11;
+            ctxt.j_1p = ctxt.j_8;
+            ctxt.changed_1p = ctxt.changed_8;
+            ctxt.t_1p = ctxt.t_8;
+            return k.apply(null);
+        };
+
+                
+        // block 2
+        Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> bubble2 = raise -> k -> {
+            ctxt.changed_1 = false;
+            ctxt.j_2 = 0;
+            return k.apply(null);
+        };
+
+
+        Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> k23 = raise -> k -> {
+            ctxt.i_3 = ctxt.i_1;
+            ctxt.j_3 = ctxt.j_2;
+            ctxt.t_3 = ctxt.t_1;
+            ctxt.changed_3 = ctxt.changed_1;
+            return k.apply(null);
+        };
+
+
+         // named loop in block 3
+         Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> loop3 = raise -> k -> {
+            
+            Function<Void, Boolean> cond = isnull -> new Boolean(ctxt.j_3 < ctxt.i_3);
+            return loop(cond, bubble4, bubble7).apply(raise).apply(k);
+        };
+
+        // block 3
+        Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> bubble3 = raise -> k -> {
+            return seq(k23,loop3).apply(raise).apply(k);
+        };
+        
+
+                
+        // block 12
+        Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> bubble12 = raise -> k -> {
+            return k.apply(null);
+        };
         
         // named loop in block 1
         Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> loop1 = raise -> k -> {
             
             Function<Void, Boolean> cond = isnull -> new Boolean(ctxt.i_1 > 0);
-            return loop(cond, bubble2, seq(k11, bubble12)).apply(raise).apply(k);
-        }
+            return loop(cond, seq(bubble2, bubble3), seq(k11, bubble12)).apply(raise).apply(k);
+        };
 
         // block 1
 		Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> bubble1 = raise -> k -> {
-            
+            return seq(k01, loop1).apply(raise).apply(k);
         };
 
-        Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> k11 = raise -> k -> {
-            
-        };
-        
-        // block 12
-        Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> bubble12 = raise -> k -> {
-            
-        };
+
+
 
     }
 
