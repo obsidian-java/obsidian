@@ -88,21 +88,24 @@ public class BubbleSSA {
 				j_3 = j_7;
 				t_3 = t_4;
 				changed_3 = changed_4;				
-				// phi resolution for end of while
-				i_3p = i_4;
-				j_3p = j_7;
-				t_3p = t_4;
-				changed_3p = changed_4;
+				// phi resolution for end of while 
+				// only applicable when the loop condition is not satisfied
+				if (!(j_3 < i_3)) {
+					i_3p = i_4;
+					j_3p = j_7;
+					t_3p = t_4;
+					changed_3p = changed_4;
+				}
 			}
 			/*
 			join {
-				i_3p = 7:i_4,
-				j_3p = 7:j_7
-				t_3p = 7:t_4
+				i_3p = 3:i_4,
+				j_3p = 3:j_7
+				t_3p = 3:t_4
 				changed_3p = 7:changed_4;
 			}
 			*/
-			// System.out.println(i);
+			// System.out.println(i_3p);
 			// optimization
 			if (!changed_3p) { // 8
 				i_1p = i_3p;
@@ -135,18 +138,21 @@ public class BubbleSSA {
 			changed_1 = changed_8;
 			t_1 = t_8;
 			// phi resolution for end of while join
-			i_1p = i_11;
-			j_1p = j_8;
-			changed_1p = changed_8;
-			t_1p = t_8;
+			// this should only be fired when the loop condition is false
+			if (!(i_1 > 0)) {
+				i_1p = i_11;
+				j_1p = j_8;
+				changed_1p = changed_8;
+				t_1p = t_8;
+			}
 
 		} // end of while
 		/*
 		join {
 			changed_1p = 9: changed_3p, 11: changed_8,
-			i_1p = 9: i_3p, 11: i_11,
-			j_1p = 9: j_3p, 11: j_8,
-			t_1p = 9: t_3p, 11: t_8
+			i_1p = 9: i_3p, 1: i_11,
+			j_1p = 9: j_3p, 1: j_8,
+			t_1p = 9: t_3p, 1: t_8
 		}
 		*/
 		// phi resolution

@@ -76,18 +76,37 @@ public class BubbleCPS {
 		Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> bubble0 = raise -> k -> {
             ctxt.changed_0 = false;
             ctxt.i_0 = nums.length - 1;
+            return k.apply(null);
+        };
 
+ 
+        Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> k01 = raise -> k -> {
             ctxt.i_1 = ctxt.i_0;
             ctxt.j_1 = ctxt.j_0;
             ctxt.t_1 = ctxt.t_0;
             ctxt.changed_1 = ctxt.changed_0;
     
             return k.apply(null);
+        }
+        
+        // named loop in block 1
+        Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> loop1 = raise -> k -> {
+            
+            Function<Void, Boolean> cond = isnull -> new Boolean(ctxt.i_1 > 0);
+            return loop(cond, bubble2, seq(k11, bubble12)).apply(raise).apply(k);
+        }
+
+        // block 1
+		Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> bubble1 = raise -> k -> {
+            
         };
 
+        Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> k11 = raise -> k -> {
+            
+        };
         
-
-		Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> bubble1 = raise -> k -> {
+        // block 12
+        Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> bubble12 = raise -> k -> {
             
         };
 
