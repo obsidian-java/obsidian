@@ -938,8 +938,8 @@ object CFG {
               _ <- {
 
                 val currNodeId = p
-                val lhs = HasVarcfgOps.getVarsFrom(exp)
-                val rhs = HasVarcfgOps.getLVarsFrom(exp)
+                val lhs = HasVarcfgOps.getLVarsFrom(exp)
+                val rhs = HasVarcfgOps.getVarsFrom(exp)
 
                 val cfg0 = st.cfg
                 val preds0 = st.currPreds
