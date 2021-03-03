@@ -102,7 +102,7 @@ public class BubbleSSA {
 				i_3p = 3:i_3,
 				j_3p = 3:j_3
 				t_3p = 3:t_3
-				changed_3p = 7:changed_3
+				changed_3p = 3:changed_3
 			}
 			*/
 			// System.out.println(i_3p);
@@ -140,19 +140,19 @@ public class BubbleSSA {
 			// phi resolution for end of while join
 			// this should only be fired when the loop condition is false
 			if (!(i_1 > 0)) {
-				i_1p = i_11;
-				j_1p = j_8;
-				changed_1p = changed_8;
-				t_1p = t_8;
+				i_1p = i_1;
+				j_1p = j_1;
+				changed_1p = changed_1;
+				t_1p = t_1;
 			}
 
 		} // end of while
 		/*
 		join {
-			changed_1p = 9: changed_3p, 11: changed_8,
-			i_1p = 9: i_3p, 1: i_11,
-			j_1p = 9: j_3p, 1: j_8,
-			t_1p = 9: t_3p, 1: t_8
+			changed_1p = 9: changed_3p, 1: changed_1,
+			i_1p = 9: i_3p, 1: i_1,
+			j_1p = 9: j_3p, 1: j_1,
+			t_1p = 9: t_3p, 1: t_1
 		}
 		*/
 		// phi resolution

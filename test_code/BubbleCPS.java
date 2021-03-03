@@ -111,10 +111,10 @@ public class BubbleCPS {
         };
 
         Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> k11 = raise -> k -> {
-            ctxt.i_1p = ctxt.i_11;
-            ctxt.j_1p = ctxt.j_8;
-            ctxt.changed_1p = ctxt.changed_8;
-            ctxt.t_1p = ctxt.t_8;
+            ctxt.i_1p = ctxt.i_1;
+            ctxt.j_1p = ctxt.j_1;
+            ctxt.changed_1p = ctxt.changed_1;
+            ctxt.t_1p = ctxt.t_1;
             return k.apply(null);
         };
 
