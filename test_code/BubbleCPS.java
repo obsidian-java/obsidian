@@ -180,15 +180,16 @@ public class BubbleCPS {
             ctxt.i_3 = ctxt.i_4;
             ctxt.j_3 = ctxt.j_7;
             ctxt.t_3 = ctxt.t_4;
+	    ctxt.changed_3 = ctxt.changed_4;
             return k.apply(null);
         };
 
 
         Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> k33 = raise -> k -> {
-            ctxt.i_3p = ctxt.i_4;
-            ctxt.j_3p = ctxt.j_7;
-            ctxt.t_3p = ctxt.t_4;
-            ctxt.changed_3p = ctxt.changed_4;
+            ctxt.i_3p = ctxt.i_3;
+            ctxt.j_3p = ctxt.j_3;
+            ctxt.t_3p = ctxt.t_3;
+            ctxt.changed_3p = ctxt.changed_3;
             return k.apply(null);
         };
 

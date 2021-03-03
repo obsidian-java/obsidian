@@ -91,18 +91,18 @@ public class BubbleSSA {
 				// phi resolution for end of while 
 				// only applicable when the loop condition is not satisfied
 				if (!(j_3 < i_3)) {
-					i_3p = i_4;
-					j_3p = j_7;
-					t_3p = t_4;
-					changed_3p = changed_4;
+					i_3p = i_3;
+					j_3p = j_3;
+					t_3p = t_3;
+					changed_3p = changed_3;
 				}
 			}
 			/*
 			join {
-				i_3p = 3:i_4,
-				j_3p = 3:j_7
-				t_3p = 3:t_4
-				changed_3p = 7:changed_4;
+				i_3p = 3:i_3,
+				j_3p = 3:j_3
+				t_3p = 3:t_3
+				changed_3p = 7:changed_3
 			}
 			*/
 			// System.out.println(i_3p);
