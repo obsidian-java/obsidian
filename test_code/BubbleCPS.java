@@ -76,7 +76,7 @@ public class BubbleCPS {
 		int i_1, i_1p, i_2 ,i_3, i_3p, i_4, i_8, i_11;
 		int j_1, j_1p, j_2, j_3, j_3p, j_4, j_7, j_8;
 		int t_1, t_1p, t_3, t_3p, t_5, t_4, t_8;
-		boolean changed_1, changed_1p, changed_3, changed_3p, changed_5, changed_4, changed_8;
+	    boolean changed_1, changed_1p, changed_2, changed_3, changed_3p, changed_5, changed_4, changed_8;
         HashMap<Integer, Function<Exception,Void>> raise_map;
         HashMap<Integer, Function<Void,Void>> k_map;
         HashMap<Integer, Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>>> func_map;
@@ -122,7 +122,7 @@ public class BubbleCPS {
         // block 2
         Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> bubble2 = raise -> k -> {
             System.out.println("bubble2");
-            ctxt.changed_1 = false;
+            ctxt.changed_2 = false;
             ctxt.j_2 = 0;
             return k.apply(null);
         };
@@ -132,7 +132,7 @@ public class BubbleCPS {
             ctxt.i_3 = ctxt.i_1;
             ctxt.j_3 = ctxt.j_2;
             ctxt.t_3 = ctxt.t_1;
-            ctxt.changed_3 = ctxt.changed_1;
+            ctxt.changed_3 = ctxt.changed_2;
             return k.apply(null);
         };
 
@@ -167,7 +167,7 @@ public class BubbleCPS {
         
 
         Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> bubble4 = raise -> k -> {
-            Function<Void, Boolean> cond = isnull -> new Boolean(nums[ctxt.j_3] < nums[ctxt.j_3+1]);
+            Function<Void, Boolean> cond = isnull -> new Boolean(nums[ctxt.j_3] > nums[ctxt.j_3+1]);
             return ifelse(cond, seq(bubble5,k54), seq(bubble6, k64)).apply(raise).apply(k);
         };
 

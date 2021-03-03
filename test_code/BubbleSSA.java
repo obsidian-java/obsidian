@@ -17,7 +17,7 @@ public class BubbleSSA {
 		int i_1, i_1p, i_2 ,i_3, i_3p, i_4, i_8, i_11;
 		int j_1, j_1p, j_2, j_3, j_3p, j_4, j_7, j_8;
 		int t_1, t_1p, t_3, t_3p, t_5, t_4, t_8;
-		boolean changed_1, changed_1p, changed_3, changed_3p, changed_5, changed_4, changed_8;
+		boolean changed_1, changed_1p, changed_2, changed_3, changed_3p, changed_5, changed_4, changed_8;
 		// need to initialized, otherwise java compiler complains that these variables 
 		// might not be initialized
 		j_0 = 0;
@@ -40,21 +40,21 @@ public class BubbleSSA {
 		t_1 = t_0;
 		changed_1 = changed_0;
 		while(i_1 > 0) { // 1 
-			changed_1 = false; // 2
+			changed_2 = false; // 2
 			j_2 = 0; 
 			/*
 			join {
 				i_3 = 2: i_1, 7: i_4
 				j_3 = 2: j_2, 7: j_7
 				t_3 = 2: t_1, 7: t_4
-				changed_3 = 2: changed_1, 7: changed_4 
+				changed_3 = 2: changed_2, 7: changed_4 
 			}
 			*/
 			// phi resolution
 			i_3 = i_1;
 			j_3 = j_2;
 			t_3 = t_1;
-			changed_3 = changed_1;
+			changed_3 = changed_2;
 			while(j_3 < i_3) { // 3
 				if (nums[j_3] > nums[j_3+1]) { // 4
 					t_5 = nums[j_3+1];         // 5
