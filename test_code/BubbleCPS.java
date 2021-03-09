@@ -196,7 +196,7 @@ public class BubbleCPS {
         // k91 is the merge at the end of while loop (block 1)
         Function<Function<Exception,Void>, Function<Function<Void, Void>, Void>> k91 = raise -> k -> {
             ctxt.i_1p = ctxt.i_3p;
-            ctxt.j_1p = ctxt.i_3p;
+            ctxt.j_1p = ctxt.j_3p;
             ctxt.changed_1p = ctxt.changed_3p;
             ctxt.t_1p = ctxt.t_3p;
             return k.apply(null);
