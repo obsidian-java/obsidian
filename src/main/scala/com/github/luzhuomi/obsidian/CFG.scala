@@ -683,7 +683,7 @@ object CFG {
           }
           case Block(stmts) =>
             for {
-              _ <- stmts.zip(0 to stmts.size).traverse_(stmt_idx => stmt_idx match {
+              _ <- stmts.zip(0 to stmts.size - 1).traverse_(stmt_idx => stmt_idx match {
                 case (stmt, idx) => {
                   cfgOps.buildCFG(stmt, childOf(p, idx))
                 }
@@ -881,7 +881,7 @@ object CFG {
                 val cfg0 = st.cfg
                 val preds0 = st.currPreds
                 val caseNodes0 = st.caseNodes
-                val childNodeIds = (0 to blocks.size).map(idx => childOf(p, idx)).toList
+                val childNodeIds = (0 to blocks.size - 1).map(idx => childOf(p, idx)).toList
                 val switchNode = SwitchNode(currNodeId, childNodeIds, lhs, rhs, preds0, childNodeIds)
                 val cfg1p = preds0.foldLeft(cfg0)((g, pred) => {
                   val n = g(pred)
@@ -1475,7 +1475,7 @@ object CFG {
             CFG, path,preds, continuable, breakNodes, contNodes, caseNodes |-
               default: stmt1; ... ; stmtn; => CFG2, max2, preds2 continuable2, breakNodes, contNodes2, caseNodes2 union (max, default)
             */
-            val children_path = (0 to blk_stmts.size).map(idx => childOf(p, idx)).toList
+            val children_path = (0 to blk_stmts.size-1).map(idx => childOf(p, idx)).toList
             for {
               st <- get
               _ <- {
@@ -1508,7 +1508,7 @@ object CFG {
             CFG, path,preds, continuable, breakNodes, contNodes, caseNodes |-
               case lit: stmt1; ... ; stmtn; => CFG2, max2, preds2 continuable2, breakNodes, contNodes2, caseNodes2 union (max, default)
             */
-            val children_path = (0 to blk_stmts.size).map(idx => childOf(p, idx)).toList
+            val children_path = (0 to blk_stmts.size - 1).map(idx => childOf(p, idx)).toList
             for {
               st <- get
               _ <- {

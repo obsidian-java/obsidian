@@ -84,13 +84,13 @@ public static void main(String [] args) {
   val methoddecl: Decl =
     classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
 
-  val cfg: CFG = Map(List(1) -> SwitchNode(List(1),List(List(1, 0), List(1, 1), List(1, 2), List(1, 3)),List(),List(Ident("x")),List(List(0)),List(List(1, 0), List(1, 1), List(1, 2), List(1, 3)))
-                   , List(1, 1) -> CaseNode(List(1, 1),List(List(1, 1, 0), List(1, 1, 1), List(1, 1, 2)),List(List(1)),List(List(1, 1, 0)))
-                   , List(1, 2) -> DefaultNode(List(1, 2),List(List(1, 2, 0), List(1, 2, 1)),List(List(1)),List(List(1, 2, 0)))
+  val cfg: CFG = Map(List(1) -> SwitchNode(List(1),List(List(1, 0), List(1, 1), List(1, 2)),List(),List(Ident("x")),List(List(0)),List(List(1, 0), List(1, 1), List(1, 2)))
+                   , List(1, 1) -> CaseNode(List(1, 1),List(List(1, 1, 0), List(1, 1, 1)),List(List(1)),List(List(1, 1, 0)))
+                   , List(1, 2) -> DefaultNode(List(1, 2),List(List(1, 2, 0)),List(List(1)),List(List(1, 2, 0)))
                    , List(1, 0, 1) -> BreakNode(List(1, 0, 1),List(List(1, 0, 0)),List(List(2)))
                    , List(1, 2, 0) -> AssignmentsNode(List(1, 2, 0),List(List(1, 2, 0)),List(),List(),List(Ident("x")),List(List(1, 2)),List(List(2)))
                    , List(2) -> ReturnNode(List(2),List(),List(),List(List(1, 2, 0), List(1, 0, 1), List(1, 1, 1)))
-                   , List(1, 0) -> CaseNode(List(1, 0),List(List(1, 0, 0), List(1, 0, 1), List(1, 0, 2)),List(List(1)),List(List(1, 0, 0)))
+                   , List(1, 0) -> CaseNode(List(1, 0),List(List(1, 0, 0), List(1, 0, 1)),List(List(1)),List(List(1, 0, 0)))
                    , List(1, 0, 0) -> AssignmentsNode(List(1, 0, 0),List(List(1, 0, 0)),List(),List(Ident("x")),List(Ident("x")),List(List(1, 0)),List(List(1, 0, 1)))
                    , List(0) -> AssignmentsNode(List(0),List(List(0)),List(Ident("x")),List(Ident("x"), Ident("args")),List(),List(),List(List(1)))
                    , List(1, 1, 1) -> BreakNode(List(1, 1, 1),List(List(1, 1, 0)),List(List(2)))
@@ -148,13 +148,13 @@ public static void main(String [] args) {
   val methoddecl: Decl =
     classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
 
-  val cfg: CFG = Map(List(1) -> SwitchNode(List(1),List(List(1, 0), List(1, 1), List(1, 2), List(1, 3)),List(),List(Ident("x")),List(List(0)),List(List(1, 0), List(1, 1), List(1, 2), List(1, 3)))
-                   , List(1, 1) -> CaseNode(List(1, 1),List(List(1, 1, 0), List(1, 1, 1), List(1, 1, 2)),List(List(1)),List(List(1, 1, 0)))
-                   , List(1, 2) -> DefaultNode(List(1, 2),List(List(1, 2, 0), List(1, 2, 1)),List(List(1)),List(List(1, 2, 0)))
+  val cfg: CFG = Map(List(1) -> SwitchNode(List(1),List(List(1, 0), List(1, 1), List(1, 2)),List(),List(Ident("x")),List(List(0)),List(List(1, 0), List(1, 1), List(1, 2)))
+                   , List(1, 1) -> CaseNode(List(1, 1),List(List(1, 1, 0), List(1, 1, 1)),List(List(1)),List(List(1, 1, 0)))
+                   , List(1, 2) -> DefaultNode(List(1, 2),List(List(1, 2, 0)),List(List(1)),List(List(1, 2, 0)))
                    , List(1, 0, 1) -> BreakNode(List(1, 0, 1),List(List(1, 0, 0)),List(List(2)))
                    , List(1, 2, 0) -> AssignmentsNode(List(1, 2, 0),List(List(1, 2, 0)),List(),List(),List(Ident("x")),List(List(1, 2)),List(List(2)))
                    , List(3) -> ReturnNode(List(3),List(),List(),List(List(2)))
-                   , List(1, 0) -> CaseNode(List(1, 0),List(List(1, 0, 0), List(1, 0, 1), List(1, 0, 2)),List(List(1)),List(List(1, 0, 0)))
+                   , List(1, 0) -> CaseNode(List(1, 0),List(List(1, 0, 0), List(1, 0, 1)),List(List(1)),List(List(1, 0, 0)))
                    , List(1, 0, 0) -> AssignmentsNode(List(1, 0, 0),List(List(1, 0, 0)),List(),List(Ident("x")),List(Ident("x")),List(List(1, 0)),List(List(1, 0, 1)))
                    , List(0) -> AssignmentsNode(List(0),List(List(0)),List(Ident("x")),List(Ident("x"), Ident("args")),List(),List(),List(List(1)))
                    , List(1, 1, 1) -> BreakNode(List(1, 1, 1),List(List(1, 1, 0)),List(List(2)))
