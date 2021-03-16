@@ -767,8 +767,8 @@ object CFG {
                         currNodeId,
                         List(p),
                         lvars,
-                        rvars,
                         lvars,
+                        rvars,
                         preds0,
                         Nil
                       )
@@ -1032,7 +1032,10 @@ object CFG {
               val cfg = st.cfg
               val preds = st.currPreds
               val node = AssignmentsNode(p, List(p), Nil, Nil, Nil, preds, Nil)
-              val cfg1 = cfg + (p -> node)
+              val cfg1 = preds.foldLeft(cfg + (p -> node))((g,pred) => {
+                val n = g(pred)
+                g + (pred -> appSucc(n, p))
+              })
               for {
                 _ <- put(st.copy(cfg = cfg1, currPreds = List(p), continuable = true))
               } yield ()
@@ -1357,7 +1360,10 @@ object CFG {
                   preds0,
                   List(tryOf(currNodeId))
                 )
-                val cfg0 = st.cfg + (currNodeId -> n)
+                val cfg0 = preds0.foldLeft(st.cfg + (currNodeId -> n))((g, pred) => {
+                  val n = g(pred)
+                  g + (pred -> appSucc(n, currNodeId))
+                })
                 val throwNodes0 = st.throwNodes
                 val catchNodes0 = st.catchNodes
                 for { // building for try block
@@ -1403,7 +1409,7 @@ object CFG {
                       }
                     } yield ()
                   }
-                      } yield ()
+                } yield ()
               }
             } yield ()
           case Try(try_blk, _, _) => m.raiseError("An error is encountered during the CFG construction. try-catch-finally block should have been desugared to have one catch block and one finally block.")
