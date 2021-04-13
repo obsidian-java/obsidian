@@ -927,6 +927,9 @@ object CFG {
           case While(exp, stmt) =>
             /*
 
+            Note: the childNode of while node is a container node, i.e. { }, not a leaf node. Hence the childNode of while is not a successor of while, 
+            the first child of the childNode is the successor of the while. similar observation applies to if-else and try. 
+
           CFG1 = CFG update { pred: {succ = p} | pred <- preds } union { path: whilenode(childOF(path), lhs, rhs, preds, childOf(path))}
           CFG1, childOF(path), {path}, _, {}, {} |- stmt |- CFG2,  preds2, continuable2, contNodes2, breakNodes2
           CFG3 = CFG3 update { nodeid: { succ = {path} | nodeid <- contNodes2(path)++preds2 } } update { path : { preds = preds ++ contNodes2(path) ++ preds2 } }
