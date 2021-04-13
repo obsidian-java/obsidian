@@ -262,7 +262,7 @@ public static void main(String [] args) {
     classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
 
   val cfg: CFG = Map(List(0) -> AssignmentsNode(List(0),List(List(0)),List(Ident("x")),List(Ident("x"), Ident("args")),List(),List(),List(List(1)))
-                   , List(1) -> TryCatchFinallyNode(List(1),List(1, 0),List(1, 1),List(Ident("exception_desugared")),List(1, 2),List(List(0)),List(List(1, 0), List(1, 0, 0)))
+                   , List(1) -> TryCatchFinallyNode(List(1),List(1, 0),List(1, 1),List(Ident("exception_desugared")),List(1, 2),List(List(0)),List(List(1, 0, 0)))
                    , List(1, 0, 0) -> AssignmentsNode(List(1, 0, 0),List(List(1, 0, 0)),List(),List(Ident("x")),List(Ident("x")),List(List(1)),List(List(1, 2)))
                    , List(1, 1, 0) -> IfThenElseNode(List(1, 1, 0),List(1, 1, 0, 0),List(1, 1, 0, 1),List(),List(Ident("exception_desugared")),List(),List(List(1, 1, 0, 0, 0), List(1, 1, 0, 1)))
                    , List(1, 1, 0, 0, 0) -> AssignmentsNode(List(1, 1, 0, 0, 0),List(List(1, 1, 0, 0, 0), List(1, 1, 0, 0, 1)),List(Ident("e")),List(Ident("e")),List(Ident("exception_desugared")),List(List(1, 1, 0)),List(List(1, 2)))
@@ -338,7 +338,69 @@ class TestCFG6 extends FunSuite with Matchers { // probably a bad test case, we 
                 cfgOps.buildCFG(d_methodDecl, List()).run(initStateInfo) match {
                     case CFGError(message) => fail(message)
                     case CFGOk((st, unit)) => {
-                        println(st.cfg)
+                        // println(st.cfg)
+                        assert(st.cfg == cfg)
+                    }
+                }
+              }
+            }
+          }
+        }
+      }
+      case _ =>
+        fail(
+          "It is supposed to be a MethodDecl member, but some other type is encountered."
+        )
+    }
+  }
+}
+
+
+
+class TestCFG7 extends FunSuite with Matchers { // probably a bad test case, we can't handle unchecked exception
+  val METHODSTR = """
+public static int fun(int n)
+{
+   bool error = false;
+   try {
+     if (n > 0){
+       throw new Exception();
+     }
+   } catch(Exception e){
+     error = true;
+   }
+}
+  """
+  val methoddecl: Decl =
+    classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
+
+  val cfg: CFG = Map(  List(1) -> TryCatchFinallyNode(List(1),List(1, 0),List(1, 1),List(Ident("exception_desugared")),List(1, 2),List(List(0)),List(List(1, 0, 0)))
+  , List(1, 2) -> AssignmentsNode(List(1, 2),List(),List(),List(),List(),List(List(1, 0, 0, 1), List(1, 1, 0, 0, 0)),List())
+  , List(1, 0, 0, 0, 0) -> ThrowNode(List(1, 0, 0, 0, 0),List(),List(),List(List(1, 0, 0)),List(List(1, 1, 0)))
+  , List(1, 1, 0, 1) -> ThrowNode(List(1, 1, 0, 1),List(),List(Ident("exception_desugared")),List(List(1, 1, 0)),List())
+  , List(1, 1, 0, 0, 0) -> AssignmentsNode(List(1, 1, 0, 0, 0),List(List(1, 1, 0, 0, 0), List(1, 1, 0, 0, 1)),List(Ident("e")),List(Ident("e"), Ident("error")),List(Ident("exception_desugared")),List(List(1, 1, 0)),List(List(1, 2)))
+  , List(1, 0, 0, 1) -> AssignmentsNode(List(1, 0, 0, 1),List(List(1, 0, 0, 1)),List(),List(),List(),List(List(1, 0, 0)),List(List(1, 2)))
+  , List(1, 0, 0) -> IfThenElseNode(List(1, 0, 0),List(1, 0, 0, 0),List(1, 0, 0, 1),List(),List(Ident("n")),List(List(1)),List(List(1, 0, 0, 0, 0), List(1, 0, 0, 1)))
+  , List(0) -> AssignmentsNode(List(0),List(List(0)),List(Ident("error")),List(Ident("error"), Ident("n")),List(),List(),List(List(1)))
+  , List(1, 1, 0) -> IfThenElseNode(List(1, 1, 0),List(1, 1, 0, 0),List(1, 1, 0, 1),List(),List(Ident("exception_desugared")),List(List(1, 0, 0, 0, 0)),List(List(1, 1, 0, 0, 0), List(1, 1, 0, 1))))
+
+
+  test("TestCFG7") {
+    methoddecl match {
+      case MemberDecl_(methodDecl @ MethodDecl(_, _, _, _, _, _, _, _)) => {
+        Label.labelOps
+          .label(methodDecl, None, None)
+          .run(Label.initStateInfo) match {
+          case Label.LabelError(message) => fail(message)
+          case Label.LabelOk((st, methDecl)) => {
+            Flatten.flatMethodDecl(methDecl).run(Flatten.initStateInfo) match {
+              case Flatten.FlatError(message) => fail(message)
+              case Flatten.FlatOk((st, f_methdDecl)) => {
+                val d_methodDecl = Desugar.dsgOps.desugar(f_methdDecl)
+                cfgOps.buildCFG(d_methodDecl, List()).run(initStateInfo) match {
+                    case CFGError(message) => fail(message)
+                    case CFGOk((st, unit)) => {
+                        // println(st.cfg)
                         assert(st.cfg == cfg)
                     }
                 }
