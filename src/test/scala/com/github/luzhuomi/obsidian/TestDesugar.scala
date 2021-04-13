@@ -21,7 +21,7 @@ class TestDesugar1 extends FunSuite with Matchers {
     val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
     val D_METHODSTR = """
 public static void main (String[] args)
-{ int x = 0; if (x > 0) { x = x + 1; } else   ; }
+{ int x = 0; if (x > 0) { x = x + 1; } else {;} }
     """
     val d_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(D_METHODSTR)).get.get
     test ("TestDesugar1") {
@@ -289,7 +289,9 @@ public static void main (String[] args)
       System.out.println("arrayout of bound");
     }
     else
+    { 
       throw exception_desugared;
+    }
   }
   finally {  }
 }

@@ -359,7 +359,7 @@ object Desugar {
           case ExpStmt(PreIncrement(ExpName(name))) => ExpStmt(Assign(NameLhs(name), EqualA, BinOp(ExpName(name), Add, Lit(IntLit(1)))))
           case ExpStmt(exp) => ExpStmt(dsgOps.desugar(exp))
           case IfThen(exp, stmt) => // if then is desugar if then else with else branch empty
-            IfThenElse(dsgOps.desugar(exp), dsgOps.desugar(stmt), Empty)
+            IfThenElse(dsgOps.desugar(exp), dsgOps.desugar(stmt), StmtBlock(Block(List(BlockStmt_(Empty)))))
           case IfThenElse(exp, th, el) =>
             IfThenElse(
               dsgOps.desugar(exp),
@@ -437,7 +437,7 @@ object Desugar {
         } 
       }
     )
-    val lastStmt:Stmt = Throw(ExpName(Name(List(ex_top))))
+    val lastStmt:Stmt = StmtBlock(Block(List(BlockStmt_(Throw(ExpName(Name(List(ex_top))))))))
     val ifelse = conds.zip(blks).foldRight(lastStmt)( (condBlk, elStmt) => condBlk match {
       case (cond, blk) => {
         IfThenElse(cond, StmtBlock(blk), elStmt)

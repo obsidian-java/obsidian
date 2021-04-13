@@ -264,9 +264,9 @@ public static void main(String [] args) {
   val cfg: CFG = Map(List(0) -> AssignmentsNode(List(0),List(List(0)),List(Ident("x")),List(Ident("x"), Ident("args")),List(),List(),List(List(1)))
                    , List(1) -> TryCatchFinallyNode(List(1),List(1, 0),List(1, 1),List(Ident("exception_desugared")),List(1, 2),List(List(0)),List(List(1, 0, 0)))
                    , List(1, 0, 0) -> AssignmentsNode(List(1, 0, 0),List(List(1, 0, 0)),List(),List(Ident("x")),List(Ident("x")),List(List(1)),List(List(1, 2)))
-                   , List(1, 1, 0) -> IfThenElseNode(List(1, 1, 0),List(1, 1, 0, 0),List(1, 1, 0, 1),List(),List(Ident("exception_desugared")),List(),List(List(1, 1, 0, 0, 0), List(1, 1, 0, 1)))
+                   , List(1, 1, 0) -> IfThenElseNode(List(1, 1, 0),List(1, 1, 0, 0),List(1, 1, 0, 1),List(),List(Ident("exception_desugared")),List(),List(List(1, 1, 0, 0, 0), List(1, 1, 0, 1, 0)))
                    , List(1, 1, 0, 0, 0) -> AssignmentsNode(List(1, 1, 0, 0, 0),List(List(1, 1, 0, 0, 0), List(1, 1, 0, 0, 1)),List(Ident("e")),List(Ident("e")),List(Ident("exception_desugared")),List(List(1, 1, 0)),List(List(1, 2)))
-                   , List(1, 1, 0, 1) -> ThrowNode(List(1, 1, 0, 1),List(),List(Ident("exception_desugared")),List(List(1, 1, 0)),List())
+                   , List(1, 1, 0, 1, 0) -> ThrowNode(List(1, 1, 0, 1, 0),List(),List(Ident("exception_desugared")),List(List(1, 1, 0)),List())
                    , List(1, 2) -> AssignmentsNode(List(1, 2),List(),List(),List(),List(),List(List(1, 0, 0), List(1, 1, 0, 0, 0)),List(List(2)))
                    , List(2) -> ReturnNode(List(2),List(),List(),List(List(1, 2)))
                    )
@@ -374,16 +374,15 @@ public static int fun(int n)
   val methoddecl: Decl =
     classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
 
-  val cfg: CFG = Map(  List(1) -> TryCatchFinallyNode(List(1),List(1, 0),List(1, 1),List(Ident("exception_desugared")),List(1, 2),List(List(0)),List(List(1, 0, 0)))
-  , List(1, 2) -> AssignmentsNode(List(1, 2),List(),List(),List(),List(),List(List(1, 0, 0, 1), List(1, 1, 0, 0, 0)),List())
-  , List(1, 0, 0, 0, 0) -> ThrowNode(List(1, 0, 0, 0, 0),List(),List(),List(List(1, 0, 0)),List(List(1, 1, 0)))
-  , List(1, 1, 0, 1) -> ThrowNode(List(1, 1, 0, 1),List(),List(Ident("exception_desugared")),List(List(1, 1, 0)),List())
-  , List(1, 1, 0, 0, 0) -> AssignmentsNode(List(1, 1, 0, 0, 0),List(List(1, 1, 0, 0, 0), List(1, 1, 0, 0, 1)),List(Ident("e")),List(Ident("e"), Ident("error")),List(Ident("exception_desugared")),List(List(1, 1, 0)),List(List(1, 2)))
-  , List(1, 0, 0, 1) -> AssignmentsNode(List(1, 0, 0, 1),List(List(1, 0, 0, 1)),List(),List(),List(),List(List(1, 0, 0)),List(List(1, 2)))
-  , List(1, 0, 0) -> IfThenElseNode(List(1, 0, 0),List(1, 0, 0, 0),List(1, 0, 0, 1),List(),List(Ident("n")),List(List(1)),List(List(1, 0, 0, 0, 0), List(1, 0, 0, 1)))
-  , List(0) -> AssignmentsNode(List(0),List(List(0)),List(Ident("error")),List(Ident("error"), Ident("n")),List(),List(),List(List(1)))
-  , List(1, 1, 0) -> IfThenElseNode(List(1, 1, 0),List(1, 1, 0, 0),List(1, 1, 0, 1),List(),List(Ident("exception_desugared")),List(List(1, 0, 0, 0, 0)),List(List(1, 1, 0, 0, 0), List(1, 1, 0, 1))))
-
+  val cfg: CFG = Map( List(1) -> TryCatchFinallyNode(List(1),List(1, 0),List(1, 1),List(Ident("exception_desugared")),List(1, 2),List(List(0)),List(List(1, 0, 0)))
+   , List(1, 2) -> AssignmentsNode(List(1, 2),List(),List(),List(),List(),List(List(1, 0, 0, 1, 0), List(1, 1, 0, 0, 0)),List())
+   , List(1, 0, 0, 0, 0) -> ThrowNode(List(1, 0, 0, 0, 0),List(),List(),List(List(1, 0, 0)),List(List(1, 1, 0)))
+   , List(1, 1, 0, 1, 0) -> ThrowNode(List(1, 1, 0, 1, 0),List(),List(Ident("exception_desugared")),List(List(1, 1, 0)),List())
+   , List(1, 1, 0, 0, 0) -> AssignmentsNode(List(1, 1, 0, 0, 0),List(List(1, 1, 0, 0, 0), List(1, 1, 0, 0, 1)),List(Ident("e")),List(Ident("e"), Ident("error")),List(Ident("exception_desugared")),List(List(1, 1, 0)),List(List(1, 2)))
+   , List(1, 0, 0) -> IfThenElseNode(List(1, 0, 0),List(1, 0, 0, 0),List(1, 0, 0, 1),List(),List(Ident("n")),List(List(1)),List(List(1, 0, 0, 0, 0), List(1, 0, 0, 1, 0)))
+   , List(0) -> AssignmentsNode(List(0),List(List(0)),List(Ident("error")),List(Ident("error"), Ident("n")),List(),List(),List(List(1)))
+   , List(1, 1, 0) -> IfThenElseNode(List(1, 1, 0),List(1, 1, 0, 0),List(1, 1, 0, 1),List(),List(Ident("exception_desugared")),List(List(1, 0, 0, 0, 0)),List(List(1, 1, 0, 0, 0), List(1, 1, 0, 1, 0)))
+   , List(1, 0, 0, 1, 0) -> AssignmentsNode(List(1, 0, 0, 1, 0),List(List(1, 0, 0, 1, 0)),List(),List(),List(),List(List(1, 0, 0)),List(List(1, 2))))
 
   test("TestCFG7") {
     methoddecl match {
@@ -416,3 +415,5 @@ public static int fun(int n)
     }
   }
 }
+
+
