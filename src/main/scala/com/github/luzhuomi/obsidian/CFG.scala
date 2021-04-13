@@ -1358,7 +1358,7 @@ object CFG {
                   catchVars,
                   childOf(currNodeId, 2),
                   preds0,
-                  List(tryOf(currNodeId))
+                  List(childOf(tryOf(currNodeId), 0))
                 )
                 val cfg0 = preds0.foldLeft(st.cfg + (currNodeId -> n))((g, pred) => {
                   val n = g(pred)
