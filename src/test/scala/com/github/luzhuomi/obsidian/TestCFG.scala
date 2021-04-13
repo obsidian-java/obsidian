@@ -28,7 +28,7 @@ class TestCFG1 extends FunSuite with Matchers {
   val methoddecl: Decl =
     classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
   val cfg: CFG = Map(List(3, 0, 0) -> AssignmentsNode(List(3, 0, 0),List(List(3, 0, 0), List(3, 0, 1), List(3, 0, 2), List(3, 0, 3)),List(Ident("t")),List(Ident("t"), Ident("f1"), Ident("f2"), Ident("i")),List(Ident("f1"), Ident("f2"), Ident("f2"), Ident("t"), Ident("i")),List(List(3)),List(List(3)))
-                   , List(3) -> WhileNode(List(3),List(3, 0, 0),List(), List(Ident("i"), Ident("n")),List(List(0), List(3, 0, 0)),List(List(3, 0, 0), List(4)))
+                   , List(3) -> WhileNode(List(3),List(3, 0),List(), List(Ident("i"), Ident("n")),List(List(0), List(3, 0, 0)),List(List(3, 0, 0), List(4)))
                    , List(0) -> AssignmentsNode(List(0),List(List(0), List(1), List(2)),List(Ident("f1"), Ident("f2"), Ident("i")),List(Ident("f1"), Ident("f2"), Ident("i"), Ident("n")),List(),List(),List(List(3)))
                    , List(4) -> ReturnNode(List(4),List(),List(Ident("f2")),List(List(3))))
   test("TestCFG1") {
@@ -207,7 +207,7 @@ public static void main (String[] args)
   val methoddecl: Decl =
     classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
 
-  val cfg: CFG = Map(List(1, 1) -> WhileNode(List(1, 1),List(1, 1, 0, 0),List(), List(Ident("i"), Ident("x")),List(List(1, 0), List(1, 1, 0, 0)),List(List(1, 1, 0, 0), List(1, 2)))
+  val cfg: CFG = Map(List(1, 1) -> WhileNode(List(1, 1),List(1, 1, 0),List(), List(Ident("i"), Ident("x")),List(List(1, 0), List(1, 1, 0, 0)),List(List(1, 1, 0, 0), List(1, 2)))
                    , List(1, 2) -> AssignmentsNode(List(1, 2),List(List(1, 2)),List(),List(),List(),List(List(1, 1)),List(List(2)))
                    , List(1, 1, 0, 0) -> AssignmentsNode(List(1, 1, 0, 0),List(List(1, 1, 0, 0), List(1, 1, 0, 1)),List(),List(Ident("i")),List(Ident("i"), Ident("i")),List(List(1, 1)),List(List(1, 1)))
                    , List(1, 0) -> AssignmentsNode(List(1, 0),List(List(1, 0)),List(Ident("i")),List(Ident("i")),List(),List(List(0)),List(List(1, 1)))
