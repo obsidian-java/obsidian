@@ -338,3 +338,52 @@ public static void main (String[] args)
     }
 }
 
+
+
+class TestDesugar11 extends FunSuite with Matchers {
+    val METHODSTR = """
+public static void main(String [] args) {
+	int x = 0;
+	switch (x) {
+        case 1: 
+            x++;
+            break;
+        case 2:
+            x--;
+            break;
+    }
+    ;
+  return;
+}
+    """
+    val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
+    val D_METHODSTR = """
+public static void main(String [] args) {
+	int x = 0;
+	switch (x) {
+        case 1: 
+            x = x + 1;
+            break;
+        case 2:
+            x = x - 1;
+            break;
+        default:
+            ;
+    }
+    ;
+  return;
+}
+    """
+    val d_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(D_METHODSTR)).get.get
+    test ("TestDesugar11") {
+        methoddecl match {
+            case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
+                val desugared = dsgOps.desugar(methodDecl) 
+                val result:Decl = MemberDecl_(desugared)
+                println(prettyPrint(result))
+                assert(result == d_methoddecl)
+            }
+            case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")           
+        }
+    }
+}

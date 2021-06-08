@@ -418,7 +418,7 @@ public static int fun(int n)
 
 
 
-class TestCFG8 extends FunSuite with Matchers {
+class TestCFG8 extends FunSuite with Matchers { 
   val METHODSTR = """
 public static void main(String [] args) {
 	int x = 0;
