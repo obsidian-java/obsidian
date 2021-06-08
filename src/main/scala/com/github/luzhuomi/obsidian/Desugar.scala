@@ -369,7 +369,18 @@ object Desugar {
           case Labeled(id, stmt) => Labeled(id, dsgOps.desugar(stmt))
           case Return(exp) => Return(exp.map(e => dsgOps.desugar(e)))
           case StmtBlock(blk) => StmtBlock(dsgOps.desugar(blk))
-          case Switch(exp, blocks) => Switch(dsgOps.desugar(exp), blocks.map(dsgOps.desugar(_)))
+          case Switch(exp, blocks) => {
+            val e = dsgOps.desugar(exp)
+            val sBlks = blocks.map(dsgOps.desugar(_))
+            val sBlksWithDefault = sBlks match { // add empty default case if it is not present as the last case
+              case Nil => List(SwitchBlock(Default, List(BlockStmt_(Empty))))
+              case noEmpty => sBlks.last match {
+                case SwitchBlock(Default,_) => sBlks
+                case _ => sBlks ++ List(SwitchBlock(Default, List(BlockStmt_(Empty))))
+              } 
+            } 
+            Switch(e, sBlksWithDefault)
+          }
           case Synchronized(exp, blk) => Synchronized(dsgOps.desugar(exp), dsgOps.desugar(blk))
           case Throw(exp) => Throw(dsgOps.desugar(exp))
           // collapse catches into 1 catch with if else and instance of
