@@ -40,7 +40,7 @@ object SSAKL {
     *
     * @param stmt
     * @param phiCatch: Phis before the catch block
-    * @param phiFinally: Phis before the finally block 
+    * @param phiFinally: Phis after the catch block
     */
   case class SSATry(
     stmt:Stmt, 
@@ -75,7 +75,7 @@ object SSAKL {
   ) extends SSAStmt
 
 
-  type Label = ASTPath 
+  // type Label = ASTPath 
 
   /**
     * A phi assignment
@@ -90,20 +90,138 @@ object SSAKL {
     rhs:Map[Label, Name]
   )
 
-  type VarMap = Map[Name, Map[ASTPath, Name]]
+
+  /**
+    * Source language Context
+    * ctx ::= Box | ctx; | ctx; \overline{s} | s; ctx | if e {ctx} else {\overline{s}} | 
+    *    if e {\overline{s}} else {ctx}  |  while e {ctx} | try {ctx} catch (T x) (\overline{s}) | 
+    *     try {\overline{s}} catch (T x) {ctx}  
+    */
+  sealed trait SCtx 
+  
+  case object SBox extends SCtx
+
+  case class SLast(ctx: SCtx) extends SCtx 
+
+  case class SHead(ctx: SCtx) extends SCtx
+
+  case class STail(ctx: SCtx) extends SCtx
+  
+  case class SThen(ctx: SCtx) extends SCtx
+
+  case class SElse(ctx: SCtx) extends SCtx
+
+  case class SWhile(ctx: SCtx) extends SCtx
+  
+  case class STry(ctx: SCtx) extends SCtx
+  
+  case class SCatch(ctx: SCtx) extends SCtx
+
+  /**
+    * Target language context (SSA)
+    * CTX ::= Box | CTX; | CTX; \overline{B} | B; CTX | if E {CTX} else {\overline{B}} | 
+    *     if E {\overline{B}} else {CTX} join {\overline{\phi}}  | 
+    *     if E {CTX} else {\overline{B}} join {\overline{\phi}}  |
+    *     if E {\overline{B}} else {\overline{B}} join {BBox}    | 
+    *     join {BBox} while E { \overline{B}} join {\overline{\phi}} |  
+    *     join {\overline{\phi}} while E { CTX } join {\overline{\phi}} |
+    *     join {\overline{\phi}} while E { \overline{B}} join {BBox} | 
+    *     try {Ctx} join {\overline{\phi}} catch (T x) {\overline{B}} join {\overline{\phi}} |
+    *     try {\overline{B}} join {BBox} catch (T x) {\overline{B}} join {\overline{\phi}} |
+    *     try {\overline{B}} join {\overline{\phi}} catch (T x) {CTX} join {\overline{\phi}} | 
+    *     try {\overline{B}} join {\overline{\phi}} catch (T x) {\overline{B}} join {BBox}}
+    */
+  sealed trait TCtx 
+
+  case object TBox extends TCtx
+
+  case class TLast(ctx:TCtx) extends TCtx
+
+  case class THead(ctx:TCtx) extends TCtx
+
+  case class TTail(ctx:TCtx) extends TCtx
+
+  case class TThen(ctx:TCtx) extends TCtx
+
+  case class TElse(ctx:TCtx) extends TCtx
+
+  case object TIfPostPhi extends TCtx
+
+  case object TWhilePrePhi extends TCtx
+
+  case class TWhile(ctx:TCtx) extends TCtx
+
+  case object TWhilePostPhi extends TCtx
+
+  case class TTry(ctx:TCtx) extends TCtx
+
+  case object TTryPeriPhi extends TCtx
+
+  case class TCatch(ctx:TCtx) extends TCtx
+
+  case object TTryPostPhi extends TCtx 
+
+
+
+
+
+  type VarMap = Map[Name, (SCtx, TCtx, Name)]
   
   /**
     * A state object for the conversion function
     *
     * @param varMap - the variable mapping
-    * @param exitLabel - the exit label from the last block
-    * @param throwLabels - the list of labels that throws exception
+    * @param exitCtx - the exit context from the last block
+    * @param throwCtxs - the list of contexts that throw exception
     */
   case class State(
     varMap: VarMap, 
-    exitLabel: Option[ASTPath],
-    throwLabels: List[ASTPath]
+    exitCtx: Option[TCtx],
+    throwCtxs: List[TCtx]
   )
+
+  sealed trait Ann
+
+  case object Pre extends Ann
+  case object Peri extends Ann
+  case object Post extends Ann
+
+  case class Label(p:ASTPath, ma:Option[Ann]) 
+
+  /**
+    * converting a target context into label
+    *
+    * @param ctx
+    * @return
+    */
+  def toLbl(ctx:TCtx):Either[String, Label] = toLbl2(Nil, ctx)
+
+  def toLbl2(p:ASTPath, ctx:TCtx):Either[String, Label] = ctx match {
+    case TBox => Right(Label(p, None))
+    case TLast(ctx2) => toLbl2(p, ctx2)
+    case THead(ctx2) => toLbl2(p, ctx2) 
+    case TTail(ctx2) => p match {
+      case Nil => Left("toLbl failed with TTail.")
+      case _   => {
+        val pp = p.init
+        val l  = p.last
+        val p2 = pp ++ List(l+1)
+        toLbl2(p2, ctx2)
+      }
+    }
+    case TThen(ctx2) => toLbl2(p++List(0,0), ctx2) 
+    case TElse(ctx2) => toLbl2(p++List(1,0), ctx2)
+    case TIfPostPhi => Right(Label(p, Some(Post)))
+    case TWhilePrePhi => Right(Label(p, Some(Pre)))
+    case TWhile(ctx2) => toLbl2(p++List(0,0), ctx2)
+    case TWhilePostPhi => Right(Label(p, Some(Post)))
+    case TTry(ctx2) => toLbl2(p++List(0,0), ctx2)
+    case TTryPeriPhi => Right(Label(p, Some(Peri)))
+    case TCatch(ctx2) => toLbl2(p++List(1,0), ctx2)
+    case TTryPostPhi => Right(Label(p, Some(Post)))
+  } 
+
+  
 
   def kexp(e:Exp, ap:ASTPath, st:State):Exp = e match {
     case ArrayAccess(idx) => e // TODO: fixme
