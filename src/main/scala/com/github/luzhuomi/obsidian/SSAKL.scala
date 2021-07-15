@@ -1,7 +1,10 @@
 package com.github.luzhuomi.obsidian
 
+
+import cats.kernel._
 import com.github.luzhuomi.scalangj.Syntax._
 import com.github.luzhuomi.obsidian.ASTPath._
+
 // Kenny's version of SSA
 
 object SSAKL {
@@ -221,6 +224,74 @@ object SSAKL {
     case TTryPostPhi => Right(Label(p, Some(Post)))
   } 
 
+
+  implicit val eqTCtx:Eq[TCtx] = new Eq[TCtx]{
+    override def eqv(x: TCtx, y: TCtx): Boolean = (x,y) match {
+      case (TBox, TBox) => true
+      case (TLast(ctx1), TLast(ctx2)) => eqv(ctx1, ctx2)
+      case (THead(ctx1), THead(ctx2)) => eqv(ctx1, ctx2)
+      case (TTail(ctx1), TTail(ctx2)) => eqv(ctx1, ctx2)
+      case (TThen(ctx1), TThen(ctx2)) => eqv(ctx1, ctx2)
+      case (TElse(ctx1), TElse(ctx2)) => eqv(ctx1, ctx2)
+      case (TIfPostPhi, TIfPostPhi) => true
+      case (TWhilePrePhi, TWhilePrePhi) => true
+      case (TWhile(ctx1), TWhile(ctx2)) => eqv(ctx1, ctx2)
+      case (TWhilePostPhi, TWhilePostPhi) => true
+      case (TTry(ctx1), TTry(ctx2)) => eqv(ctx1, ctx2)
+      case (TTryPeriPhi, TTryPeriPhi) => true
+      case (TCatch(ctx1), TCatch(ctx2)) => eqv(ctx1, ctx2)
+      case (TTryPostPhi, TTryPostPhi) => true
+      case (_,_) => false 
+    }
+  }
+
+  implicit val partialOrderTCtx:PartialOrder[TCtx] = new PartialOrder[TCtx]{
+    override def partialCompare(x: TCtx, y: TCtx): Double = (x,y) match {
+      case (_, _) if (eqv(x,y)) => 0.0
+      case (TBox, _) => -1.0
+      case (_, TBox) => 1.0
+      case (TLast(ctx1), TLast(ctx2)) => partialCompare(ctx1,ctx2)
+
+      case (THead(ctx1), THead(ctx2)) => partialCompare(ctx1,ctx2)
+      case (THead(_), TTail(_)) => -1.0
+      case (TTail(ctx1), TTail(ctx2)) => partialCompare(ctx1,ctx2)
+      case (TTail(_), THead(_)) => 1.0
+
+      case (TThen(ctx1), TThen(ctx2)) => partialCompare(ctx1, ctx2)
+      case (TThen(_), TIfPostPhi) => -1.0
+      case (TElse(ctx1), TElse(ctx2)) => partialCompare(ctx1, ctx2)
+      case (TElse(_), TIfPostPhi) => -1.0
+      case (TIfPostPhi, TThen(_)) => 1.0
+      case (TIfPostPhi, TElse(_)) => 1.0
+
+      case (TWhilePrePhi, TWhile(_)) => -1.0
+      case (TWhilePrePhi, TWhilePostPhi) => -1.0
+      case (TWhile(_), TWhilePrePhi) => 1.0
+      case (TWhile(ctx1), TWhile(ctx2)) => partialCompare(ctx1, ctx2)
+      case (TWhile(_), TWhilePostPhi) => -1.0
+      case (TWhilePostPhi, TWhilePrePhi) => 1.0
+      case (TWhilePostPhi, TWhile(_)) => 1.0
+
+      case (TTry(ctx1), TTry(ctx2)) => partialCompare(ctx1, ctx2)
+      case (TTry(_), TTryPeriPhi) => -1.0
+      case (TTry(_), TCatch(_)) => -1.0
+      case (TTry(_), TTryPostPhi) => -1.0
+      case (TTryPeriPhi, TTry(_)) => 1.0
+      case (TTryPeriPhi, TCatch(_)) => -1.0
+      case (TTryPeriPhi, TTryPostPhi) => -1.0
+      case (TCatch(_), TTry(_)) => 1.0
+      case (TCatch(_), TTryPeriPhi) => 1.0
+      case (TCatch(ctx1), TCatch(ctx2)) => partialCompare(ctx1, ctx2)
+      case (TCatch(_), TTryPostPhi) => -1.0
+      case (TTryPostPhi, TTry(_)) => 1.0
+      case (TTryPostPhi, TTryPeriPhi) => 1.0
+      case (TTryPostPhi, TCatch(_)) => 1.0
+
+      case _ => Double.NaN
+    }
+  }
+
+
   
 
   def kexp(e:Exp, ap:ASTPath, st:State):Exp = e match {
@@ -273,4 +344,52 @@ object SSAKL {
       true    
     }
   }
+
+
+  /**
+    *     A 
+    *   /   \
+    *  B     C
+    *  |     |
+    *  D     E
+    *   \   /
+    *     F
+    */
+
+  /*
+  sealed trait T 
+
+  case object A extends T
+  case object B extends T
+  case object D extends T
+  case object C extends T
+  case object E extends T
+  case object F extends T
+
+  implicit val eqT:Eq[T] = new Eq[T]{
+    override def eqv(x: T, y: T): Boolean = (x,y) match 
+    {
+      case (A,A) => true
+      case (B,B) => true
+      case (C,C) => true
+      case (D,D) => true
+      case (E,E) => true 
+      case (F,F) => true
+      case (_,_) => false
+    }
+  }
+
+  implicit val partialOrderT:PartialOrder[T] = new PartialOrder[T] {
+    override def partialCompare(x: T, y: T): Double = (x,y) match {
+      case (x,y) if x == y => 0.0
+      case (A,B) => -1.0
+      case (A,C) => -1.0
+      case (B,D) => -1.0
+      case (C,E) => -1.0
+      case (D,F) => -1.0
+      case (E,F) => -1.0
+      case (_,_) => Double.NaN
+    }
+  }
+  */
 }
