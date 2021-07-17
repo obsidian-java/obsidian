@@ -291,6 +291,49 @@ object SSAKL {
     }
   }
 
+  implicit val semilatticeTCtx:Semilattice[TCtx] = new Semilattice[TCtx] {
+    override def combine(x: TCtx, y: TCtx): TCtx = (x,y) match {
+      case (_, _) if (eqTCtx.eqv(x,y)) => x 
+      case (TBox, a) => a
+      case (a, TBox) => a
+      case (TLast(ctx1), TLast(ctx2)) => TLast(combine(ctx1, ctx2))
+
+      case (THead(ctx1), THead(ctx2)) => THead(combine(ctx1, ctx2))
+      case (THead(_), TTail(_)) => y 
+      case (TTail(ctx1), TTail(ctx2)) => TTail(combine(ctx1, ctx2))
+      case (TTail(_), THead(_)) => x
+      
+      case (TThen(ctx1), TThen(ctx2)) => TThen(combine(ctx1, ctx2))
+      case (TThen(_), TIfPostPhi) => TIfPostPhi 
+      case (TElse(ctx1), TElse(ctx2)) => TElse(combine(ctx1, ctx2))
+      case (TElse(_), TIfPostPhi) => TIfPostPhi
+
+      case (TWhilePrePhi, TWhile(_)) => y 
+      case (TWhilePrePhi, TWhilePostPhi) => TWhilePostPhi
+      case (TWhile(_),  TWhilePrePhi) => x
+      case (TWhile(ctx1), TWhile(ctx2)) => TWhile(combine(ctx1, ctx2))
+      case (TWhile(_),  TWhilePostPhi) => TWhilePostPhi
+      case (TWhilePostPhi, TWhilePrePhi) => TWhilePostPhi
+      case (TWhilePostPhi, TWhile(_)) => TWhilePostPhi
+
+      case (TTry(ctx1), TTry(ctx2)) => TTry(combine(ctx1, ctx2))
+      case (TTry(_), TTryPeriPhi) => TTryPeriPhi
+      case (TTry(_), TCatch(_)) => y
+      case (TTry(_), TTryPostPhi) => TTryPostPhi
+      case (TTryPeriPhi, TTry(_)) => TTryPeriPhi 
+      case (TTryPeriPhi, TCatch(_)) => y
+      case (TTryPeriPhi, TTryPostPhi) => TTryPostPhi
+      case (TCatch(_), TTry(_)) => x 
+      case (TCatch(_), TTryPeriPhi) => x
+      case (TCatch(ctx1), TCatch(ctx2)) => TCatch(combine(ctx1, ctx2))
+      case (TCatch(_), TTryPostPhi) => TTryPostPhi
+      case (TTryPostPhi, TTry(_)) => TTryPostPhi
+      case (TTryPostPhi, TTryPeriPhi) => TTryPostPhi
+      case (TTryPostPhi, TCatch(_)) => TTryPostPhi
+
+    }
+  }
+
 
   
 
