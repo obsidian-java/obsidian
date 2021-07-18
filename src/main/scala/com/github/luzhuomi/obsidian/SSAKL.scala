@@ -291,6 +291,15 @@ object SSAKL {
     }
   }
 
+
+  /**
+    * SemiLattice for target program context
+    * 
+    * It is a partial function since it has a partial order.
+    * 
+    * For all ctx from the same program, the LUB (and GLB) exist
+    */
+
   implicit val semilatticeTCtx:Semilattice[TCtx] = new Semilattice[TCtx] {
     override def combine(x: TCtx, y: TCtx): TCtx = (x,y) match {
       case (_, _) if (eqTCtx.eqv(x,y)) => x 
@@ -335,21 +344,47 @@ object SSAKL {
   }
 
 
-  
+  def R(ths:List[TCtx], ctx:TCtx, vm:VarMap, x:Name):Name = {
+    x // todo
+  }
 
-  def kexp(e:Exp, ap:ASTPath, st:State):Exp = e match {
+  def block(src:TCtx, ths:List[TCtx], tar:TCtx):Boolean = {
+    val ths1 = for { 
+      th <- ths;  
+      if (partialOrderTCtx.partialCompare(th, tar) == -1.0)
+    } yield th
+    block(src, ths1)
+  }
+
+  def block(src:TCtx, ths:List[TCtx]): Boolean = {
+    val thsCl = closure(ths)
+    thsCl.contains(src)
+  }
+
+  /**
+    * Building a closure of a set of (blocking) contexts
+    * 
+    * @param ths
+    * @return
+    */
+  
+  def closure(ths:List[TCtx]):List[TCtx] = {
+    ths // todo 
+  }
+
+  def kexp(e:Exp, ctx:TCtx, st:State):Exp = e match {
     case ArrayAccess(idx) => e // TODO: fixme
-    case Cast(ty, exp) => Cast(ty,kexp(exp, ap, st)) 
-    case ArrayCreate(ty, exps, num_dims) => ArrayCreate(ty, exps.map(kexp(_, ap, st)), num_dims) 
+    case Cast(ty, exp) => Cast(ty,kexp(exp, ctx, st)) 
+    case ArrayCreate(ty, exps, num_dims) => ArrayCreate(ty, exps.map(kexp(_, ctx, st)), num_dims) 
     case ArrayCreateInit(ty, size, init) => e //TODO: fixme
     case Assign(lhs, op, rhs) => e // TODO: it should not be handled here.
     case BinOp(e1, op, e2) => {
-      val e1p = kexp(e1, ap, st)
-      val e2p = kexp(e2, ap, st)
+      val e1p = kexp(e1, ctx, st)
+      val e2p = kexp(e2, ctx, st)
       BinOp(e1p, op, e2p)
     }
     case ClassLit(ty) => e 
-    case Cond(cond, true_exp, false_exp) => Cond(kexp(cond,ap,st), kexp(true_exp, ap, st), kexp(false_exp, ap, st))
+    case Cond(cond, true_exp, false_exp) => Cond(kexp(cond,ctx,st), kexp(true_exp, ctx, st), kexp(false_exp, ctx, st))
     case ExpName(name) => e 
     case FieldAccess_(access) => e // TODO: fixme
     case InstanceCreation(type_args, type_decl, args, body) => e //TODO: fixme
