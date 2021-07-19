@@ -2,8 +2,10 @@ package com.github.luzhuomi.obsidian
 
 
 import cats.kernel._
+import cats.implicits._
 import com.github.luzhuomi.scalangj.Syntax._
 import com.github.luzhuomi.obsidian.ASTPath._
+import scala.collection.immutable
 
 // Kenny's version of SSA
 
@@ -120,6 +122,19 @@ object SSAKL {
   
   case class SCatch(ctx: SCtx) extends SCtx
 
+
+  def putSCtx(outter:SCtx, inner:SCtx): SCtx = outter match {
+    case SBox => inner 
+    case SLast(o) => SLast(putSCtx(o, inner))
+    case SHead(o) => SHead(putSCtx(o, inner))
+    case STail(o) => STail(putSCtx(o, inner))
+    case SThen(o) => SThen(putSCtx(o, inner))
+    case SElse(o) => SElse(putSCtx(o, inner))
+    case SWhile(o) => SWhile(putSCtx(o, inner))
+    case STry(o) => STry(putSCtx(o, inner))
+    case SCatch(o) => SCatch(putSCtx(o, inner))
+  }
+
   /**
     * Target language context (SSA)
     * CTX ::= Box | CTX; | CTX; \overline{B} | B; CTX | if E {CTX} else {\overline{B}} | 
@@ -168,7 +183,7 @@ object SSAKL {
 
 
 
-  type VarMap = Map[Name, (SCtx, TCtx, Name)]
+  type VarMap = Map[Name, Map[SCtx, (TCtx, Name)]]
   
   /**
     * A state object for the conversion function
@@ -191,15 +206,17 @@ object SSAKL {
 
   case class Label(p:ASTPath, ma:Option[Ann]) 
 
+  type ErrorM = String
+
   /**
     * converting a target context into label
     *
     * @param ctx
     * @return
     */
-  def toLbl(ctx:TCtx):Either[String, Label] = toLbl2(Nil, ctx)
+  def toLbl(ctx:TCtx):Either[ErrorM, Label] = toLbl2(Nil, ctx)
 
-  def toLbl2(p:ASTPath, ctx:TCtx):Either[String, Label] = ctx match {
+  def toLbl2(p:ASTPath, ctx:TCtx):Either[ErrorM, Label] = ctx match {
     case TBox => Right(Label(p, None))
     case TLast(ctx2) => toLbl2(p, ctx2)
     case THead(ctx2) => toLbl2(p, ctx2) 
@@ -298,6 +315,8 @@ object SSAKL {
     * It is a partial function since it has a partial order.
     * 
     * For all ctx from the same program, the LUB (and GLB) exist
+    * 
+    * combine(x,y) finds the LUB of x and y, i.e. join
     */
 
   implicit val semilatticeTCtx:Semilattice[TCtx] = new Semilattice[TCtx] {
@@ -341,11 +360,54 @@ object SSAKL {
       case (TTryPostPhi, TCatch(_)) => TTryPostPhi
 
     }
+
   }
 
 
-  def R(ths:List[TCtx], ctx:TCtx, vm:VarMap, x:Name):Name = {
-    x // todo
+  def Rlt(ths:List[TCtx], ctx:TCtx, vm:VarMap, x:Name):Option[Name] = R(ths, ctx, vm, x, 
+    {
+      case ((tctx1, tctx2))  => (partialOrderTCtx.partialCompare(tctx1, tctx2) == -1.0)
+    }
+  )
+
+    def Rleq(ths:List[TCtx], ctx:TCtx, vm:VarMap, x:Name):Option[Name] = R(ths, ctx, vm, x, 
+    {
+      case ((tctx1, tctx2))  => ((partialOrderTCtx.partialCompare(tctx1, tctx2) == -1.0) || (partialOrderTCtx.partialCompare(tctx1, tctx2) == 0.0))
+    }
+  )
+
+  /**
+    * Compute the name from the lub of all the reachable context until ctx
+    *
+    * @param ths
+    * @param ctx
+    * @param vm
+    * @param x
+    * @param cmp - modifier to switch between leq or lt
+    * @return optional target name, though it should never be None
+    */
+  def R(ths:List[TCtx], ctx:TCtx, vm:VarMap, x:Name, cmp:(TCtx,TCtx) => Boolean):Option[Name] = vm.get(x) match {
+    case None => None // though this should never happen
+    case Some(trs) => {
+      val tcvs = for { 
+        (sctx, (tctx, tx)) <- trs.toList
+        if (cmp(tctx, ctx) && (!block(tctx, ths, ctx)))
+      } yield (tctx, tx)
+
+      // partial function, but lub should be in the set.
+      def comb(px:(TCtx,Name), py:(TCtx,Name)):(TCtx, Name) = (px, py) match {
+        case ((cx, vx), (cy, vy)) if (semilatticeTCtx.combine(cx, cy) == cx) => (cx, vx)
+        case ((cx, vx), (cy, vy)) if (semilatticeTCtx.combine(cx, cy) == cy) => (cy, vy)
+        
+      }
+
+      tcvs match {
+        case Nil => None // this should not happen.
+        case (tcv::tcvs) => tcvs.foldLeft(tcv)((x,y) => comb(x,y)) match {
+          case (_, vx) => Some(vx)
+        }
+      }
+    }
   }
 
   def block(src:TCtx, ths:List[TCtx], tar:TCtx):Boolean = {
@@ -363,63 +425,280 @@ object SSAKL {
 
   /**
     * Building a closure of a set of (blocking) contexts
+    *  
+    * base:
+    *   curr \subseteq closure(curr)
     * 
-    * @param ths
-    * @return
+    * recursive cases:
+    *   case 1:
+    *   ctx[if E {Box} else {\overline{B}} join {\overline{\phi}}] \in closure(curr) 
+    *      and 
+    *   ctx[if E {\overline{B}} else {Box} join {\overline{\phi}}] \in closure(curr)
+    *      implies
+    *   ctx \in closure(curr)
+    * 
+    *   case 2:
+    *   ctx[try {Box} join {\overline{\phi}} catch (t x) {\overline{B}} join {\overline{\phi}}] \in closure(curr)
+    *      and
+    *   ctx[try {\overline{B}} join {\overline{\phi}} catch (t x) {Box} join {\overline{\phi}}] \in closure(curr)
+    *      implies
+    *   ctx \in closure(curr)
+    * 
+    *   case 3:
+    *   ctx[B;Box] \in closure(curr)
+    *      implies
+    *   ctx[Box;\overline{B}] \in closure(curr) and ctx \in closure(curr)
+    * 
+    *   case 4:
+    *   ctx[Box;\overline{B}] \in closure(curr)
+    *      implies 
+    *   ctx \in closure(curr)
+    * 
+    *   case 5:
+    *   ctx[Box;] \in closure(curr)
+    *      implies
+    *   ctx \in closure(curr)
+    *      
+    * @param curr initial set of contexts with throw statement
+    * @return the closture of the list of contexts in the blockage
     */
   
-  def closure(ths:List[TCtx]):List[TCtx] = {
-    ths // todo 
+  def closure(curr:List[TCtx]):List[TCtx] = {
+    val next = go(curr, curr.toSet).toSet
+
+    if (next.size == curr.toSet.size) { curr } else closure(next.toList)
   }
 
-  def kexp(e:Exp, ctx:TCtx, st:State):Exp = e match {
-    case ArrayAccess(idx) => e // TODO: fixme
-    case Cast(ty, exp) => Cast(ty,kexp(exp, ctx, st)) 
-    case ArrayCreate(ty, exps, num_dims) => ArrayCreate(ty, exps.map(kexp(_, ctx, st)), num_dims) 
-    case ArrayCreateInit(ty, size, init) => e //TODO: fixme
-    case Assign(lhs, op, rhs) => e // TODO: it should not be handled here.
-    case BinOp(e1, op, e2) => {
-      val e1p = kexp(e1, ctx, st)
-      val e2p = kexp(e2, ctx, st)
-      BinOp(e1p, op, e2p)
+  def go(curr:List[TCtx], acc:Set[TCtx]): Set[TCtx] = curr match {
+    case Nil => acc
+    case (TBox::rest) => go(rest, acc) // todo: check
+    case (TIfPostPhi::rest) => go(rest, acc)
+    case (TWhilePrePhi::rest) => go(rest, acc)
+    case (TWhilePostPhi::rest) => go(rest, acc)
+    case (TTryPeriPhi::rest) => go(rest, acc)
+    case (TTryPostPhi::rest) => go(rest, acc)
+    case (ctx::rest) => getLeaf(ctx, List(), List()) match {
+      case None => go(rest,acc)
+      // case 1 
+      case Some((TThen(TBox), xtrs, ctrs)) => { // it is a Then, we need to find an Else
+        rest.map( ctx1 => extract(xtrs, ctx1)).filterNot(_.isEmpty) match {
+          case xs if xs.contains(Some(TElse(TBox))) => {
+            val acc1 = acc + construct(ctrs, TBox)
+            go(rest,acc1)
+          }
+          case _ => go(rest, acc) 
+        }
+      }
+      case Some((TElse(TBox), xtrs, ctrs)) => { // it is a Else, we need to find a Then
+        rest.map( ctx1 => extract(xtrs, ctx1)).filterNot(_.isEmpty) match {
+          case xs if xs.contains(Some(TThen(TBox))) => {
+            val acc1 = acc + construct(ctrs, TBox)
+            go(rest,acc1)
+          }
+          case _ => go(rest, acc) 
+        }
+      }
+      // case 2
+      case Some((TTry(TBox), xtrs, ctrs)) => { // it is a Try, we need to find a Catch
+        rest.map( ctx1 => extract(xtrs, ctx1)).filterNot(_.isEmpty) match {
+          case xs if xs.contains(Some(TCatch(TBox))) => {
+            val acc1 = acc + construct(ctrs, TBox) 
+            go(rest,acc1)
+          }
+          case _ => go(rest, acc) 
+        }
+      }     
+      case Some((TCatch(TBox), xtrs, ctrs)) => { // it is a Catch, we need to find a Try
+        rest.map( ctx1 => extract(xtrs, ctx1)).filterNot(_.isEmpty) match {
+          case xs if xs.contains(Some(TTry(TBox))) => {
+            val acc1 = acc + construct(ctrs, TBox)
+            go(rest,acc1)
+          }
+          case _ => go(rest, acc) 
+        }
+      }
+      // case 3
+      case Some((TTail(TBox), xtrs, ctrs)) => {
+        val acc1 = acc ++ Set(construct(ctrs, THead(TBox)), construct(ctrs, TBox))
+        go(rest, acc1)
+      } 
+      // case 4
+      case Some((THead(TBox), xtrs, ctrs)) => {
+        val acc1 = acc + construct(ctrs, TBox)
+        go(rest, acc1)
+      }
+      // case 5 
+      case Some((TLast(TBox), xtrs, ctrs)) => {
+        val acc1 = acc + construct(ctrs, TBox)
+        go(rest, acc1)
+      }
+      case _ => go(rest, acc)
     }
-    case ClassLit(ty) => e 
-    case Cond(cond, true_exp, false_exp) => Cond(kexp(cond,ctx,st), kexp(true_exp, ctx, st), kexp(false_exp, ctx, st))
-    case ExpName(name) => e 
-    case FieldAccess_(access) => e // TODO: fixme
-    case InstanceCreation(type_args, type_decl, args, body) => e //TODO: fixme
-    case InstanceOf(e, ref_type) => e // TODO: fixme
-    case Lambda(params, body) => e
-    case Lit(lit) => e
-    case MethodInv(methodInv) => e // TODO: it should not be handled here.
-    case MethodRef(name, id) => e // TODO: fixme
-    case PostDecrement(exp) => e // TODO: it should have been desugared.
-    case PostIncrement(exp) => e // TODO: it should have been desugared.
-    case PreBitCompl(exp) => e // TODO: fixme
-    case PreDecrement(exp) => e // TODO: it should have been desugared.
-    case PreIncrement(exp) => e // TODO: it should have been desugared.
-    case PreMinus(exp) => e // TODO: fixme
-    case PreNot(exp) => e //TODO: fixme
-    case PrePlus(exp) => e // TODO: fixme
-    case QualInstanceCreation(exp, type_args, id, args, body) => e //TODO: fixme
-    case This => e 
-    case ThisClass(name) => e 
   }
 
 
-  def reach(ap:ASTPath, ths:List[ASTPath], m:VarMap, n:Name):Option[Name] = {
-    None // TODO: fixme
+
+  type Extractor = TCtx => Option[TCtx]
+  type Constructor = TCtx => TCtx
+
+  /**
+    * extract - applies a sequence of extractors to a context
+    *
+    * @param xtrs
+    * @param ctx
+    * @return
+    */
+  def extract(xtrs:List[Extractor], ctx:TCtx): Option[TCtx] = xtrs match {
+    case Nil => Some(ctx)
+    case (x::xs) => x(ctx) match {
+      case None => None
+      case Some(ctx1) => extract(xs, ctx1)
+    }
   }
 
+  /**
+    * construct - applies a sequence of constructors to a context
+    *
+    * @param ctrs
+    * @param ctx
+    * @return
+    */
+  def construct(ctrs:List[Constructor], ctx:TCtx): TCtx = ctrs match {
+    case Nil => ctx
+    case (c::cs) => construct(cs, c(ctx))
+  }
+
+  /**
+    * getLeaf - given a non-leaf node, extract the node containing the leaf, the sequence of extractors and the sequence of constructors
+    *
+    * @param ctx current node
+    * @param xtrs sequence of extractor, should be applied from left to right, outermost to inner most
+    * @param ctrs seuqence of constructor, should be appluied from left to right, innermost to outer most
+    * @return 
+    */
+  def getLeaf(ctx:TCtx, xtrs:List[Extractor], ctrs:List[Constructor]):Option[(TCtx, List[Extractor], List[Constructor])] = ctx match {
+    case TBox => None
+    case TLast(TBox) => Some(ctx, xtrs, ctrs)
+    case TLast(ctx1) => getLeaf(ctx1, xtrs++List((ctx:TCtx) => ctx match {
+      case TLast(ctx1) => Some(ctx1)
+      case _ => None
+    }), (TLast(_))::ctrs)
+    case THead(TBox) => Some(ctx, xtrs, ctrs)
+    case THead(ctx1) => getLeaf(ctx1, xtrs++List((ctx:TCtx) => ctx match {
+      case THead(ctx1) => Some(ctx1)
+      case _ => None
+    }), (THead(_))::ctrs)
+    case TTail(TBox) => Some(ctx, xtrs, ctrs)
+    case TTail(ctx1) => getLeaf(ctx1, xtrs++List((ctx:TCtx) => ctx match {
+      case TTail(ctx1) => Some(ctx1) 
+      case _ => None
+    }), (TTail(_))::ctrs)
+    case TThen(TBox) => Some(ctx, xtrs, ctrs)
+    case TThen(ctx1) => getLeaf(ctx1, xtrs++List((ctx:TCtx) => ctx match {
+      case TThen(ctx1) => Some(ctx1)
+      case _ => None
+    }), (TThen(_))::ctrs)
+    case TElse(TBox) => Some(ctx, xtrs, ctrs) 
+    case TElse(ctx1) => getLeaf(ctx1, xtrs++List((ctx:TCtx) => ctx match {
+      case TElse(ctx1) => Some(ctx1)
+      case _ => None
+    }), (TElse(_))::ctrs)
+    case TIfPostPhi => None
+    case TWhilePrePhi => None
+    case TWhile(TBox) => Some(ctx, xtrs, ctrs)
+    case TWhile(ctx1) => getLeaf(ctx1, xtrs++List((ctx:TCtx) => ctx match {
+      case TWhile(ctx1) => Some(ctx1)
+      case _ => None
+    }), (TWhile(_))::ctrs)
+    case TWhilePostPhi => None
+    case TTry(TBox) => Some(ctx, xtrs, ctrs)
+    case TTry(ctx1) => getLeaf(ctx1, xtrs++List((ctx:TCtx) => ctx match {
+      case TTry(ctx1) => Some(ctx1)
+      case _ => None
+    }), (TTry(_))::ctrs)
+    case TTryPeriPhi => None
+    case TCatch(TBox) => Some(ctx, xtrs, ctrs)
+    case TCatch(ctx1) => getLeaf(ctx1, xtrs++List((ctx:TCtx) => ctx match {
+      case TCatch(ctx1) => Some(ctx1)
+      case _ => None
+    }), (TCatch(_))::ctrs)
+    case TTryPostPhi => None
+  }
+
+
+  def kexp(e:Exp, ctx:TCtx, st:State):Either[ErrorM, Exp] = e match {
+    case ArrayAccess(idx) => Right(e) // TODO: fixme
+    case Cast(ty, exp) => kexp(exp, ctx, st) match {
+      case Left(err) => Left(err)
+      case Right(exp1) => Right(Cast(ty,exp1))
+    } 
+    case ArrayCreate(ty, exps, num_dims) => for {
+      exps1 <- exps.traverse(kexp(_, ctx, st))
+    } yield ArrayCreate(ty, exps1, num_dims)
+    
+    case ArrayCreateInit(ty, size, init) => Right(e) //TODO: fixme
+    case Assign(lhs, op, rhs) => Right(e) // TODO: it should not be handled here.
+    case BinOp(e1, op, e2) => for {
+      e1p <- kexp(e1, ctx, st);
+      e2p <- kexp(e2, ctx, st)
+    } yield BinOp(e1p, op, e2p)
   
-  def block(ap:ASTPath, ths:List[ASTPath]):Boolean = ap match {
-    case Nil => false
-    case _   => {
-      val p = ap.init
-      val n = ap.last
-      val end_with_throw_same_block = ths.filter( th => !(th.isEmpty) && (th.init == p))
-        .exists( th => th.last >= n )
-      true    
+    case ClassLit(ty) => Right(e) 
+    case Cond(cond, true_exp, false_exp) => for {
+      cond1 <- kexp(cond,ctx,st);
+      true_exp1 <- kexp(true_exp, ctx, st)
+      false_exp1 <- kexp(false_exp, ctx, st)
+    } yield Cond(cond1, true_exp1, false_exp1)
+    case ExpName(name) => st match {
+      case State(vm, eCtx, ths) => Rlt(ths, ctx, vm, name) match {
+        case None => Left("Rlt failed")
+        case Some(name1) => Right(ExpName(name1))
+      }
+    }
+    case FieldAccess_(access) => Right(e) // TODO: fixme
+    case InstanceCreation(type_args, type_decl, args, body) => Right(e) //TODO: fixme
+    case InstanceOf(e, ref_type) => for {
+      e1 <- kexp(e, ctx, st)
+    } yield InstanceOf(e1, ref_type) // TODO: fixme
+    case Lambda(params, body) => Right(e)
+    case Lit(lit) => Right(e)
+    case MethodInv(methodInv) => Right(e) // TODO: it should not be handled here.
+    case MethodRef(name, id) => Right(e) // TODO: fixme
+    case PostDecrement(exp) => Right(e) // TODO: it should have been desugared.
+    case PostIncrement(exp) => Right(e) // TODO: it should have been desugared.
+    case PreBitCompl(exp) => for {
+      e1 <- kexp(exp, ctx, st) 
+    } yield PreBitCompl(e1) // TODO: fixme
+    case PreDecrement(exp) => Right(e) // TODO: it should have been desugared.
+    case PreIncrement(exp) => Right(e) // TODO: it should have been desugared.
+    case PreMinus(exp) => for {
+      exp1 <- kexp(exp, ctx, st)
+    } yield PreMinus(exp1) 
+    case PreNot(exp) => for {
+      exp1 <- kexp(exp, ctx, st)
+    } yield PreNot(exp1) 
+    case PrePlus(exp) => for {
+      exp1 <- kexp(exp, ctx, st)
+    } yield PrePlus(exp1)
+    case QualInstanceCreation(exp, type_args, id, args, body) => Right(e) //TODO: fixme
+    case This => Right(e) 
+    case ThisClass(name) => Right(e) 
+  }
+
+  def kstmt(stmt:Stmt, ctx:SCtx, st:State):Either[ErrorM, (SSABlock, State)] = Left("") //TODO: fixme
+  
+  def kstmts(stmts:List[Stmt], ctx:SCtx, st:State):Either[ErrorM, (List[SSABlock], State)] = stmts match {
+    case Nil => Right((Nil, st))
+    case (s::Nil) => kstmt(s, putSCtx(ctx,SLast(SBox)), st) match {
+      case Left(err) => Left(err)
+      case Right((b,st1)) => Right((List(b), st1))
+    }
+    case (s::ss) => kstmt(s, putSCtx(ctx,SHead(SBox)), st) match {
+      case Left(err) => Left(err)
+      case Right((b,st1)) => kstmts(ss, putSCtx(ctx, STail(SBox)), st1) match {
+        case Left(err) => Left(err)
+        case Right((bs, st2)) => Right((b::bs), st2)
+      }
     }
   }
 
