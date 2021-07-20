@@ -732,6 +732,10 @@ object SSAKL {
             lbl <- toLbl(tctx)
             e2  <- kexp(e1, tctx, st)
           } yield ((SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(FieldLhs(PrimaryFieldAccess(e2, id)), op, rhs1)))))), st)
+          case SuperFieldAccess(id) => for {
+            rhs1 <- kexp(rhs, tctx, st)
+            lbl <- toLbl(tctx)
+          } yield ((SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(FieldLhs(SuperFieldAccess(id)), op, rhs1)))))), st)
         }
         // todo continue from here. 
       }
