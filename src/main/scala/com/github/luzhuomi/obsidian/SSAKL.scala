@@ -6,6 +6,7 @@ import cats.implicits._
 import com.github.luzhuomi.scalangj.Syntax._
 import com.github.luzhuomi.obsidian.ASTPath._
 import scala.collection.immutable
+import com.github.luzhuomi.obsidian.ASTUtils._
 
 // Kenny's version of SSA
 
@@ -26,11 +27,13 @@ object SSAKL {
   )
 
   case class SSABlock(
-    label: ASTPath,
+    label: Label,
     stmt: SSAStmt
   )
 
   sealed trait SSAStmt 
+
+  case class SSAAssert(exp:Exp, msg:Option[Exp]) extends SSAStmt
 
   case class SSAAssignments(stmts: List[Stmt]) extends SSAStmt
   
@@ -39,6 +42,8 @@ object SSAKL {
   case class SSAThrow(stmt:Stmt) extends SSAStmt
 
   case class SSAMethodInvocation(stmt:Stmt) extends SSAStmt
+
+  case object SSAEmpty extends SSAStmt
 
   /**
     * 
@@ -685,7 +690,75 @@ object SSAKL {
     case ThisClass(name) => Right(e) 
   }
 
-  def kstmt(stmt:Stmt, ctx:SCtx, st:State):Either[ErrorM, (SSABlock, State)] = Left("") //TODO: fixme
+  def kstmt(stmt:Stmt, ctx:SCtx, st:State):Either[ErrorM, (SSABlock, State)] = {
+    val tctx = kctx(ctx)
+    stmt match {
+      case Assert(exp, msg) => for {
+        lbl  <- toLbl(tctx)
+        exp1 <- kexp(exp, tctx, st)
+        msg1 <- msg.traverse( m => kexp(m, tctx, st))
+      } yield (SSABlock(lbl, SSAAssert(exp1, msg1)), st)
+
+      case BasicFor(init, loop_cond, post_update, stmt) => Left("BasicFor should have been desugared.")
+
+      case EnhancedFor(modifiers, ty, id, exp, stmt) => Left("EnhancedFor should have been desugared.")
+
+      case Break(id) => Left("Break is not yet supported.") // TODO: fixme
+
+      case Continue(id) => Left("Continue is not yet supported.") // TODO: fixme
+
+      case Do(stmt, exp) => Left("Do should have been desguared.")
+
+      case Empty => for {
+        lbl <- toLbl(tctx)
+      } yield (SSABlock(lbl, SSAEmpty), st)
+
+      case ExpStmt(Assign(lhs, op, rhs)) => lhs match {
+        case NameLhs(x) => st match {
+          case State(vm, eCtx, ths) => for {
+            rhs1 <- kexp(rhs, tctx, st)
+            lbl <- toLbl(tctx) 
+            xlbl <- mkName(x,lbl)
+            vm1 <- Right(vm.get(x) match {
+              case None => vm + (x -> (ctx -> (tctx, xlbl)))
+              case Some(im) => vm + (x -> (im + (ctx -> (tctx, xlbl))))
+            })
+          } yield ((SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(NameLhs(xlbl), op, rhs1)))))), st)
+        }
+
+        case FieldLhs(fa) => fa match {
+          case PrimaryFieldAccess(e1, id) => for {
+            rhs1 <- kexp(rhs, tctx, st)
+            lbl <- toLbl(tctx)
+            e2  <- kexp(e1, tctx, st)
+          } yield ((SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(FieldLhs(PrimaryFieldAccess(e2, id)), op, rhs1)))))), st)
+        }
+        // todo continue from here. 
+      }
+    }
+  } 
+
+
+  def mkName(n:Name, lbl:Label):Either[ErrorM, Name] = n match 
+    {
+      case Name(Nil) => Left("mkName is applied to an empty name.")
+      case Name(ids) => {
+        val pre = ids.init
+        val x   = ids.last
+        val s   = lblToStr(lbl)
+        val y   = appIdStr(x, s)
+        Right(Name(pre++List(y)))
+      }
+    }
+
+  def lblToStr(lbl:Label):String = lbl match {
+    case Label(p, None)       => apToStr(p)
+    case Label(p, Some(Pre))  => apToStr(p) ++ "_"
+    case Label(p, Some(Peri)) => apToStr(p) ++ "__"
+    case Label(p, Some(Post)) => apToStr(p) ++ "___"
+  }
+
+
   
   def kstmts(stmts:List[Stmt], ctx:SCtx, st:State):Either[ErrorM, (List[SSABlock], State)] = stmts match {
     case Nil => Right((Nil, st))
@@ -702,6 +775,24 @@ object SSAKL {
     }
   }
 
+  /**
+    * kctx - converts a source program context into a target program context
+    *
+    * @param ctx
+    * @return
+    */
+
+  def kctx(ctx:SCtx):TCtx = ctx match {
+    case SBox => TBox
+    case SLast(ctx1) => TLast(kctx(ctx1))
+    case SHead(ctx1) => THead(kctx(ctx1))
+    case STail(ctx1) => TTail(kctx(ctx1))
+    case SThen(ctx1) => TThen(kctx(ctx1))
+    case SElse(ctx1) => TElse(kctx(ctx1))
+    case SWhile(ctx1) => TWhile(kctx(ctx1))
+    case STry(ctx1) => TTry(kctx(ctx1))
+    case SCatch(ctx1) => TCatch(kctx(ctx1))
+  } 
 
   /**
     *     A 

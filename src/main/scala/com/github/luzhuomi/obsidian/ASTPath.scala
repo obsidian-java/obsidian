@@ -209,4 +209,5 @@ object ASTPath {
     def tryOf(p:ASTPath): ASTPath = p ++ List(0)
 
 
+    def apToStr(p:ASTPath):String = p.mkString("_")
 }

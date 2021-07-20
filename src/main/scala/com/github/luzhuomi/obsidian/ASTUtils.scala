@@ -51,5 +51,8 @@ object ASTUtils {
     }
 
 
+    def appIdStr(id:Ident, suff:String): Ident = id match {
+        case Ident(s) => Ident(s ++ "_" ++ suff)
+    }
 
 }
