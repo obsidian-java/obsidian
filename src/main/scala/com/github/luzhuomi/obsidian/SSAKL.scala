@@ -741,10 +741,21 @@ object SSAKL {
             lbl <- toLbl(tctx)
           } yield ((SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(FieldLhs(ClassFieldAccess(name,id)), op, rhs1)))))), st)
         }
-        // todo continue from here. 
 
+        case ArrayLhs(ArrayIndex(e,es)) => for {
+          rhs1 <- kexp(rhs, tctx, st)
+          e1   <- kexp(e, tctx, st)
+          es1 <- es.traverse( e => kexp(e, tctx, st))
+          lbl <- toLbl(tctx)
+        } yield ((SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(ArrayLhs(ArrayIndex(e1,es1)), op, rhs1)))))),st)
+        // todo continue from here. 
         
       }
+
+      case ExpStmt(exp) => Left("A non-assignment expression statemnt is encountered.")
+
+      
+      
     }
   } 
 
