@@ -752,9 +752,12 @@ object SSAKL {
         
       }
 
-      case ExpStmt(exp) => Left("A non-assignment expression statemnt is encountered.")
+      case ExpStmt(exp) => for {
+        exp1 <- kexp(exp, tctx, st )
+        lbl  <- toLbl(tctx)
+      } yield (SSABlock(lbl, SSAExps(List(ExpStmt))))
 
-      
+      case 
       
     }
   } 
