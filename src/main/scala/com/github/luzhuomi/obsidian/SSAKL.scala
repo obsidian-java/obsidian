@@ -36,6 +36,8 @@ object SSAKL {
   case class SSAAssert(exp:Exp, msg:Option[Exp]) extends SSAStmt
 
   case class SSAAssignments(stmts: List[Stmt]) extends SSAStmt
+
+  case class SSAExps(stmts: List[Stmt]) extends SSAStmt
   
   case class SSAReturn(stmt:Stmt) extends SSAStmt
 
@@ -748,16 +750,23 @@ object SSAKL {
           es1 <- es.traverse( e => kexp(e, tctx, st))
           lbl <- toLbl(tctx)
         } yield ((SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(ArrayLhs(ArrayIndex(e1,es1)), op, rhs1)))))),st)
-        // todo continue from here. 
         
       }
 
       case ExpStmt(exp) => for {
         exp1 <- kexp(exp, tctx, st )
         lbl  <- toLbl(tctx)
-      } yield (SSABlock(lbl, SSAExps(List(ExpStmt))))
+      } yield (SSABlock(lbl, SSAExps(List(ExpStmt(exp1)))), st)
 
-      case 
+      case IfThen(exp, stmt) => Left("If then statment should have been desugared.")
+
+      /*
+      case IfThenElse(exp, then_stmt, else_stmt) => {
+        val then_stmts = then_stmt match {
+          case StmtBlock(Block(blockstmt)) => 
+        }
+      }
+      */
       
     }
   } 
