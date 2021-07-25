@@ -9,6 +9,10 @@ import scala.collection.immutable
 import com.github.luzhuomi.obsidian.ASTUtils._
 
 // Kenny's version of SSA
+/**
+  * Assumption: nested declaration contains no repetitive variable name
+  *   source program is desguared, flattened and label.
+  */
 
 object SSAKL {
   case class SSAMethodDecl(
@@ -198,11 +202,13 @@ object SSAKL {
     * @param varMap - the variable mapping
     * @param exitCtx - the exit context from the last block
     * @param throwCtxs - the list of contexts that throw exception
+    * @param nestedDecls - the list of nested declared variables
     */
   case class State(
     varMap: VarMap, 
     exitCtx: Option[TCtx],
-    throwCtxs: List[TCtx]
+    throwCtxs: List[TCtx], 
+    nestedDecls: List[(TCtx, Name)]
   )
 
   sealed trait Ann
@@ -657,7 +663,7 @@ object SSAKL {
       false_exp1 <- kexp(false_exp, ctx, st)
     } yield Cond(cond1, true_exp1, false_exp1)
     case ExpName(name) => st match {
-      case State(vm, eCtx, ths) => Rlt(ths, ctx, vm, name) match {
+      case State(vm, eCtx, ths, nDecls) => Rlt(ths, ctx, vm, name) match {
         case None => Left("Rlt failed")
         case Some(name1) => Right(ExpName(name1))
       }
@@ -717,7 +723,7 @@ object SSAKL {
 
       case ExpStmt(Assign(lhs, op, rhs)) => lhs match {
         case NameLhs(x) => st match {
-          case State(vm, eCtx, ths) => for {
+          case State(vm, eCtx, ths, nDecls) => for {
             rhs1 <- kexp(rhs, tctx, st)
             lbl <- toLbl(tctx) 
             xlbl <- mkName(x,lbl)
@@ -771,6 +777,30 @@ object SSAKL {
     }
   } 
 
+  /**
+    * kstmtBlock - a special version just to handle StmtBlock
+    *
+    * @param stmt
+    * @param ctx
+    * @param st
+    * @return
+    */
+  
+  def kstmtBlock(stmt:Stmt, ctx:SCtx, st:State):Either[ErrorM, (List[SSABlock], State)] = stmt match {
+    case StmtBlock(Block(blkStmts)) => for {
+      
+    }
+    case _ => kstmt(stmt, ctx, st) match {
+      case Left(err) => Left(err)
+      case Right((b,st1)) => Right((List(b), st1)) 
+    }
+  }
+
+  def kblkStmt(blkStmt:BlockStmt, ctx:SCtx, st:State):Either[ErrorM, (SSABlock, State)] = blkStmt match {
+    case BlockStmt_(stmt) => kstmt(stmt, ctx ,st) 
+    
+  }
+  
 
   def mkName(n:Name, lbl:Label):Either[ErrorM, Name] = n match 
     {
