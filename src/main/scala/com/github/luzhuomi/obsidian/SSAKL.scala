@@ -698,6 +698,9 @@ object SSAKL {
     case ThisClass(name) => Right(e) 
   }
 
+
+  
+
   def kstmt(stmt:Stmt, ctx:SCtx, st:State):Either[ErrorM, (SSABlock, State)] = {
     val tctx = kctx(ctx)
     stmt match {
