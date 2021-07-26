@@ -940,8 +940,10 @@ object SSAKL {
   } 
 
 
-  def mkPhi(st1:State, st2:State)(implicit m:MonadError[SSAState, ErrorM]):SState[State, List[Phi]] = 
-    m.pure(Nil) // todo 
+  def mkPhi(st1:State, st2:State)(implicit m:MonadError[SSAState, ErrorM]):SState[State, List[Phi]] = (st1, st2) match {
+    case (State(vm1, eCtx1, ths1, _), State(vm2, eCtx2, ths2,_)) if (ths1.contains(eCtx1) && ths2.contains(eCtx2)) => m.pure(Nil) // todo 
+
+  }
 
   /**
     * kstmtBlock - a special version just to handle StmtBlock
