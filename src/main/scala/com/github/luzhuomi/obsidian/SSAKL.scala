@@ -1,8 +1,10 @@
 package com.github.luzhuomi.obsidian
 
 
-import cats.kernel._
+import cats.kernel.Semilattice
+import cats._
 import cats.implicits._
+import cats.data.StateT
 import com.github.luzhuomi.scalangj.Syntax._
 import com.github.luzhuomi.obsidian.ASTPath._
 import scala.collection.immutable
@@ -36,6 +38,8 @@ object SSAKL {
   )
 
   sealed trait SSAStmt 
+  // to handle nested decl, not in the paper
+  case class SSAVarDecls(mods:List[Modifier], ty:Type, varDecls:List[VarDecl]) extends SSAStmt
 
   case class SSAAssert(exp:Exp, msg:Option[Exp]) extends SSAStmt
 
@@ -192,6 +196,19 @@ object SSAKL {
 
 
 
+  def putTCtx(outter:TCtx, inner:TCtx): TCtx = outter match {
+    case TBox => inner 
+    case TLast(o) => TLast(putTCtx(o, inner))
+    case THead(o) => THead(putTCtx(o, inner))
+    case STail(o) => TTail(putTCtx(o, inner))
+    case SThen(o) => TThen(putTCtx(o, inner))
+    case SElse(o) => TElse(putTCtx(o, inner))
+    case SWhile(o) => TWhile(putTCtx(o, inner))
+    case TTry(o) => TTry(putTCtx(o, inner))
+    case TCatch(o) => TCatch(putTCtx(o, inner))
+    case _ => outter
+  }
+
 
 
   type VarMap = Map[Name, Map[SCtx, (TCtx, Name)]]
@@ -208,7 +225,7 @@ object SSAKL {
     varMap: VarMap, 
     exitCtx: Option[TCtx],
     throwCtxs: List[TCtx], 
-    nestedDecls: List[(TCtx, Name)]
+    nestedDecls: List[(TCtx, Ident, Type, List[Modifier])]
   )
 
   sealed trait Ann
@@ -221,20 +238,112 @@ object SSAKL {
 
   type ErrorM = String
 
+
+  sealed trait SSAResult[+A]
+
+  case class SSAError(msg:ErrorM) extends SSAResult[Nothing]
+  
+  case class SSAOk[A](result:A) extends SSAResult[A]
+
+  implicit def ssaResultFunctor: Functor[SSAResult] =
+    new Functor[SSAResult] {
+      override def map[A, B](fa: SSAResult[A])(f: A => B): SSAResult[B] =
+        fa match {
+          case SSAError(s) => SSAError(s)
+          case SSAOk(a) => SSAOk(f(a))
+        }
+    }
+
+  implicit def ssaResultApplicative: ApplicativeError[SSAResult, ErrorM] = 
+    new ApplicativeError[SSAResult, ErrorM] {
+      override def ap[A, B](ff: SSAResult[A => B])(fa: SSAResult[A]): SSAResult[B] =
+        ff match {
+          case SSAOk(f) =>
+            fa match {
+              case SSAOk(a) => SSAOk(f(a))
+              case SSAError(s) => SSAError(s)
+            }
+          case SSAError(s) => SSAError(s)
+        }
+
+      override def pure[A](a: A): SSAResult[A] = SSAOk(a)
+
+      override def raiseError[A](e: ErrorM): SSAResult[A] = SSAError(e)
+
+      override def handleErrorWith[A](fa: SSAResult[A])(f: ErrorM => SSAResult[A]): SSAResult[A] =
+        fa match {
+          case SSAError(s) => f(s)
+          case SSAOk(a) => SSAOk(a)
+        }
+    }
+
+  implicit def ssaResultMonadError(implicit app:ApplicativeError[SSAResult, ErrorM]):MonadError[SSAResult, ErrorM] = {
+    new MonadError[SSAResult, ErrorM] {
+      override def raiseError[A](e: ErrorM): SSAResult[A] = app.raiseError(e)
+
+      override def handleErrorWith[A](fa: SSAResult[A])(f: ErrorM => SSAResult[A]): SSAResult[A] = app.handleErrorWith(fa)(f)
+
+      override def flatMap[A, B](fa: SSAResult[A])(f: A => SSAResult[B]): SSAResult[B] =
+        fa match {
+          case SSAOk(a) => f(a)
+          case SSAError(s) => SSAError(s)
+        }
+
+      override def pure[A](a: A): SSAResult[A] = app.pure(a)
+
+      @annotation.tailrec
+      def tailRecM[A, B](init: A)(fn: A => SSAResult[Either[A, B]]): SSAResult[B] =
+        fn(init) match {
+          case SSAError(msg) => SSAError(msg)
+          case SSAOk(Right(b)) => SSAOk(b)
+          case SSAOk(Left(a)) => tailRecM(a)(fn)
+        }
+    }
+  }
+
+  type SState[S,A] = StateT[SSAResult, S, A]
+  type SSAState[A] = SState[State, A]
+
+
+  def get:SState[State, State] = StateT { state => SSAOk((state, state))} 
+
+  def put(st:State):SState[State, Unit] = StateT { _ => SSAOk((st,()))} 
+
+
+  def mergeState(st1:State, st2:State, st3:State):State = {
+    val st12 = mergeState(st1, st2)
+    mergeState(st12, st3)  
+  } 
+
+  /** 
+   * mergeState - merge two states by taking the vm and ectx from st1,
+   * and union the ths and nDecls
+   * */
+  def mergeState(st1:State, st2:State):State = (st1, st2) match {
+    case (State(vm1, eCtx1, ths1, nDecls1), State(vm2, eCtx2, ths2, nDecls2)) => 
+      State(vm1, eCtx1, (ths1++ths2).toSet.toList, (nDecls1 ++ nDecls2).toSet.toList)
+  }
+
+  def addVarsInVMap(st:State, sctx:SCtx, tctx:TCtx):State = st match {
+    case (State(vm, eCtx, ths, nDecls)) => {
+      // TODO
+    }
+  }
+
   /**
     * converting a target context into label
     *
     * @param ctx
     * @return
     */
-  def toLbl(ctx:TCtx):Either[ErrorM, Label] = toLbl2(Nil, ctx)
+  def toLbl(ctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Label] = toLbl2(Nil, ctx)(m)
 
-  def toLbl2(p:ASTPath, ctx:TCtx):Either[ErrorM, Label] = ctx match {
-    case TBox => Right(Label(p, None))
+  def toLbl2(p:ASTPath, ctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Label] = ctx match {
+    case TBox => m.pure(Label(p, None))
     case TLast(ctx2) => toLbl2(p, ctx2)
     case THead(ctx2) => toLbl2(p, ctx2) 
     case TTail(ctx2) => p match {
-      case Nil => Left("toLbl failed with TTail.")
+      case Nil => m.raiseError("toLbl failed with TTail.")
       case _   => {
         val pp = p.init
         val l  = p.last
@@ -244,14 +353,14 @@ object SSAKL {
     }
     case TThen(ctx2) => toLbl2(p++List(0,0), ctx2) 
     case TElse(ctx2) => toLbl2(p++List(1,0), ctx2)
-    case TIfPostPhi => Right(Label(p, Some(Post)))
-    case TWhilePrePhi => Right(Label(p, Some(Pre)))
+    case TIfPostPhi => m.pure(Label(p, Some(Post)))
+    case TWhilePrePhi => m.pure(Label(p, Some(Pre)))
     case TWhile(ctx2) => toLbl2(p++List(0,0), ctx2)
-    case TWhilePostPhi => Right(Label(p, Some(Post)))
+    case TWhilePostPhi => m.pure(Label(p, Some(Post)))
     case TTry(ctx2) => toLbl2(p++List(0,0), ctx2)
-    case TTryPeriPhi => Right(Label(p, Some(Peri)))
+    case TTryPeriPhi => m.pure(Label(p, Some(Peri)))
     case TCatch(ctx2) => toLbl2(p++List(1,0), ctx2)
-    case TTryPostPhi => Right(Label(p, Some(Post)))
+    case TTryPostPhi => m.pure(Label(p, Some(Post)))
   } 
 
 
@@ -639,143 +748,167 @@ object SSAKL {
   }
 
 
-  def kexp(e:Exp, ctx:TCtx, st:State):Either[ErrorM, Exp] = e match {
-    case ArrayAccess(idx) => Right(e) // TODO: fixme
-    case Cast(ty, exp) => kexp(exp, ctx, st) match {
-      case Left(err) => Left(err)
-      case Right(exp1) => Right(Cast(ty,exp1))
-    } 
+  def kexp(e:Exp, ctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Exp] = e match {
+    case ArrayAccess(idx) => m.pure(e) // TODO: fixme
+    case Cast(ty, exp) => for {
+      exp1 <- kexp(exp, ctx) 
+    } yield Cast(ty,exp1)
     case ArrayCreate(ty, exps, num_dims) => for {
-      exps1 <- exps.traverse(kexp(_, ctx, st))
+      exps1 <- exps.traverse(kexp(_, ctx))
     } yield ArrayCreate(ty, exps1, num_dims)
     
-    case ArrayCreateInit(ty, size, init) => Right(e) //TODO: fixme
-    case Assign(lhs, op, rhs) => Right(e) // TODO: it should not be handled here.
+    case ArrayCreateInit(ty, size, init) => m.pure(e) //TODO: fixme
+    case Assign(lhs, op, rhs) => m.pure(e) // TODO: it should not be handled here.
     case BinOp(e1, op, e2) => for {
-      e1p <- kexp(e1, ctx, st);
-      e2p <- kexp(e2, ctx, st)
+      e1p <- kexp(e1, ctx)
+      e2p <- kexp(e2, ctx)
     } yield BinOp(e1p, op, e2p)
   
-    case ClassLit(ty) => Right(e) 
+    case ClassLit(ty) => m.pure(e) 
     case Cond(cond, true_exp, false_exp) => for {
-      cond1 <- kexp(cond,ctx,st);
-      true_exp1 <- kexp(true_exp, ctx, st)
-      false_exp1 <- kexp(false_exp, ctx, st)
+      cond1 <- kexp(cond,ctx)
+      true_exp1 <- kexp(true_exp, ctx)
+      false_exp1 <- kexp(false_exp, ctx)
     } yield Cond(cond1, true_exp1, false_exp1)
-    case ExpName(name) => st match {
-      case State(vm, eCtx, ths, nDecls) => Rlt(ths, ctx, vm, name) match {
-        case None => Left("Rlt failed")
-        case Some(name1) => Right(ExpName(name1))
+    case ExpName(name) => for {
+      st <- get
+      exp1 <- st match {
+        case State(vm, eCtx, ths, nDecls) => Rlt(ths, ctx, vm, name) match {
+          case None => m.raiseError("Rlt failed")
+          case Some(name1) => m.pure(ExpName(name1))
+        }
       }
-    }
-    case FieldAccess_(access) => Right(e) // TODO: fixme
-    case InstanceCreation(type_args, type_decl, args, body) => Right(e) //TODO: fixme
+    } yield exp1
+    
+    case FieldAccess_(access) => m.pure(e) // TODO: fixme
+    case InstanceCreation(type_args, type_decl, args, body) => m.pure(e) //TODO: fixme
     case InstanceOf(e, ref_type) => for {
-      e1 <- kexp(e, ctx, st)
+      e1 <- kexp(e, ctx)
     } yield InstanceOf(e1, ref_type) // TODO: fixme
-    case Lambda(params, body) => Right(e)
-    case Lit(lit) => Right(e)
-    case MethodInv(methodInv) => Right(e) // TODO: it should not be handled here.
-    case MethodRef(name, id) => Right(e) // TODO: fixme
-    case PostDecrement(exp) => Right(e) // TODO: it should have been desugared.
-    case PostIncrement(exp) => Right(e) // TODO: it should have been desugared.
+    case Lambda(params, body) => m.pure(e)
+    case Lit(lit) => m.pure(e)
+    case MethodInv(methodInv) => m.pure(e) // TODO: it should not be handled here.
+    case MethodRef(name, id) => m.pure(e) // TODO: fixme
+    case PostDecrement(exp) => m.pure(e) // TODO: it should have been desugared.
+    case PostIncrement(exp) => m.pure(e) // TODO: it should have been desugared.
     case PreBitCompl(exp) => for {
-      e1 <- kexp(exp, ctx, st) 
+      e1 <- kexp(exp, ctx) 
     } yield PreBitCompl(e1) // TODO: fixme
-    case PreDecrement(exp) => Right(e) // TODO: it should have been desugared.
-    case PreIncrement(exp) => Right(e) // TODO: it should have been desugared.
+    case PreDecrement(exp) => m.pure(e) // TODO: it should have been desugared.
+    case PreIncrement(exp) => m.pure(e) // TODO: it should have been desugared.
     case PreMinus(exp) => for {
-      exp1 <- kexp(exp, ctx, st)
+      exp1 <- kexp(exp, ctx)
     } yield PreMinus(exp1) 
     case PreNot(exp) => for {
-      exp1 <- kexp(exp, ctx, st)
+      exp1 <- kexp(exp, ctx)
     } yield PreNot(exp1) 
     case PrePlus(exp) => for {
-      exp1 <- kexp(exp, ctx, st)
+      exp1 <- kexp(exp, ctx)
     } yield PrePlus(exp1)
-    case QualInstanceCreation(exp, type_args, id, args, body) => Right(e) //TODO: fixme
-    case This => Right(e) 
-    case ThisClass(name) => Right(e) 
+    case QualInstanceCreation(exp, type_args, id, args, body) => m.pure(e) //TODO: fixme
+    case This => m.pure(e) 
+    case ThisClass(name) => m.pure(e) 
   }
 
 
+
+
   
 
-  def kstmt(stmt:Stmt, ctx:SCtx, st:State):Either[ErrorM, (SSABlock, State)] = {
+  def kstmt(stmt:Stmt, ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, SSABlock] = {
     val tctx = kctx(ctx)
     stmt match {
       case Assert(exp, msg) => for {
         lbl  <- toLbl(tctx)
-        exp1 <- kexp(exp, tctx, st)
-        msg1 <- msg.traverse( m => kexp(m, tctx, st))
-      } yield (SSABlock(lbl, SSAAssert(exp1, msg1)), st)
+        exp1 <- kexp(exp, tctx)
+        msg1 <- msg.traverse( m => kexp(m, tctx))
+      } yield SSABlock(lbl, SSAAssert(exp1, msg1))
 
-      case BasicFor(init, loop_cond, post_update, stmt) => Left("BasicFor should have been desugared.")
+      case BasicFor(init, loop_cond, post_update, stmt) => m.raiseError("BasicFor should have been desugared.")
 
-      case EnhancedFor(modifiers, ty, id, exp, stmt) => Left("EnhancedFor should have been desugared.")
+      case EnhancedFor(modifiers, ty, id, exp, stmt) => m.raiseError("EnhancedFor should have been desugared.")
 
-      case Break(id) => Left("Break is not yet supported.") // TODO: fixme
+      case Break(id) => m.raiseError("Break is not yet supported.") // TODO: fixme
 
-      case Continue(id) => Left("Continue is not yet supported.") // TODO: fixme
+      case Continue(id) => m.raiseError("Continue is not yet supported.") // TODO: fixme
 
-      case Do(stmt, exp) => Left("Do should have been desguared.")
+      case Do(stmt, exp) => m.raiseError("Do should have been desguared.")
 
       case Empty => for {
         lbl <- toLbl(tctx)
-      } yield (SSABlock(lbl, SSAEmpty), st)
+      } yield (SSABlock(lbl, SSAEmpty))
 
       case ExpStmt(Assign(lhs, op, rhs)) => lhs match {
-        case NameLhs(x) => st match {
-          case State(vm, eCtx, ths, nDecls) => for {
-            rhs1 <- kexp(rhs, tctx, st)
-            lbl <- toLbl(tctx) 
-            xlbl <- mkName(x,lbl)
-            vm1 <- Right(vm.get(x) match {
-              case None => vm + (x -> (ctx -> (tctx, xlbl)))
-              case Some(im) => vm + (x -> (im + (ctx -> (tctx, xlbl))))
-            })
-          } yield ((SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(NameLhs(xlbl), op, rhs1)))))), st)
-        }
+        case NameLhs(x) => for {
+          st <- get
+          b <- st match {
+            case State(vm, eCtx, ths, nDecls) => for {
+              rhs1 <- kexp(rhs, tctx)
+              lbl <- toLbl(tctx) 
+              xlbl <- mkName(x,lbl)
+              vm1 <- vm.get(x) match {
+                case None => m.pure(vm + (x -> (ctx -> (tctx, xlbl))))
+                case Some(im) => m.pure(vm + (x -> (im + (ctx -> (tctx, xlbl)))))
+              }
+            } yield SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(NameLhs(xlbl), op, rhs1)))))
+          } 
+        } yield b
 
         case FieldLhs(fa) => fa match {
           case PrimaryFieldAccess(e1, id) => for {
-            rhs1 <- kexp(rhs, tctx, st)
+            rhs1 <- kexp(rhs, tctx)
             lbl <- toLbl(tctx)
-            e2  <- kexp(e1, tctx, st)
-          } yield ((SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(FieldLhs(PrimaryFieldAccess(e2, id)), op, rhs1)))))), st)
+            e2  <- kexp(e1, tctx)
+          } yield SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(FieldLhs(PrimaryFieldAccess(e2, id)), op, rhs1)))))
           case SuperFieldAccess(id) => for {
-            rhs1 <- kexp(rhs, tctx, st)
+            rhs1 <- kexp(rhs, tctx)
             lbl <- toLbl(tctx)
-          } yield ((SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(FieldLhs(SuperFieldAccess(id)), op, rhs1)))))), st)
+          } yield SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(FieldLhs(SuperFieldAccess(id)), op, rhs1)))))
           case ClassFieldAccess(name, id) => for {
-            rhs1 <- kexp(rhs, tctx, st)
+            rhs1 <- kexp(rhs, tctx)
             lbl <- toLbl(tctx)
-          } yield ((SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(FieldLhs(ClassFieldAccess(name,id)), op, rhs1)))))), st)
+          } yield SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(FieldLhs(ClassFieldAccess(name,id)), op, rhs1)))))
         }
 
         case ArrayLhs(ArrayIndex(e,es)) => for {
-          rhs1 <- kexp(rhs, tctx, st)
-          e1   <- kexp(e, tctx, st)
-          es1 <- es.traverse( e => kexp(e, tctx, st))
+          rhs1 <- kexp(rhs, tctx)
+          e1   <- kexp(e, tctx)
+          es1 <- es.traverse( e => kexp(e, tctx))
           lbl <- toLbl(tctx)
-        } yield ((SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(ArrayLhs(ArrayIndex(e1,es1)), op, rhs1)))))),st)
+        } yield SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(ArrayLhs(ArrayIndex(e1,es1)), op, rhs1)))))
         
       }
 
       case ExpStmt(exp) => for {
-        exp1 <- kexp(exp, tctx, st )
+        exp1 <- kexp(exp, tctx)
         lbl  <- toLbl(tctx)
-      } yield (SSABlock(lbl, SSAExps(List(ExpStmt(exp1)))), st)
+      } yield SSABlock(lbl, SSAExps(List(ExpStmt(exp1))))
 
-      case IfThen(exp, stmt) => Left("If then statment should have been desugared.")
+      case IfThen(exp, stmt) => m.raiseError("If then statment should have been desugared.")
 
-      /*
-      case IfThenElse(exp, then_stmt, else_stmt) => {
-        val then_stmts = then_stmt match {
-          case StmtBlock(Block(blockstmt)) => 
+      
+      case IfThenElse(exp, then_stmt, else_stmt) => for {
+        exp1       <- kexp(exp, tctx)
+        // reset the ths in the state 
+        st         <- get
+        stThenIn   <- st match {
+          case State(vm, eCtx, ths, nDecls) => m.pure(State(vm, eCtx, Nil, nDecls))
         }
-      }
-      */
+        _          <- put(stThenIn)
+        then_stmts <- kstmtBlock(then_stmt, ctx)
+        stThenOut  <- get
+        stElseIn   <- st match {
+          case State(vm, eCtx, ths, nDecls) => m.pure(State(vm, eCtx, Nil, nDecls))
+        }
+        _          <- put(stElseIn)
+        else_stmts <- kstmtBlock(else_stmt, ctx)
+        stElseOut  <- get
+        stMerged   <- m.pure(mergeState(st, stThenOut, stElseOut))
+        _          <- put(stMerged)
+        tctx2      <- m.pure(putTCtx(tctx, TIfPostPhi))
+        lbl2       <- toLbl(tctx2)
+      } 
+      
       
     }
   } 
@@ -789,33 +922,113 @@ object SSAKL {
     * @return
     */
   
-  def kstmtBlock(stmt:Stmt, ctx:SCtx, st:State):Either[ErrorM, (List[SSABlock], State)] = stmt match {
-    case StmtBlock(Block(blkStmts)) => for {
-      
-    }
-    case _ => kstmt(stmt, ctx, st) match {
-      case Left(err) => Left(err)
-      case Right((b,st1)) => Right((List(b), st1)) 
-    }
+  def kstmtBlock(stmt:Stmt, ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,List[SSABlock]] = stmt match {
+    case StmtBlock(Block(blkStmts)) => kblkStmts(blkStmts,ctx)
+    case _ => for {
+      b <- kstmt(stmt, ctx)
+    } yield List(b)
   }
 
-  def kblkStmt(blkStmt:BlockStmt, ctx:SCtx, st:State):Either[ErrorM, (SSABlock, State)] = blkStmt match {
-    case BlockStmt_(stmt) => kstmt(stmt, ctx ,st) 
+  def kblkStmts(blkStmts:List[BlockStmt], ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, List[SSABlock]] = blkStmts match {
+    case Nil => m.pure(Nil)
+    case (bstmt::Nil) => for {
+      b <- kblkStmt(bstmt,putSCtx(ctx, SLast(SBox)))
+    } yield List(b)
+    case (bstmt::rest) => for {
+      b <- kblkStmt(bstmt,putSCtx(ctx, SHead(SBox)))
+      bs <- kblkStmts(rest, putSCtx(ctx, STail(SBox)))
+    } yield (b::bs)
+  }
+
+  def kblkStmt(blkStmt:BlockStmt, ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,SSABlock] = blkStmt match {
+    case BlockStmt_(stmt) => kstmt(stmt, ctx) 
+    case LocalClass(_) => m.raiseError("local class is not supported.")
+    case LocalVars(mods, ty, varDecls) => kVarDecls(mods, ty, varDecls, ctx)
+  }
     
-  }
+  def kVarDecls(mods:List[Modifier], ty:Type, varDecls:List[VarDecl], ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, SSABlock] = for {
+    tctx <- m.pure(kctx(ctx))
+    // a new case, combining KVD and KSTMT assignment
+    // we first record all the variable name and type
+    _ <- recordVarDecls(mods, ty, varDecls, tctx)
+    // we then convert varDecls to SSAVarDecl, hm... what about array init?
+    // array id should not be renamed and should not be merged in phis, we keep them inplace as 
+    lbl <- toLbl(tctx)
+    varDecls1 <- kVarDecls(varDecls, tctx)
+  } yield SSABlock(lbl, SSAVarDecls(mods, ty, varDecls1))
   
+  def recordVarDecls(mods:List[Modifier], ty:Type, varDecls:List[VarDecl], tCtx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,Unit] = varDecls match {
+    case Nil => m.pure(())
+    case (varDecl::rest) => varDecl match {
+      case VarDecl(VarId(id), v_init) => for {
+        st <- get
+        st1  <- m.pure(st match {
+          case State(varMap, eCtx, ths, nDecls) => {
+            val nDecls1 = nDecls ++ List((tCtx, id, ty, mods))
+            State(varMap, eCtx, ths, nDecls1)
+          }
+        })
+        _ <- put(st1)
+        _ <- recordVarDecls(mods, ty, rest, tCtx)
+      } yield ()
+      case VarDecl(_, v_init) => // it is an array declaration, we don't need to record it as array id will never be merged in phis.
+        recordVarDecls(mods, ty, rest, tCtx)
+    }
+  }
 
-  def mkName(n:Name, lbl:Label):Either[ErrorM, Name] = n match 
+  def kVarDecls(varDecls:List[VarDecl], tCtx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,List[VarDecl]] = varDecls match {
+    case Nil => m.pure(Nil)
+    case (varDecl::rest) => varDecl match {
+      case VarDecl(VarId(id), ov_init) => for {
+        lbl <- toLbl(tCtx)
+        id1 <- mkId(id, lbl)
+        ov_init1 <- ov_init match {
+          case None => m.pure(None)
+          case Some(v_init) => for { 
+            vi1 <- kVarInit(v_init,tCtx)
+          } yield Some(vi1)
+        }
+        rest1 <- kVarDecls(rest, tCtx)
+      } yield (VarDecl(VarId(id1), ov_init1)::rest1)
+      // array init, we do not rename the lhs ID, we only convert the referenced ids on the RHS
+      case VarDecl(VarDeclArray(var_decl_id), ov_init) => for {
+        ov_init1 <- ov_init match {
+          case None => m.pure(None)
+          case Some(v_init) => for {
+            vi1 <- kVarInit(v_init, tCtx)
+          } yield Some(vi1)
+        }
+        rest1 <- kVarDecls(rest, tCtx)
+      } yield (VarDecl(VarDeclArray(var_decl_id), ov_init1)::rest1)
+    }
+  }
+
+  def kVarInit(vInit:VarInit, tCtx:TCtx)(implicit m:MonadError[SSAState, ErrorM]): SState[State, VarInit] = vInit match {
+    case InitExp(exp) => for {
+      exp1 <- kexp(exp, tCtx) 
+    } yield InitExp(exp1)
+    case InitArray(ArrayInit(var_inits)) => for {
+      var_inits1 <- var_inits.traverse(vi => kVarInit(vi, tCtx))
+    } yield InitArray(ArrayInit(var_inits1))
+  }
+
+  def mkName(n:Name, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Name] = n match 
     {
-      case Name(Nil) => Left("mkName is applied to an empty name.")
+      case Name(Nil) => m.raiseError("mkName is applied to an empty name.")
       case Name(ids) => {
         val pre = ids.init
         val x   = ids.last
         val s   = lblToStr(lbl)
         val y   = appIdStr(x, s)
-        Right(Name(pre++List(y)))
+        m.pure(Name(pre++List(y)))
       }
     }
+
+  def mkId(id:Ident, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Ident] = {
+    val s = lblToStr(lbl)
+    val y = appIdStr(id,s)
+    m.pure(y)
+  }
 
   def lblToStr(lbl:Label):String = lbl match {
     case Label(p, None)       => apToStr(p)
@@ -825,6 +1038,16 @@ object SSAKL {
   }
 
 
+  /**
+    * deprecated thanks to kblkStmts
+    *
+    * @param stmts
+    * @param ctx
+    * @param st
+    * @return
+    */
+
+  /*
   
   def kstmts(stmts:List[Stmt], ctx:SCtx, st:State):Either[ErrorM, (List[SSABlock], State)] = stmts match {
     case Nil => Right((Nil, st))
@@ -840,6 +1063,7 @@ object SSAKL {
       }
     }
   }
+  */
 
   /**
     * kctx - converts a source program context into a target program context

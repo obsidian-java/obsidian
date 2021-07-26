@@ -597,11 +597,7 @@ object CFG {
       CFGOk((st, ()))
     }
 
-  def idFromVarDeclId(vdid: VarDeclId): Ident =
-    vdid match {
-      case VarId(id) => id
-      case VarDeclArray(vid) => idFromVarDeclId(vid)
-    }
+
 
   implicit def methodCFGInstance: CFGClass[MethodDecl] =
     new CFGClass[MethodDecl] {

@@ -55,4 +55,9 @@ object ASTUtils {
         case Ident(s) => Ident(s ++ "_" ++ suff)
     }
 
+    def idFromVarDeclId(vdid: VarDeclId): Ident =
+    vdid match {
+        case VarId(id) => id
+        case VarDeclArray(vid) => idFromVarDeclId(vid)
+    }
 }
