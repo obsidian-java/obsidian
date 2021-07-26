@@ -90,7 +90,9 @@ object SSAKL {
     * @param phiExit: Phis at the exit of the while stmt
     */
   case class SSAIf(
-    stmt:Stmt,
+    exp:Exp,
+    thenStmts:List[SSABlock],
+    elseStmts:List[SSABlock],
     phiExit: List[Phi]
   ) extends SSAStmt
 
@@ -200,10 +202,10 @@ object SSAKL {
     case TBox => inner 
     case TLast(o) => TLast(putTCtx(o, inner))
     case THead(o) => THead(putTCtx(o, inner))
-    case STail(o) => TTail(putTCtx(o, inner))
-    case SThen(o) => TThen(putTCtx(o, inner))
-    case SElse(o) => TElse(putTCtx(o, inner))
-    case SWhile(o) => TWhile(putTCtx(o, inner))
+    case TTail(o) => TTail(putTCtx(o, inner))
+    case TThen(o) => TThen(putTCtx(o, inner))
+    case TElse(o) => TElse(putTCtx(o, inner))
+    case TWhile(o) => TWhile(putTCtx(o, inner))
     case TTry(o) => TTry(putTCtx(o, inner))
     case TCatch(o) => TCatch(putTCtx(o, inner))
     case _ => outter
@@ -213,6 +215,14 @@ object SSAKL {
 
   type VarMap = Map[Name, Map[SCtx, (TCtx, Name)]]
   
+  def unionVarMap(vm1:VarMap, vm2:VarMap):VarMap = vm2.toList.foldLeft(vm1)( (vm, kv) => kv match {
+    case (name, m) => vm.get(name) match {
+      case None => vm + (name -> m)
+      case Some(m2) => vm + (name -> (m ++ m2))
+    }
+  })
+  
+
   /**
     * A state object for the conversion function
     *
@@ -309,26 +319,37 @@ object SSAKL {
 
   def put(st:State):SState[State, Unit] = StateT { _ => SSAOk((st,()))} 
 
-
+  
   def mergeState(st1:State, st2:State, st3:State):State = {
     val st12 = mergeState(st1, st2)
     mergeState(st12, st3)  
-  } 
+  }
+  
 
   /** 
    * mergeState - merge two states by taking the vm and ectx from st1,
    * and union the ths and nDecls
    * */
   def mergeState(st1:State, st2:State):State = (st1, st2) match {
-    case (State(vm1, eCtx1, ths1, nDecls1), State(vm2, eCtx2, ths2, nDecls2)) => 
-      State(vm1, eCtx1, (ths1++ths2).toSet.toList, (nDecls1 ++ nDecls2).toSet.toList)
+    case (State(vm1, eCtx1, ths1, nDecls1), State(vm2, eCtx2, ths2, nDecls2)) => State(unionVarMap(vm1, vm2), eCtx1, (ths1++ths2).toSet.toList, (nDecls1 ++ nDecls2).toSet.toList)
   }
 
-  def addVarsInVMap(st:State, sctx:SCtx, tctx:TCtx):State = st match {
-    case (State(vm, eCtx, ths, nDecls)) => {
-      // TODO
+  def extendAllVarsWithContextAndLabel(sctx:SCtx, tctx:TCtx, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
+    st <- get
+    st1 <- st match {
+      case (State(vm0, eCtx, ths, nDecls)) => for {
+        entries <- vm0.keySet.toList.traverse(v => for {
+          v_lbl <- mkName(v, lbl)
+        } yield (v, sctx, tctx, v_lbl ))
+      } yield State(entries.foldLeft(vm0)((vm, ent) => ent match {
+        case (v, sctx, tctx, v_lbl) => vm.get(v) match {
+          case None => vm
+          case Some(m) => vm + (v -> (m + (sctx -> (tctx, v_lbl))))
+        }
+      }), eCtx, ths, nDecls)
     }
-  }
+    _ <- put(st1)
+  } yield ()
 
   /**
     * converting a target context into label
@@ -889,6 +910,7 @@ object SSAKL {
       
       case IfThenElse(exp, then_stmt, else_stmt) => for {
         exp1       <- kexp(exp, tctx)
+        lbl        <- toLbl(tctx)
         // reset the ths in the state 
         st         <- get
         stThenIn   <- st match {
@@ -905,13 +927,21 @@ object SSAKL {
         stElseOut  <- get
         stMerged   <- m.pure(mergeState(st, stThenOut, stElseOut))
         _          <- put(stMerged)
+
         tctx2      <- m.pure(putTCtx(tctx, TIfPostPhi))
         lbl2       <- toLbl(tctx2)
-      } 
+
+        phis       <- mkPhi(stThenOut, stElseOut)
+        _          <- extendAllVarsWithContextAndLabel(ctx, tctx, lbl2)
+      } yield SSABlock(lbl, SSAIf(exp1, then_stmts, else_stmts, phis))
       
       
     }
   } 
+
+
+  def mkPhi(st1:State, st2:State)(implicit m:MonadError[SSAState, ErrorM]):SState[State, List[Phi]] = 
+    m.pure(Nil) // todo 
 
   /**
     * kstmtBlock - a special version just to handle StmtBlock
