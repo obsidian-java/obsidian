@@ -47,9 +47,9 @@ object SSAKL {
 
   case class SSAExps(stmts: List[Stmt]) extends SSAStmt
   
-  case class SSAReturn(stmt:Stmt) extends SSAStmt
+  case class SSAReturn(oexp:Option[Exp]) extends SSAStmt
 
-  case class SSAThrow(stmt:Stmt) extends SSAStmt
+  case class SSAThrow(exp:Exp) extends SSAStmt
 
   case class SSAMethodInvocation(stmt:Stmt) extends SSAStmt
 
@@ -58,13 +58,17 @@ object SSAKL {
   /**
     * 
     *
-    * @param stmt
+    * @param tryStmts: try blocks
     * @param phiCatch: Phis before the catch block
+    * @param params: parameters for the catch block
+    * @param catchStmts: catch blocks
     * @param phiFinally: Phis after the catch block
     */
   case class SSATry(
-    stmt:Stmt, 
+    tryStmts:List[SSABlock], 
     phiCatch: List[Phi],
+    param: FormalParam,
+    catchStmts:List[SSABlock],
     phiFinally: List[Phi] 
   ) extends SSAStmt
 
@@ -85,8 +89,9 @@ object SSAKL {
 
   /**
     * 
-    *
-    * @param stmt
+    * @param exp boolean expression
+    * @param thenStmts then blocks
+    * @param elseStmts else blocks
     * @param phiExit: Phis at the exit of the while stmt
     */
   case class SSAIf(
@@ -233,10 +238,18 @@ object SSAKL {
     */
   case class State(
     varMap: VarMap, 
-    exitCtx: Option[TCtx],
+    exitCtx: TCtx,
     throwCtxs: List[TCtx], 
     nestedDecls: List[(TCtx, Ident, Type, List[Modifier])]
   )
+
+  def thsFromState(st:State):List[TCtx] = st match {
+    case State(_, _, ths, _) => ths
+  }
+
+  def eCtxFromState(st:State):TCtx = st match {
+    case State(_,ectx, _, _) => ectx
+  }
 
   sealed trait Ann
 
@@ -319,7 +332,57 @@ object SSAKL {
 
   def put(st:State):SState[State, Unit] = StateT { _ => SSAOk((st,()))} 
 
+  /**
+    * setECtx - setting the exiting context in the state
+    *
+    * @param tctx
+    * @param m
+    * @return
+    */
+  def setECtx(tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
+    st <- get
+    st1 <- m.pure(st match {
+      case State(vm, eCtx, ths, nestedDecls) => State(vm, tctx, ths, nestedDecls)
+    })
+    _   <- put(st1)
+  } yield ()
+
+  /**
+    * addThs - add the given context to the list of throwing context in the state
+    *
+    * @param tctx
+    * @param m
+    * @return
+    */
+  def addThs(tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
+    st <- get
+    st1 <- m.pure(st match {
+      case State(vm, eCtx, ths, nestedDecls) => State(vm, eCtx, (ths.toSet + tctx).toList, nestedDecls )
+    })
+    _  <- put(st1)
+  } yield ()
   
+  /**
+    * addNestedVarDecls - add an entry to the nested var decls in the state
+    *
+    * @param tctx
+    * @param id
+    * @param ty
+    * @param mods
+    * @param m
+    * @return
+    */
+  def addNestedVarDecls(tctx:TCtx, id:Ident, ty:Type, mods:List[Modifier])(implicit m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
+    st <- get
+    st1  <- m.pure(st match {
+      case State(varMap, eCtx, ths, nDecls) => {
+        val nDecls1 = (nDecls.toSet + ((tctx, id, ty, mods))).toList
+        State(varMap, eCtx, ths, nDecls1)
+      }
+    })
+    _  <- put(st1)
+  } yield ()
+
   def mergeState(st1:State, st2:State, st3:State):State = {
     val st12 = mergeState(st1, st2)
     mergeState(st12, st3)  
@@ -333,6 +396,8 @@ object SSAKL {
   def mergeState(st1:State, st2:State):State = (st1, st2) match {
     case (State(vm1, eCtx1, ths1, nDecls1), State(vm2, eCtx2, ths2, nDecls2)) => State(unionVarMap(vm1, vm2), eCtx1, (ths1++ths2).toSet.toList, (nDecls1 ++ nDecls2).toSet.toList)
   }
+
+  
 
   def extendAllVarsWithContextAndLabel(sctx:SCtx, tctx:TCtx, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
     st <- get
@@ -843,6 +908,7 @@ object SSAKL {
         lbl  <- toLbl(tctx)
         exp1 <- kexp(exp, tctx)
         msg1 <- msg.traverse( m => kexp(m, tctx))
+        _    <- setECtx(tctx)
       } yield SSABlock(lbl, SSAAssert(exp1, msg1))
 
       case BasicFor(init, loop_cond, post_update, stmt) => m.raiseError("BasicFor should have been desugared.")
@@ -857,6 +923,7 @@ object SSAKL {
 
       case Empty => for {
         lbl <- toLbl(tctx)
+        _   <- setECtx(tctx)
       } yield (SSABlock(lbl, SSAEmpty))
 
       case ExpStmt(Assign(lhs, op, rhs)) => lhs match {
@@ -872,7 +939,8 @@ object SSAKL {
                 case Some(im) => m.pure(vm + (x -> (im + (ctx -> (tctx, xlbl)))))
               }
             } yield SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(NameLhs(xlbl), op, rhs1)))))
-          } 
+          }
+          _    <- setECtx(tctx)        
         } yield b
 
         case FieldLhs(fa) => fa match {
@@ -880,14 +948,17 @@ object SSAKL {
             rhs1 <- kexp(rhs, tctx)
             lbl <- toLbl(tctx)
             e2  <- kexp(e1, tctx)
+            _    <- setECtx(tctx)
           } yield SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(FieldLhs(PrimaryFieldAccess(e2, id)), op, rhs1)))))
           case SuperFieldAccess(id) => for {
             rhs1 <- kexp(rhs, tctx)
             lbl <- toLbl(tctx)
+            _    <- setECtx(tctx)
           } yield SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(FieldLhs(SuperFieldAccess(id)), op, rhs1)))))
           case ClassFieldAccess(name, id) => for {
             rhs1 <- kexp(rhs, tctx)
             lbl <- toLbl(tctx)
+            _    <- setECtx(tctx)
           } yield SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(FieldLhs(ClassFieldAccess(name,id)), op, rhs1)))))
         }
 
@@ -896,6 +967,7 @@ object SSAKL {
           e1   <- kexp(e, tctx)
           es1 <- es.traverse( e => kexp(e, tctx))
           lbl <- toLbl(tctx)
+          _    <- setECtx(tctx)
         } yield SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(ArrayLhs(ArrayIndex(e1,es1)), op, rhs1)))))
         
       }
@@ -903,6 +975,7 @@ object SSAKL {
       case ExpStmt(exp) => for {
         exp1 <- kexp(exp, tctx)
         lbl  <- toLbl(tctx)
+        _    <- setECtx(tctx)
       } yield SSABlock(lbl, SSAExps(List(ExpStmt(exp1))))
 
       case IfThen(exp, stmt) => m.raiseError("If then statment should have been desugared.")
@@ -917,13 +990,15 @@ object SSAKL {
           case State(vm, eCtx, ths, nDecls) => m.pure(State(vm, eCtx, Nil, nDecls))
         }
         _          <- put(stThenIn)
-        then_stmts <- kstmtBlock(then_stmt, ctx)
+        then_ctx   <- m.pure(putSCtx(ctx, SThen(SBox)))
+        then_stmts <- kstmtBlock(then_stmt, then_ctx)
         stThenOut  <- get
         stElseIn   <- st match {
           case State(vm, eCtx, ths, nDecls) => m.pure(State(vm, eCtx, Nil, nDecls))
         }
         _          <- put(stElseIn)
-        else_stmts <- kstmtBlock(else_stmt, ctx)
+        else_ctx   <- m.pure(putSCtx(ctx,SElse(SBox)))
+        else_stmts <- kstmtBlock(else_stmt, else_ctx)
         stElseOut  <- get
         stMerged   <- m.pure(mergeState(st, stThenOut, stElseOut))
         _          <- put(stMerged)
@@ -931,19 +1006,214 @@ object SSAKL {
         tctx2      <- m.pure(putTCtx(tctx, TIfPostPhi))
         lbl2       <- toLbl(tctx2)
 
-        phis       <- mkPhi(stThenOut, stElseOut)
+        phis       <- mkPhi(stThenOut, stElseOut, lbl2)
         _          <- extendAllVarsWithContextAndLabel(ctx, tctx, lbl2)
+        _          <- setECtx(tctx)
       } yield SSABlock(lbl, SSAIf(exp1, then_stmts, else_stmts, phis))
       
-      
+      case Labeled(id, stmt) => m.raiseError("Labeled statement is not supported.") // todo
+
+      case Return(oexp) => oexp match {
+        case Some(exp) => for {
+          lbl  <- toLbl(tctx)
+          exp1 <- kexp(exp,tctx) 
+          _    <- setECtx(tctx)
+
+        } yield SSABlock(lbl, SSAReturn(Some(exp1)))
+        case None => for {
+          lbl  <- toLbl(tctx)
+          _    <- setECtx(tctx)
+        } yield SSABlock(lbl, SSAReturn(None))
+      }
+
+      case StmtBlock(blk) => m.raiseError("Statement Block should not be handled here.") // todo
+
+      case Switch(exp, blocks) => m.raiseError("Switch statement is not supported.") // todo
+      case Synchronized(exp, blk) => m.raiseError("Synchronized statement is not supported.") // todo
+
+      case Throw(exp) => for {
+        lbl  <- toLbl(tctx)
+        exp1 <- kexp(exp, tctx)
+        _    <- addThs(tctx)
+        _    <- setECtx(tctx)
+      } yield SSABlock(lbl, SSAThrow(exp1))
+
+
+      case Try(try_blk, Catch(param, catch_blk)::Nil, finally_blk) => finally_blk match {
+        case Some(b) => m.raiseError("Try catch finally should be desugared to Try catch.")
+        case None    => for {
+          lbl       <- toLbl(tctx)
+          st        <- get
+
+          stTryIn   <- st match {
+            case State(vm, eCtx, ths, nestedDecls) => m.pure(State(vm,eCtx,Nil, nestedDecls))
+          }
+          _         <- put(stTryIn)
+          try_ctx   <- m.pure(putSCtx(ctx, STry(SBox)))
+          try_stmts <- kBlock(try_blk, try_ctx)
+          stTryOut  <- get
+
+          tctx1p    <- m.pure(putTCtx(tctx, TTryPeriPhi))
+          lbl1p     <- toLbl(tctx1p)
+          phis_peri <- mkPhisFromThrows(stTryOut, thsFromState(st), lbl1p)
+
+          catch_ctx <- m.pure(putSCtx(ctx, SCatch(SBox)))
+          catch_tctx <- m.pure(putTCtx(tctx, TCatch(TBox)))
+          stCatchIn <- stTryOut match {
+            case State(vm1, eCtx1, ths1, nestedDecls1) => for {
+              entries <- vm1.keySet.toList.traverse(v => for {
+                v_lbl <- mkName(v, lbl1p)
+              } yield (v, ctx, tctx1p, v_lbl))
+            } yield State((entries.foldLeft(vm1)((vm, ent) => ent match {
+              case (v, sctx, tctx, v_lbl) => vm.get(v) match {
+                case None => vm
+                case Some(m) => vm + (v -> (m + (sctx -> (tctx, v_lbl))))
+              }}) + ((paramIdtoName(param)) -> Map(ctx -> ((catch_tctx, paramIdtoName(param)))))), 
+              tctx1p, Nil, nestedDecls1)
+            }
+          catch_stmts <- kBlock(catch_blk, catch_ctx)
+          stCatchOut <- get
+          
+          tctx3 <- m.pure(putTCtx(tctx, TTryPostPhi))
+          lbl3  <- toLbl(tctx3)
+
+          phis_post <- mkPhi(stTryOut, stCatchOut, lbl3)
+          _         <- extendAllVarsWithContextAndLabel(ctx, tctx3, lbl3)
+          _         <- setECtx(tctx)
+          _         <- thsFromState(st).traverse( ctx => addThs(ctx))
+        } yield SSABlock(lbl, SSATry(try_stmts, phis_peri, param, catch_stmts, phis_post))
+      } 
+      case Try(_, Nil, _) => m.raiseError("There is no catch in a try statement")
+      case Try(_, _::_, _) => m.raiseError("Multiple catch clauses encountered, which should have been merged.")
+      case While(exp, stmt) => for {
+        lbl <- toLbl(tctx)
+        st  <- get
+        lblp  <- toLbl(eCtxFromState(st))
+        tctx_pre <- m.pure(putTCtx(tctx, TWhilePrePhi))
+        lbl0  <- toLbl(tctx_pre)
+        phis_pre  <- st match {
+          case State(vm, eCtx, ths, nestedDecls) if (ths.contains(eCtx)) => 
+            vm.keySet.toList.traverse( v => for {
+              v_lbl <- mkName(v, lbl0)
+            } yield Phi(v, vlbl, Map()))
+          case State(vm, eCtx, ths, nestedDecls) => 
+            vm.keySet.toList.traverse( v => for {
+              v_lbl <- mkName(v, lbl0)
+              rhs <- m.pure(Rleq(ths, eCtx, vm, v) match {
+                case None => Map()
+                case Some(n) => Map(lblp -> n)
+              })
+            } yield Phi(v, v_lbl, rhs))
+        }
+        stBodyIn <- st match {
+          case State(vm, eCtx, ths, nestedDecls) => for {
+            entries <- vm.keySet.toList.traverse( v => for {
+              v_lbl <- mkName(v, lbl0)
+            } yield (v, ctx, tctx_pre, v_lbl))
+          } yield State(entries.foldLeft(vm)((vm1, ent) => ent match {
+            case (v, sctx, tctx2, v_lbl) => vm1.get(v) match {
+              case None => vm1
+              case Some(m) => vm1 + (v -> (m + (sctx -> (tctx2, vlbl))))
+            }}), tctx_pre, Nil, nestedDecls)
+        }
+        _ <- put(stBodyIn)
+        exp1 <- kexp(exp, tctx)
+        body_ctx <- m.pure(putSCtx(ctx, SWhile(SBox)))
+        body_stmts <- kstmtBlock(stmt, body_ctx)
+        stBodyOut <- get
+      }
     }
   } 
 
-
-  def mkPhi(st1:State, st2:State)(implicit m:MonadError[SSAState, ErrorM]):SState[State, List[Phi]] = (st1, st2) match {
-    case (State(vm1, eCtx1, ths1, _), State(vm2, eCtx2, ths2,_)) if (ths1.contains(eCtx1) && ths2.contains(eCtx2)) => m.pure(Nil) // todo 
-
+  def paramIdtoName(fp:FormalParam):Name = fp match {
+    case FormalParam(mods, ty, arity, var_decl_id) => Name(List(idFromVarDeclId(var_decl_id)))
   }
+
+  /**
+    * mkPhi - create phis by merging all variables found in vmap in st1 and st2, 
+    *
+    * @param st1 - incoming state 1
+    * @param st2 - incoming state 2
+    * @param lbl - phi LHS variable label
+    * @param m   - monad type class context
+    * @return
+    */
+
+  def mkPhi(st1:State, st2:State, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State, List[Phi]] = (st1, st2) match {
+    case (State(vm1, eCtx1, ths1, _), State(vm2, eCtx2, ths2,_)) if (ths1.contains(eCtx1) && ths2.contains(eCtx2)) => for {
+      vs <- m.pure(vm1.keySet ++ vm2.keySet)
+      phis <- vs.toList.traverse( v => for {
+        vlbl <- mkName(v, lbl)
+      } yield Phi(v, vlbl, Map()))
+    } yield phis
+    case (State(vm1, eCtx1, ths1, _), State(vm2, eCtx2, ths2,_)) if (!ths1.contains(eCtx1) && ths2.contains(eCtx2)) => for {
+      vs <- m.pure(vm1.keySet)
+      phis <- vs.toList.traverse( v => for {
+        vlbl <- mkName(v, lbl)
+        lbl1 <- toLbl(eCtx1)
+        oname <- m.pure(Rleq(ths1, eCtx1, vm1, v))
+      } yield Phi(v, vlbl, oname match {
+        case None => Map()
+        case Some(n) => Map(lbl1 -> n)
+      }))
+    } yield phis
+    case (State(vm1, eCtx1, ths1, _), State(vm2, eCtx2, ths2,_)) if (ths1.contains(eCtx1) && !ths2.contains(eCtx2)) => for {
+      vs <- m.pure(vm2.keySet)
+      phis <- vs.toList.traverse( v => for {
+        vlbl <- mkName(v, lbl)
+        lbl2 <- toLbl(eCtx2)
+        oname <- m.pure(Rleq(ths2, eCtx2, vm2, v))
+      } yield Phi(v, vlbl, oname match {
+        case None => Map()
+        case Some(n) => Map(lbl2 -> n)
+      }))
+    } yield phis  
+    case (State(vm1, eCtx1, ths1, _), State(vm2, eCtx2, ths2,_)) => for {
+      vs <- m.pure(vm1.keySet ++ vm2.keySet)
+      phis <- vs.toList.traverse( v => for {
+        vlbl <- mkName(v, lbl)
+        lbl1 <- toLbl(eCtx1)
+        lbl2 <- toLbl(eCtx2)
+        oname1 <- m.pure(Rleq(ths1, eCtx1, vm1, v))
+        oname2 <- m.pure(Rleq(ths2, eCtx2, vm2, v))
+      } yield Phi(v, vlbl, (oname1, oname2) match {
+        case (Some(n1), Some(n2)) => Map(lbl1 -> n1, lbl2 -> n2) // do we need the remaining 3 cases?
+        case (None, None) => Map()
+        case (Some(n1), None) => Map(lbl1 -> n1)
+        case (None, Some(n2)) => Map(lbl2 -> n2)
+      }))
+    } yield phis  
+  }
+
+  /**
+    * mkPhisFromThrows - making the peri phis in try-catch statement from the throws contexts from try
+    *
+    * @param st
+    * @param parentThs
+    * @param lbl
+    * @param m
+    * @return
+    */
+  def mkPhisFromThrows(st:State, parentThs:List[TCtx], lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State, List[Phi]] = st match {
+    case State(vm, eCtx, ths, nestedDecls) => for {
+      vs <- m.pure(vm.keySet.toList)
+      phis <- vs.traverse( v => for {
+        vlbl <- mkName(v, lbl)
+        lbls_onames <- ths.traverse( ctx => for {
+          lbl1 <- toLbl(ctx)
+          on   <- m.pure(Rleq(parentThs, ctx, vm, v))
+        } yield (lbl1,on))
+        rhs <- m.pure(
+          lbls_onames
+          .foldLeft(Map():Map[Label,Name])((m,p) => p match {
+            case (lbl, None) => m 
+            case (lbl, Some(n)) => m + (lbl -> n)
+          }))
+      } yield Phi(v, vlbl, rhs))
+    } yield phis
+  }
+
+  
 
   /**
     * kstmtBlock - a special version just to handle StmtBlock
@@ -959,6 +1229,10 @@ object SSAKL {
     case _ => for {
       b <- kstmt(stmt, ctx)
     } yield List(b)
+  }
+
+  def kBlock(blk:Block, ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,List[SSABlock]] = blk match {
+    case Block(blkStmts) => kblkStmts(blkStmts,ctx)
   }
 
   def kblkStmts(blkStmts:List[BlockStmt], ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, List[SSABlock]] = blkStmts match {
@@ -993,14 +1267,7 @@ object SSAKL {
     case Nil => m.pure(())
     case (varDecl::rest) => varDecl match {
       case VarDecl(VarId(id), v_init) => for {
-        st <- get
-        st1  <- m.pure(st match {
-          case State(varMap, eCtx, ths, nDecls) => {
-            val nDecls1 = nDecls ++ List((tCtx, id, ty, mods))
-            State(varMap, eCtx, ths, nDecls1)
-          }
-        })
-        _ <- put(st1)
+        _ <- addNestedVarDecls(tCtx, id, ty, mods)
         _ <- recordVarDecls(mods, ty, rest, tCtx)
       } yield ()
       case VarDecl(_, v_init) => // it is an array declaration, we don't need to record it as array id will never be merged in phis.
