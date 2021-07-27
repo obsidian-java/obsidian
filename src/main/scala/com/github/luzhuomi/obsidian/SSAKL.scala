@@ -76,13 +76,15 @@ object SSAKL {
   /**
     * 
     *
-    * @param stmt
     * @param phiEntr: Phis at the entry of the while stmt
+    * @param exp: boolean expression
+    * @param stmts
     * @param phiExit: Phis at the exit of the while stmt
     */
   case class SSAWhile(
-    stmt:Stmt,
     phiEntr: List[Phi],
+    exp: Exp,
+    stmts:List[SSABlock],
     phiExit: List[Phi]
   ) extends SSAStmt
 
@@ -1095,12 +1097,12 @@ object SSAKL {
           case State(vm, eCtx, ths, nestedDecls) if (ths.contains(eCtx)) => 
             vm.keySet.toList.traverse( v => for {
               v_lbl <- mkName(v, lbl0)
-            } yield Phi(v, vlbl, Map()))
+            } yield Phi(v, v_lbl, Map()))
           case State(vm, eCtx, ths, nestedDecls) => 
             vm.keySet.toList.traverse( v => for {
               v_lbl <- mkName(v, lbl0)
               rhs <- m.pure(Rleq(ths, eCtx, vm, v) match {
-                case None => Map()
+                case None => (Map():Map[Label, Name])
                 case Some(n) => Map(lblp -> n)
               })
             } yield Phi(v, v_lbl, rhs))
@@ -1113,7 +1115,7 @@ object SSAKL {
           } yield State(entries.foldLeft(vm)((vm1, ent) => ent match {
             case (v, sctx, tctx2, v_lbl) => vm1.get(v) match {
               case None => vm1
-              case Some(m) => vm1 + (v -> (m + (sctx -> (tctx2, vlbl))))
+              case Some(m) => vm1 + (v -> (m + (sctx -> (tctx2, v_lbl))))
             }}), tctx_pre, Nil, nestedDecls)
         }
         _ <- put(stBodyIn)
@@ -1121,7 +1123,30 @@ object SSAKL {
         body_ctx <- m.pure(putSCtx(ctx, SWhile(SBox)))
         body_stmts <- kstmtBlock(stmt, body_ctx)
         stBodyOut <- get
-      }
+
+        phis_pre_updated <- stBodyOut match {
+          case State(vm2, eCtx2, ths2, nestedDecls2) if (ths2.contains(eCtx2)) => m.pure(phis_pre)
+          case State(vm2, eCtx2, ths2, nestedDecls2) => for { 
+            lbl2 <- toLbl(eCtx2)
+          } yield phis_pre.map( phi => phi match {
+            case Phi(v, v_lbl, rhs_map) => Rleq(ths2, eCtx2, vm2, v) match {
+              case None => Phi(v, v_lbl, rhs_map)
+              case Some(n) => Phi(v, v_lbl, rhs_map + (lbl2 -> n))
+            }
+          })
+        }
+
+        tctx3 <- m.pure(putTCtx(tctx, TWhilePostPhi))
+        lbl3  <- toLbl(tctx3)
+        phis_post <- stBodyOut match {
+          case State(vm2, eCtx2, ths2, nestedDecls2) => vm2.keySet.toList.traverse( v => for {
+            v_lbl3 <- mkName(v, lbl3)
+            v_lbl0 <- mkName(v, lbl0)
+          } yield Phi(v, v_lbl3, Map(lbl0 -> v_lbl0)))
+        }
+        _          <- extendAllVarsWithContextAndLabel(ctx, tctx3, lbl3)
+        _          <- setECtx(tctx)
+      } yield SSABlock(lbl, SSAWhile(phis_pre_updated, exp1, body_stmts, phis_post))
     }
   } 
 
