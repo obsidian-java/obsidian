@@ -51,7 +51,7 @@ object SSAKL {
 
   case class SSAThrow(exp:Exp) extends SSAStmt
 
-  case class SSAMethodInvocation(stmt:Stmt) extends SSAStmt
+  case class SSAMethodInvocation(methodInv:MethodInvocation) extends SSAStmt
 
   case object SSAEmpty extends SSAStmt
 
@@ -835,6 +835,14 @@ object SSAKL {
     case TTryPostPhi => None
   }
 
+  /**
+    * kexp - converts an expression, correspondent to the KE function in the paper
+    *
+    * @param e
+    * @param ctx
+    * @param m
+    * @return
+    */
 
   def kexp(e:Exp, ctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Exp] = e match {
     case ArrayAccess(idx) => m.pure(e) // TODO: fixme
@@ -900,7 +908,14 @@ object SSAKL {
 
 
 
-
+  /**
+    * kstmt - convert a statement, correspond to KS in the paper.
+    *
+    * @param stmt
+    * @param ctx
+    * @param m
+    * @return
+    */
   
 
   def kstmt(stmt:Stmt, ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, SSABlock] = {
@@ -972,6 +987,36 @@ object SSAKL {
           _    <- setECtx(tctx)
         } yield SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(ArrayLhs(ArrayIndex(e1,es1)), op, rhs1)))))
         
+      }
+
+      // todo: what about method call on the rhs of an assignment
+      case ExpStmt(MethodInv(methodInv)) => methodInv match {
+        // method name does not need to be convert
+        case MethodCall(name, args) => for {
+          lbl <- toLbl(tctx)
+          args1 <- args.traverse(arg => kexp(arg, tctx))
+        } yield SSABlock(lbl, SSAMethodInvocation(MethodCall(name, args1)))
+
+        case PrimaryMethodCall(e, ref_types, id, args) => for {
+          lbl <- toLbl(tctx)
+          args1 <- args.traverse(arg => kexp(arg, tctx))
+          e1 <- kexp(e, tctx)
+        } yield SSABlock(lbl, SSAMethodInvocation(PrimaryMethodCall(e1, ref_types, id, args1)))
+
+        case ClassMethodCall(name, ref_types, id, args) => for {
+          lbl <- toLbl(tctx)
+          args1 <- args.traverse(arg => kexp(arg, tctx))
+        } yield SSABlock(lbl, SSAMethodInvocation(ClassMethodCall(name, ref_types, id, args1)))
+
+        case SuperMethodCall(ref_types, id, args) => for {
+          lbl <- toLbl(tctx)
+          args1 <- args.traverse(arg => kexp(arg, tctx))
+        } yield SSABlock(lbl, SSAMethodInvocation(SuperMethodCall(ref_types, id, args1)))
+
+        case TypeMethodCall(name, ref_types, id, args) => for {
+          lbl <- toLbl(tctx)
+          args1 <- args.traverse(arg => kexp(arg, tctx))
+        } yield SSABlock(lbl, SSAMethodInvocation(TypeMethodCall(name, ref_types, id, args1)))
       }
 
       case ExpStmt(exp) => for {
@@ -1241,7 +1286,8 @@ object SSAKL {
   
 
   /**
-    * kstmtBlock - a special version just to handle StmtBlock
+    * kstmtBlock - a special version just to handle StmtBlock, when the statement encloses a block of statements, we convert them using kBlock
+    *               otherwise, we call kstmt
     *
     * @param stmt
     * @param ctx
@@ -1250,15 +1296,33 @@ object SSAKL {
     */
   
   def kstmtBlock(stmt:Stmt, ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,List[SSABlock]] = stmt match {
-    case StmtBlock(Block(blkStmts)) => kblkStmts(blkStmts,ctx)
+    // case StmtBlock(Block(blkStmts)) => kblkStmts(blkStmts,ctx)
+    case StmtBlock(blk) => kBlock(blk,ctx)
     case _ => for {
       b <- kstmt(stmt, ctx)
     } yield List(b)
   }
 
+  /**
+    * kBlock - convert a block of statements
+    *
+    * @param blk
+    * @param ctx
+    * @param m
+    * @return
+    */
   def kBlock(blk:Block, ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,List[SSABlock]] = blk match {
     case Block(blkStmts) => kblkStmts(blkStmts,ctx)
   }
+
+  /**
+    * kblkStmts - convert a list of block stmts. It is correspondent to the \overline{KS} in the paper.
+    *
+    * @param blkStmts
+    * @param ctx
+    * @param m
+    * @return
+    */
 
   def kblkStmts(blkStmts:List[BlockStmt], ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, List[SSABlock]] = blkStmts match {
     case Nil => m.pure(Nil)
@@ -1271,12 +1335,30 @@ object SSAKL {
     } yield (b::bs)
   }
 
+  /**
+    * kblkStmt - convert a block statement, it does not handle local class. LocalVars are converted into a SSAVarDecls which is not mentioned in the paper.
+    *
+    * @param blkStmt
+    * @param ctx
+    * @param m
+    * @return
+    */
   def kblkStmt(blkStmt:BlockStmt, ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,SSABlock] = blkStmt match {
     case BlockStmt_(stmt) => kstmt(stmt, ctx) 
     case LocalClass(_) => m.raiseError("local class is not supported.")
     case LocalVars(mods, ty, varDecls) => kVarDecls(mods, ty, varDecls, ctx)
   }
-    
+  
+  /**
+    * kVarDecls - converts a var declaration, we convert the initialization like other statement / expression. We also keep track of the declration in the state
+    *
+    * @param mods
+    * @param ty
+    * @param varDecls
+    * @param ctx
+    * @param m
+    * @return
+    */
   def kVarDecls(mods:List[Modifier], ty:Type, varDecls:List[VarDecl], ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, SSABlock] = for {
     tctx <- m.pure(kctx(ctx))
     // a new case, combining KVD and KSTMT assignment
@@ -1336,6 +1418,14 @@ object SSAKL {
     } yield InitArray(ArrayInit(var_inits1))
   }
 
+  /**
+    * mkName - create a new name from an existing name and a label.
+    *
+    * @param n
+    * @param lbl
+    * @param m
+    * @return
+    */
   def mkName(n:Name, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Name] = n match 
     {
       case Name(Nil) => m.raiseError("mkName is applied to an empty name.")
@@ -1348,6 +1438,14 @@ object SSAKL {
       }
     }
 
+  /**
+    * mkId - create a new ID from an existing id and a label
+    *
+    * @param id
+    * @param lbl
+    * @param m
+    * @return
+    */
   def mkId(id:Ident, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Ident] = {
     val s = lblToStr(lbl)
     val y = appIdStr(id,s)
