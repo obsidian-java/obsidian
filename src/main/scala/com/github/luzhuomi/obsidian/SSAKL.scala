@@ -874,7 +874,7 @@ object SSAKL {
       case MethodBody(Some(block)) => for {
         blocks <- kBlock(block, SBox) 
         // todo: need to extract the vm and vardecls from the nestedDecls
-        varDecls <- genVarDecls // todo: what's the label for these var decl stmts
+        // varDecls <- genVarDecls // todo: what's the label for these var decl stmts
       } yield SSAMethodDecl(modifiers, type_params, return_ty, fname, formal_params, ex_types, exp, SSAMethodBody(blocks))
     }
   }
@@ -896,7 +896,7 @@ object SSAKL {
   } yield stmts
   */
 
-  
+
   /**
     * kexp - converts an expression, correspondent to the KE function in the paper
     *
