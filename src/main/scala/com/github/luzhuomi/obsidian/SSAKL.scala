@@ -457,7 +457,7 @@ object SSAKL {
     case TLast(ctx2) => toLbl2(p, ctx2)
     case THead(ctx2) => toLbl2(p, ctx2) 
     case TTail(ctx2) => p match {
-      case Nil => m.raiseError("toLbl failed with TTail.")
+      case Nil => m.raiseError("SSA construction failed, toLbl failed with TTail.")
       case _   => {
         val pp = p.init
         val l  = p.last
@@ -873,29 +873,44 @@ object SSAKL {
       case MethodBody(None) => m.pure(SSAMethodDecl(modifiers, type_params, return_ty, fname, formal_params, ex_types, exp, SSAMethodBody(Nil)))
       case MethodBody(Some(block)) => for {
         blocks <- kBlock(block, SBox) 
-        // todo: need to extract the vm and vardecls from the nestedDecls
-        // varDecls <- genVarDecls // todo: what's the label for these var decl stmts
-      } yield SSAMethodDecl(modifiers, type_params, return_ty, fname, formal_params, ex_types, exp, SSAMethodBody(blocks))
+
+        lbl <- toLbl(TBox) 
+        varDeclsStmts <- genVarDecls 
+        varDecls <- m.pure(varDeclsStmts.map(vds => SSABlock(lbl, vds)))
+      } yield SSAMethodDecl(modifiers, type_params, return_ty, fname, formal_params, ex_types, exp, SSAMethodBody(varDecls ++ blocks))
     }
   }
 
-  /*
+  
   def genVarDecls(implicit m:MonadError[SSAState, ErrorM]):SState[State, List[SSAStmt]] = for {
     st <- get
     stmts <- st match {
       case State(vm, eCtx, ths, nestedDecls, methodInvs) => for {
         tbl <- m.pure(mkTable(nestedDecls)) 
-        ll <- vm.toList.traverse( p => p match {
-          case (x, m) => tbl.get(m) match {
-            case None => m.pure(Nil)
-            case Some((ty,mods)) => m.toList.traverse( q => q match {
-              case (ctx, (tctx, xlbl)) => 
-          })
-        })      
+        ll  <- vm.toList.traverse( p => p match {
+          case (x, ctxm) => tbl.get(x) match {
+            case None => m.pure(Nil:List[SSAStmt])
+            case Some((ty,mods)) => { 
+              def go(q:(SCtx, (TCtx, Name))):SState[State, SSAStmt] = q match {
+                case (ctx, (tctx, xlbl@Name(List(id)))) => {
+                  m.pure(SSAVarDecls(mods, ty, List(VarDecl(VarId(id), None))))
+                }
+                case (ctx, (tctx, xlbl)) => {
+                  m.raiseError("SSA construction failed, genVarDecls - the renamed variable is a not a simple id.")
+                }
+              }
+              ctxm.toList.traverse(go(_))
+            }
+          }
+        })
+      } yield ll.flatMap( p => p)
     }
   } yield stmts
-  */
-
+  
+  def mkTable(nestedDecls: List[(TCtx, Ident, Type, List[Modifier])]):Map[Name, (Type, List[Modifier])] = 
+    nestedDecls.foldLeft(Map():Map[Name, (Type, List[Modifier])])( (m, ndecl) => ndecl match {
+      case (_, id, ty, mods) => m + (Name(List(id)) -> (ty,mods))
+    })
 
   /**
     * kexp - converts an expression, correspondent to the KE function in the paper
@@ -907,7 +922,10 @@ object SSAKL {
     */
 
   def kexp(e:Exp, ctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Exp] = e match {
-    case ArrayAccess(idx) => m.pure(e) // TODO: fixme
+    case ArrayAccess(ArrayIndex(e, es)) => for {
+      e1 <- kexp(e, ctx)
+      es1 <- es.traverse(kexp(_, ctx))
+    } yield ArrayAccess(ArrayIndex(e1, es1))
     case Cast(ty, exp) => for {
       exp1 <- kexp(exp, ctx) 
     } yield Cast(ty,exp1)
@@ -915,8 +933,10 @@ object SSAKL {
       exps1 <- exps.traverse(kexp(_, ctx))
     } yield ArrayCreate(ty, exps1, num_dims)
     
-    case ArrayCreateInit(ty, size, init) => m.pure(e) //TODO: fixme
-    case Assign(lhs, op, rhs) => m.pure(e) // TODO: it should not be handled here.
+    case ArrayCreateInit(ty, size, ArrayInit(v_inits)) => for {
+      v_inits1 <- v_inits.traverse(kVarInit(_, ctx))
+    } yield ArrayCreateInit(ty, size, ArrayInit(v_inits1))
+    case Assign(lhs, op, rhs) => m.raiseError("SSA construction failed, assignment expression should be handled in kstmt.") // might not be true, it does not work with x = (y = 1) + 1 // maybe it should have been flattened or desugared? todo: double check
     case BinOp(e1, op, e2) => for {
       e1p <- kexp(e1, ctx)
       e2p <- kexp(e2, ctx)
@@ -932,18 +952,24 @@ object SSAKL {
       st <- get
       exp1 <- st match {
         case State(vm, eCtx, ths, nDecls, methInvs) => Rlt(ths, ctx, vm, name) match {
-          case None => m.raiseError("Rlt failed")
+          case None => m.raiseError("SSA construction failed, Rlt failed during expression conversion.")
           case Some(name1) => m.pure(ExpName(name1))
         }
       }
     } yield exp1
     
-    case FieldAccess_(access) => m.pure(e) // TODO: fixme
-    case InstanceCreation(type_args, type_decl, args, body) => m.pure(e) //TODO: fixme
+    case FieldAccess_(access) => access match {
+      case PrimaryFieldAccess(e, id) => for {
+        e1 <- kexp(e, ctx)
+      } yield FieldAccess_(PrimaryFieldAccess(e1, id))
+      case SuperFieldAccess(id) => m.pure(e)
+      case ClassFieldAccess(n, id) => m.pure(e)
+    }
+    case InstanceCreation(type_args, type_decl, args, body) => m.raiseError("SSA construction failed, instance creation is not supported.")
     case InstanceOf(e, ref_type) => for {
       e1 <- kexp(e, ctx)
-    } yield InstanceOf(e1, ref_type) // TODO: fixme
-    case Lambda(params, body) => m.pure(e)
+    } yield InstanceOf(e1, ref_type) 
+    case Lambda(params, body) => m.raiseError("SSA construction failed, lambda expression is not supported.")
     case Lit(lit) => m.pure(e)
     case MethodInv(methodInv) => methodInv match {
       // method name does not need to be convert
@@ -973,14 +999,14 @@ object SSAKL {
         _ <- addMethodInv(ctx, TypeMethodCall(name, ref_types, id, args1))
       } yield MethodInv(TypeMethodCall(name, ref_types, id, args1))
     }
-    case MethodRef(name, id) => m.pure(e) // TODO: fixme
-    case PostDecrement(exp) => m.pure(e) // TODO: it should have been desugared.
-    case PostIncrement(exp) => m.pure(e) // TODO: it should have been desugared.
+    case MethodRef(name, id) => m.pure(e) 
+    case PostDecrement(exp) => m.raiseError("SSA construction failed, PostDecrement expression should have been desugared.")
+    case PostIncrement(exp) => m.raiseError("SSA construction failed, PostIncrement expression should have been desugared.")
     case PreBitCompl(exp) => for {
       e1 <- kexp(exp, ctx) 
-    } yield PreBitCompl(e1) // TODO: fixme
-    case PreDecrement(exp) => m.pure(e) // TODO: it should have been desugared.
-    case PreIncrement(exp) => m.pure(e) // TODO: it should have been desugared.
+    } yield PreBitCompl(e1) 
+    case PreDecrement(exp) => m.raiseError("SSA construction failed, PreDecrement expression should have been desugared.")
+    case PreIncrement(exp) => m.raiseError("SSA construction failed, PreIncrement expression should have been desugared.")
     case PreMinus(exp) => for {
       exp1 <- kexp(exp, ctx)
     } yield PreMinus(exp1) 
@@ -990,7 +1016,7 @@ object SSAKL {
     case PrePlus(exp) => for {
       exp1 <- kexp(exp, ctx)
     } yield PrePlus(exp1)
-    case QualInstanceCreation(exp, type_args, id, args, body) => m.pure(e) //TODO: fixme
+    case QualInstanceCreation(exp, type_args, id, args, body) => m.raiseError("SSA construction failed, Qualified Instance creation expression is not supported.")
     case This => m.pure(e) 
     case ThisClass(name) => m.pure(e) 
   }
@@ -1017,15 +1043,15 @@ object SSAKL {
         _    <- setECtx(tctx)
       } yield SSABlock(lbl, SSAAssert(exp1, msg1))
 
-      case BasicFor(init, loop_cond, post_update, stmt) => m.raiseError("BasicFor should have been desugared.")
+      case BasicFor(init, loop_cond, post_update, stmt) => m.raiseError("SSA construction failed, BasicFor should have been desugared.")
 
-      case EnhancedFor(modifiers, ty, id, exp, stmt) => m.raiseError("EnhancedFor should have been desugared.")
+      case EnhancedFor(modifiers, ty, id, exp, stmt) => m.raiseError("SSA construction failed, EnhancedFor should have been desugared.")
 
-      case Break(id) => m.raiseError("Break is not yet supported.") // TODO: fixme
+      case Break(id) => m.raiseError("SSA construction failed, Break is not yet supported.") // TODO: fixme
 
-      case Continue(id) => m.raiseError("Continue is not yet supported.") // TODO: fixme
+      case Continue(id) => m.raiseError("SSA construction failed, Continue is not yet supported.") // TODO: fixme
 
-      case Do(stmt, exp) => m.raiseError("Do should have been desguared.")
+      case Do(stmt, exp) => m.raiseError("SSA construction failed, Do should have been desguared.")
 
       case Empty => for {
         lbl <- toLbl(tctx)
@@ -1115,7 +1141,7 @@ object SSAKL {
         _    <- setECtx(tctx)
       } yield SSABlock(lbl, SSAExps(List(ExpStmt(exp1))))
 
-      case IfThen(exp, stmt) => m.raiseError("If then statment should have been desugared.")
+      case IfThen(exp, stmt) => m.raiseError("SSA construction failed, If then statment should have been desugared.")
 
       
       case IfThenElse(exp, then_stmt, else_stmt) => for {
@@ -1148,7 +1174,7 @@ object SSAKL {
         _          <- setECtx(tctx)
       } yield SSABlock(lbl, SSAIf(exp1, then_stmts, else_stmts, phis))
       
-      case Labeled(id, stmt) => m.raiseError("Labeled statement is not supported.") // todo
+      case Labeled(id, stmt) => m.raiseError("SSA construction failed, Labeled statement is not supported.") // todo
 
       case Return(oexp) => oexp match {
         case Some(exp) => for {
@@ -1163,10 +1189,10 @@ object SSAKL {
         } yield SSABlock(lbl, SSAReturn(None))
       }
 
-      case StmtBlock(blk) => m.raiseError("Statement Block should not be handled here.") // todo
+      case StmtBlock(blk) => m.raiseError("SSA construction failed, Statement Block should not be handled here.") // todo
 
-      case Switch(exp, blocks) => m.raiseError("Switch statement is not supported.") // todo
-      case Synchronized(exp, blk) => m.raiseError("Synchronized statement is not supported.") // todo
+      case Switch(exp, blocks) => m.raiseError("SSA construction failed, Switch statement is not supported.") // todo
+      case Synchronized(exp, blk) => m.raiseError("SSA construction failed, Synchronized statement is not supported.") // todo
 
       case Throw(exp) => for {
         lbl  <- toLbl(tctx)
@@ -1177,7 +1203,7 @@ object SSAKL {
 
 
       case Try(try_blk, Catch(param, catch_blk)::Nil, finally_blk) => finally_blk match {
-        case Some(b) => m.raiseError("Try catch finally should be desugared to Try catch.")
+        case Some(b) => m.raiseError("SSA construction failed, Try catch finally should be desugared to Try catch.")
         case None    => for {
           lbl       <- toLbl(tctx)
           st        <- get
@@ -1220,8 +1246,8 @@ object SSAKL {
           _         <- thsFromState(st).traverse( ctx => addThs(ctx))
         } yield SSABlock(lbl, SSATry(try_stmts, phis_peri, param, catch_stmts, phis_post))
       } 
-      case Try(_, Nil, _) => m.raiseError("There is no catch in a try statement")
-      case Try(_, _::_, _) => m.raiseError("Multiple catch clauses encountered, which should have been merged.")
+      case Try(_, Nil, _) => m.raiseError("SSA construction failed, there is no catch in a try statement")
+      case Try(_, _::_, _) => m.raiseError("SSA construction failed, Multiple catch clauses encountered, which should have been merged.")
       case While(exp, stmt) => for {
         lbl <- toLbl(tctx)
         st  <- get
@@ -1435,7 +1461,7 @@ object SSAKL {
     */
   def kblkStmt(blkStmt:BlockStmt, ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,SSABlock] = blkStmt match {
     case BlockStmt_(stmt) => kstmt(stmt, ctx) 
-    case LocalClass(_) => m.raiseError("local class is not supported.")
+    case LocalClass(_) => m.raiseError("SSA construction failed, local class is not supported.")
     case LocalVars(mods, ty, varDecls) => kVarDecls(mods, ty, varDecls, ctx)
   }
   
@@ -1518,7 +1544,7 @@ object SSAKL {
     */
   def mkName(n:Name, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Name] = n match 
     {
-      case Name(Nil) => m.raiseError("mkName is applied to an empty name.")
+      case Name(Nil) => m.raiseError("SSA construction failed, mkName is applied to an empty name.")
       case Name(ids) => {
         val pre = ids.init
         val x   = ids.last
