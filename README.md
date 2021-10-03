@@ -5,7 +5,7 @@ It is work in progress
 
 # Documentation
 
-* [Technical Report](https://github.com/luzhuomi/obsidian/raw/master/pepm21-fixed.pdf)
+* [Technical Report](https://github.com/obsidian-java/obsidian/raw/master/pepm21-fixed.pdf)
 
 # Example 
 
