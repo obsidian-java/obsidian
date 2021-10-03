@@ -1,5 +1,9 @@
 package com.github.luzhuomi.obsidian
 
+
+import cats._
+import cats.implicits._
+
 import cats.data.State
 import com.github.luzhuomi.obsidian.CFG.{AssignmentsNode, CFG, HasVarcfgOps, Node, NodeId, getLVars, getRVars, getSuccs}
 import com.github.luzhuomi.scalangj.Syntax.{Ident, MethodDecl}
