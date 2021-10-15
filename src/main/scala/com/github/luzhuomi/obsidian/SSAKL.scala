@@ -248,29 +248,30 @@ object SSAKL {
   case class State(
     varMap: VarMap, 
     exitCtx: TCtx,
-    eenv: List[TCtx], 
-    benv: List[(TCtx,TCtx)], // break context, breakee context
-    cenv: List[(TCtx,TCtx)], // continue context, continuee context
+    aenv: AEnv, // all non phi context so far
+    eenv: EEnv, 
+    benv: BEnv, // break context, breakee context
+    cenv: CEnv, // continue context, continuee context
     nestedDecls: List[(TCtx, Ident, Type, List[Modifier])],
     methodInvs: List[(TCtx, MethodInvocation)]
   )
 
   def eenvFromState(st:State):List[TCtx] = st match {
-    case State(_, _, eenv, _, _, _, _) => eenv
+    case State(_, _, aenv, eenv, _, _, _, _) => eenv
   }
 
   def benvFromState(st:State):List[(TCtx,TCtx)] = st match {
-    case State(_, _, _, benv, _, _, _) => benv
+    case State(_, _, aenv, _, benv, _, _, _) => benv
   }
 
   def cenvFromState(st:State):List[(TCtx,TCtx)] = st match {
-    case State(_, _, _, _, cenv, _, _) => cenv
+    case State(_, _, aenv, _, _, cenv, _, _) => cenv
   }
 
 
 
   def eCtxFromState(st:State):TCtx = st match {
-    case State(_,ectx, _, _, _, _, _) => ectx
+    case State(_,ectx, aenv, _, _, _, _, _) => ectx
   }
 
   sealed trait Ann
@@ -364,7 +365,7 @@ object SSAKL {
   def setECtx(tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get
     st1 <- m.pure(st match {
-      case State(vm, eCtx, eenv, benv, cenv, nestedDecls, methInvs) => State(vm, tctx, eenv, benv, cenv, nestedDecls, methInvs)
+      case State(vm, eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs) => State(vm, tctx, aenv, eenv, benv, cenv, nestedDecls, methInvs)
     })
     _   <- put(st1)
   } yield ()
@@ -379,7 +380,7 @@ object SSAKL {
   def addeenv(tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
     st <- get
     st1 <- m.pure(st match {
-      case State(vm, eCtx, eenv, benv, cenv, nestedDecls, methInvs) => State(vm, eCtx, (eenv.toSet + tctx).toList, benv, cenv, nestedDecls, methInvs)
+      case State(vm, eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs) => State(vm, eCtx, aenv, (eenv.toSet + tctx).toList, benv, cenv, nestedDecls, methInvs)
     })
     _  <- put(st1)
   } yield ()
@@ -399,9 +400,9 @@ object SSAKL {
   def addNestedVarDecls(tctx:TCtx, id:Ident, ty:Type, mods:List[Modifier])(implicit m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
     st <- get
     st1  <- m.pure(st match {
-      case State(varMap, eCtx, eenv, benv, cenv, nDecls, methInvs) => {
+      case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs) => {
         val nDecls1 = (nDecls.toSet + ((tctx, id, ty, mods))).toList
-        State(varMap, eCtx, eenv, benv, cenv, nDecls1, methInvs)
+        State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls1, methInvs)
       }
     })
     _  <- put(st1)
@@ -418,14 +419,62 @@ object SSAKL {
   def addMethodInv(tctx:TCtx, methinv:MethodInvocation)(implicit m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
     st <- get 
     st1  <- m.pure(st match {
-      case State(varMap, eCtx, eenv, benv, cenv, nDecls, methInvs) => {
+      case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs) => {
         val methInvs1 = (methInvs.toSet + ((tctx, methinv))).toList
-        State(varMap, eCtx, eenv, benv, cenv, nDecls, methInvs1)
+        State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs1)
       }
     })
     _  <- put(st1)
   } yield ()
   
+  def addAEnv(tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
+    st <- get 
+    st1  <- m.pure(st match {
+      case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs) => {
+        val aenv1 = (aenv.toSet + tctx).toList
+        State(varMap, eCtx, aenv1, eenv, benv, cenv, nDecls, methInvs)
+      }
+    })
+    _  <- put(st1)
+  } yield ()
+
+
+  def addEEnv(tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
+    st <- get 
+    st1  <- m.pure(st match {
+      case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs) => {
+        val eenv1 = (eenv.toSet + tctx).toList
+        State(varMap, eCtx, aenv, eenv1, benv, cenv, nDecls, methInvs)
+      }
+    })
+    _  <- put(st1)
+  } yield ()
+
+
+  def addBEnv(bctx:TCtx, tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
+    st <- get 
+    st1  <- m.pure(st match {
+      case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs) => {
+        val benv1 = (benv.toSet + ((bctx,tctx))).toList
+        State(varMap, eCtx, aenv, eenv, benv1, cenv, nDecls, methInvs)
+      }
+    })
+    _  <- put(st1)
+  } yield ()
+
+  def addCEnv(bctx:TCtx, tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
+    st <- get 
+    st1  <- m.pure(st match {
+      case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs) => {
+        val cenv1 = (cenv.toSet + ((bctx,tctx))).toList
+        State(varMap, eCtx, aenv, eenv, benv, cenv1, nDecls, methInvs)
+      }
+    })
+    _  <- put(st1)
+  } yield ()
+
+
+
 
   def mergeState(st1:State, st2:State, st3:State):State = {
     val st12 = mergeState(st1, st2)
@@ -438,8 +487,8 @@ object SSAKL {
    * and union the eenv and nDecls
    * */
   def mergeState(st1:State, st2:State):State = (st1, st2) match {
-    case (State(vm1, eCtx1, eenv1, benv1, cenv1, nDecls1, methInvs1), State(vm2, eCtx2, eenv2, benv2, cenv2, nDecls2, methInvs2)) => 
-      State(unionVarMap(vm1, vm2), eCtx1, (eenv1++eenv2).toSet.toList, (benv1++benv2).toSet.toList, (cenv1++cenv2).toSet.toList, (nDecls1 ++ nDecls2).toSet.toList, (methInvs1 ++ methInvs2).toSet.toList)
+    case (State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1, nDecls1, methInvs1), State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, nDecls2, methInvs2)) => 
+      State(unionVarMap(vm1, vm2), eCtx1, (aenv1++aenv2).toSet.toList, (eenv1++eenv2).toSet.toList, (benv1++benv2).toSet.toList, (cenv1++cenv2).toSet.toList, (nDecls1 ++ nDecls2).toSet.toList, (methInvs1 ++ methInvs2).toSet.toList)
   }
 
   
@@ -447,7 +496,7 @@ object SSAKL {
   def extendAllVarsWithContextAndLabel(sctx:SCtx, tctx:TCtx, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
     st <- get
     st1 <- st match {
-      case State(vm0, eCtx, eenv, benv, cenv, nDecls, methInvs) => for {
+      case State(vm0, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs) => for {
         entries <- vm0.keySet.toList.traverse(v => for {
           v_lbl <- mkName(v, lbl)
         } yield (v, sctx, tctx, v_lbl ))
@@ -456,7 +505,7 @@ object SSAKL {
           case None => vm
           case Some(m) => vm + (v -> (m + (sctx -> (tctx, v_lbl))))
         }
-      }), eCtx, eenv, benv, cenv, nDecls, methInvs)
+      }), eCtx, aenv, eenv, benv, cenv, nDecls, methInvs)
     }
     _ <- put(st1)
   } yield ()
@@ -515,6 +564,7 @@ object SSAKL {
     }
   }
 
+  type AEnv = List[TCtx]
   type EEnv = List[TCtx] 
   type BEnv = List[(TCtx, TCtx)] 
   type CEnv = List[(TCtx, TCtx)]
@@ -522,9 +572,9 @@ object SSAKL {
 
   // return the domain of a mapping
 
-  def dom(m:List[(A,B)]):A = m.map({
+  def dom[A,B](m:List[(A,B)]):List[A] = m.map{
     case (a,b) => a
-  })
+  }
 
   // list of extractors
 
@@ -580,11 +630,13 @@ object SSAKL {
 
   // check whether a context is the last of a sequence
   def isLast(tctx:TCtx):Boolean = tctx match {
-    case TLast(_) => True
+    case TLast(_) => true
     case TTail(c) => isLast(c)
-    case _ => False
+    case _ => false
   }
   
+  // besides the eenv, cenv, and benv, we need to pass the list of all TCtxts in the given code excluding the phi locations.
+  // the reason that the < relation is non syntax-directed, we need to know what is the next sibling context to apply the transitivity rule!
   
   implicit def partialOrderTCtx(eenv:EEnv, benv:BEnv, cenv:CEnv):PartialOrder[TCtx] = new PartialOrder[TCtx]{
     override def partialCompare(x: TCtx, y: TCtx): Double = (x,y) match {
@@ -598,7 +650,7 @@ object SSAKL {
         val deenv = appDec(unTLast, eenv)
         val dbenv = appDec2(unTLast, benv) 
         val dcenv = appDec2(unTLast, cenv)
-        partialORderTCtx(deenv, dbenv, dcenv).partialCompare(ctx1,ctx2)
+        partialOrderTCtx(deenv, dbenv, dcenv).partialCompare(ctx1,ctx2)
       }
 
       // CtxOrdInd specialized for Head
@@ -606,18 +658,18 @@ object SSAKL {
         val deenv = appDec(unTHead, eenv)
         val dbenv = appDec2(unTHead, benv) 
         val dcenv = appDec2(unTHead, cenv)
-        partialORderTCtx(deenv, dbenv, dcenv).partialCompare(ctx1,ctx2)
+        partialOrderTCtx(deenv, dbenv, dcenv).partialCompare(ctx1,ctx2)
       }
 
       // CtxOrdSeq
-      case (THead(_), TTail(_)) if not ((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => -1.0
+      case (THead(_), TTail(_)) if !((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => -1.0
 
       // CtxOrdInd specialized for TTail
       case (TTail(ctx1), TTail(ctx2)) =>  {
         val deenv = appDec(unTTail, eenv)
         val dbenv = appDec2(unTTail, benv) 
         val dcenv = appDec2(unTTail, cenv)
-        partialORderTCtx(deenv, dbenv, dcenv).partialCompare(ctx1,ctx2)
+        partialOrderTCtx(deenv, dbenv, dcenv).partialCompare(ctx1,ctx2)
       }
 
       // CtxOrdSeq - dual 
@@ -628,11 +680,11 @@ object SSAKL {
         val deenv = appDec(unTThen, eenv)
         val dbenv = appDec2(unTThen, benv) 
         val dcenv = appDec2(unTThen, cenv)
-        partialORderTCtx(deenv, dbenv, dcenv).partialCompare(ctx1,ctx2)
+        partialOrderTCtx(deenv, dbenv, dcenv).partialCompare(ctx1,ctx2)
       }
       
       // CtxOrdThen 
-      case (TThen(c), TIfPostPhi) if last(c) && not ((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => -1.0
+      case (TThen(c), TIfPostPhi) if isLast(c) && !((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => -1.0
       // if not last, we need to apply the transtivity?
 
 
@@ -641,11 +693,11 @@ object SSAKL {
         val deenv = appDec(unTElse, eenv)
         val dbenv = appDec2(unTElse, benv) 
         val dcenv = appDec2(unTElse, cenv)
-        partialORderTCtx(deenv, dbenv, dcenv).partialCompare(ctx1,ctx2)
+        partialOrderTCtx(deenv, dbenv, dcenv).partialCompare(ctx1,ctx2)
       }
       
       // CtxOrdElse 
-      case (TElse(c), TIfPostPhi) if last(c) && not ((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => -1.0
+      case (TElse(c), TIfPostPhi) if isLast(c) && !((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => -1.0
       // if not last, we need to apply the transtivity?
 
       // CtxOrdThen - dual 
@@ -659,7 +711,7 @@ object SSAKL {
       case (TWhilePrePhi, TWhilePostPhi) => -1.0
 
       // CtxOrdWhileEntry2
-      case (TWhile(c), TWhilePrePhi) if last(c) && not ((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => -1.0
+      case (TWhile(c), TWhilePrePhi) if isLast(c) && !((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => -1.0
       // if not last, we need to apply the transtranstivitytivity?
 
       // CtxOrdInd specialized for TWhile
@@ -667,7 +719,7 @@ object SSAKL {
         val deenv = appDec(unTWhile, eenv)
         val dbenv = appDec2(unTWhile, benv) 
         val dcenv = appDec2(unTWhile, cenv)
-        partialORderTCtx(deenv, dbenv, dcenv).partialCompare(ctx1,ctx2)
+        partialOrderTCtx(deenv, dbenv, dcenv).partialCompare(ctx1,ctx2)
       }
 
       case (TWhile(_), TWhilePostPhi) => -1.0
@@ -750,20 +802,21 @@ object SSAKL {
   }
 
 
-  def Rlt(eenv:List[TCtx], ctx:TCtx, vm:VarMap, x:Name, default:Name):Name = R(eenv, ctx, vm, x, default, 
+  def Rlt(eenv:EEnv, benv:BEnv, cenv:CEnv, ctx:TCtx, vm:VarMap, x:Name):Option[Name] = R(eenv, benv, cenv, ctx, vm, x, 
     {
-      case ((tctx1, tctx2))  => (partialOrderTCtx.partialCompare(tctx1, tctx2) == -1.0)
+      case ((tctx1, tctx2))  => (partialOrderTCtx(eenv, benv, cenv).partialCompare(tctx1, tctx2) == -1.0)
     }
-  )
+  ) 
 
-  def Rleq(eenv:List[TCtx], ctx:TCtx, vm:VarMap, x:Name, default:Name):Name = R(eenv, ctx, vm, x, default, 
+  def Rleq(eenv:EEnv, benv:BEnv, cenv:CEnv, ctx:TCtx, vm:VarMap, x:Name):Option[Name] = R(eenv, benv, cenv, ctx, vm, x, 
     {
-      case ((tctx1, tctx2))  => ((partialOrderTCtx.partialCompare(tctx1, tctx2) == -1.0) || (partialOrderTCtx.partialCompare(tctx1, tctx2) == 0.0))
+      case ((tctx1, tctx2))  => ((partialOrderTCtx(eenv, benv, cenv).partialCompare(tctx1, tctx2) == -1.0) || (partialOrderTCtx(eenv,benv,cenv).partialCompare(tctx1, tctx2) == 0.0))
     }
   )
 
   /**
     * Compute the name from the lub of all the reachable context until ctx
+    *  it defers from the paper, which takes in a default value, we return None in case the set of contexts an empty set. The defaulting should be handled at the call site.
     *
     * @param eenv - exception throwing program contexts
     * @param benv - break statement contexts
@@ -771,12 +824,11 @@ object SSAKL {
     * @param ctx
     * @param vm
     * @param x
-    * @param default - default value in case of empty set.
     * @param cmp - modifier to switch between leq or lt
     * @return - return the name of the variable that is the most recent dominator of x
     */
-  def R(eenv:EEnv, benv:BEnv, cenv:CEnv, ctx:TCtx, vm:VarMap, x:Name, default:Name, cmp:(TCtx,TCtx) => Boolean):Name = vm.get(x) match {
-    case None => default
+  def R(eenv:EEnv, benv:BEnv, cenv:CEnv, ctx:TCtx, vm:VarMap, x:Name, cmp:(TCtx,TCtx) => Boolean):Option[Name] = vm.get(x) match {
+    case None => None
     case Some(trs) => {
       val tcvs = for { 
         (sctx, (tctx, tx)) <- trs.toList
@@ -791,7 +843,7 @@ object SSAKL {
       }
 
       tcvs match {
-        case Nil => default
+        case Nil => None
         case (tcv::tcvs) => tcvs.foldLeft(tcv)((x,y) => comb(x,y)) match {
           case (_, vx) => Some(vx)
         }
@@ -1043,7 +1095,7 @@ object SSAKL {
   def genVarDecls(implicit m:MonadError[SSAState, ErrorM]):SState[State, List[SSAStmt]] = for {
     st <- get
     stmts <- st match {
-      case State(vm, eCtx, eenv, benv, cenv, nestedDecls, methodInvs) => for {
+      case State(vm, eCtx, aenv, eenv, benv, cenv, nestedDecls, methodInvs) => for {
         tbl <- m.pure(mkTable(nestedDecls)) 
         ll  <- vm.toList.traverse( p => p match {
           case (x, ctxm) => tbl.get(x) match {
@@ -1109,7 +1161,7 @@ object SSAKL {
     case ExpName(name) => for {
       st <- get
       exp1 <- st match {
-        case State(vm, eCtx, eenv, benv, cenv, nDecls, methInvs) => Rlt(eenv, ctx, vm, name) match {
+        case State(vm, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs) => Rlt(eenv, benv, cenv, ctx, vm, name) match {
           case None => m.raiseError("SSA construction failed, Rlt failed during expression conversion.")
           case Some(name1) => m.pure(ExpName(name1))
         }
