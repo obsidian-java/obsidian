@@ -515,32 +515,165 @@ object SSAKL {
     }
   }
 
-  implicit val partialOrderTCtx:PartialOrder[TCtx] = new PartialOrder[TCtx]{
+  type EEnv = List[TCtx] 
+  type BEnv = List[(TCtx, TCtx)] 
+  type CEnv = List[(TCtx, TCtx)]
+
+
+  // return the domain of a mapping
+
+  def dom(m:List[(A,B)]):A = m.map({
+    case (a,b) => a
+  })
+
+  // list of extractors
+
+
+  def unTHead(tctx:TCtx):Option[TCtx] = tctx match {
+    case THead(c) => Some(c)
+    case _        => None
+  }
+
+  def unTLast(tctx:TCtx):Option[TCtx] = tctx match {
+    case TLast(c) => Some(c) 
+    case _        => None
+  }
+
+  def unTTail(tctx:TCtx):Option[TCtx] = tctx match {
+    case TTail(c) => Some(c)
+    case _        => None
+  }
+
+  def unTThen(tctx:TCtx):Option[TCtx] = tctx match {
+    case TThen(c) => Some(c)
+    case _        => None
+  } 
+   
+  def unTElse(tctx:TCtx):Option[TCtx] = tctx match {
+    case TElse(c) => Some(c)
+    case _        => None
+  }
+
+  def unTWhile(tctx:TCtx):Option[TCtx] = tctx match {
+    case TWhile(c) => Some(c)
+    case _         => None
+  }
+
+  def TTry(tctx:TCtx):Option[TCtx] = tctx match {
+    case TTry(c) => Some(c) 
+    case _       => None
+  }
+
+  def unTCatch(tctx:TCtx):Option[TCtx] = tctx match {
+    case TCatch(c) => Some(c)
+    case _         => None
+  }
+
+  def appDec(dec:TCtx => Option[TCtx], ts:List[TCtx]):List[TCtx] = ts.map(dec(_)).filter( x => !x.isEmpty).map({
+    case Some(c) => c
+  })
+
+  def appDec2(dec:TCtx => Option[TCtx], ts:List[(TCtx,TCtx)]):List[(TCtx,TCtx)] = ts.flatMap({ case (c1,c2) => (dec(c1), dec(c2)) match {
+    case (Some(c3), Some(c4)) => List((c3,c4))
+    case (_, _) => Nil
+  }})
+
+  // check whether a context is the last of a sequence
+  def isLast(tctx:TCtx):Boolean = tctx match {
+    case TLast(_) => True
+    case TTail(c) => isLast(c)
+    case _ => False
+  }
+  
+  
+  implicit def partialOrderTCtx(eenv:EEnv, benv:BEnv, cenv:CEnv):PartialOrder[TCtx] = new PartialOrder[TCtx]{
     override def partialCompare(x: TCtx, y: TCtx): Double = (x,y) match {
       case (_, _) if (eqv(x,y)) => 0.0
-      case (TBox, _) => -1.0
+      // CtxOrdHole
+      case (TBox, _) => -1.0 
       case (_, TBox) => 1.0
-      case (TLast(ctx1), TLast(ctx2)) => partialCompare(ctx1,ctx2)
 
-      case (THead(ctx1), THead(ctx2)) => partialCompare(ctx1,ctx2)
-      case (THead(_), TTail(_)) => -1.0
-      case (TTail(ctx1), TTail(ctx2)) => partialCompare(ctx1,ctx2)
-      case (TTail(_), THead(_)) => 1.0
+      // CtxOrdInd  specialized for Last
+      case (TLast(ctx1), TLast(ctx2)) => {
+        val deenv = appDec(unTLast, eenv)
+        val dbenv = appDec2(unTLast, benv) 
+        val dcenv = appDec2(unTLast, cenv)
+        partialORderTCtx(deenv, dbenv, dcenv).partialCompare(ctx1,ctx2)
+      }
 
-      case (TThen(ctx1), TThen(ctx2)) => partialCompare(ctx1, ctx2)
-      case (TThen(_), TIfPostPhi) => -1.0
-      case (TElse(ctx1), TElse(ctx2)) => partialCompare(ctx1, ctx2)
-      case (TElse(_), TIfPostPhi) => -1.0
-      case (TIfPostPhi, TThen(_)) => 1.0
-      case (TIfPostPhi, TElse(_)) => 1.0
+      // CtxOrdInd specialized for Head
+      case (THead(ctx1), THead(ctx2)) => {
+        val deenv = appDec(unTHead, eenv)
+        val dbenv = appDec2(unTHead, benv) 
+        val dcenv = appDec2(unTHead, cenv)
+        partialORderTCtx(deenv, dbenv, dcenv).partialCompare(ctx1,ctx2)
+      }
 
-      case (TWhilePrePhi, TWhile(_)) => -1.0
+      // CtxOrdSeq
+      case (THead(_), TTail(_)) if not ((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => -1.0
+
+      // CtxOrdInd specialized for TTail
+      case (TTail(ctx1), TTail(ctx2)) =>  {
+        val deenv = appDec(unTTail, eenv)
+        val dbenv = appDec2(unTTail, benv) 
+        val dcenv = appDec2(unTTail, cenv)
+        partialORderTCtx(deenv, dbenv, dcenv).partialCompare(ctx1,ctx2)
+      }
+
+      // CtxOrdSeq - dual 
+      case (TTail(_), THead(_))  => -partialCompare(y,x) 
+
+      // CtxOrdInd specialized for TThen
+      case (TThen(ctx1), TThen(ctx2)) => {
+        val deenv = appDec(unTThen, eenv)
+        val dbenv = appDec2(unTThen, benv) 
+        val dcenv = appDec2(unTThen, cenv)
+        partialORderTCtx(deenv, dbenv, dcenv).partialCompare(ctx1,ctx2)
+      }
+      
+      // CtxOrdThen 
+      case (TThen(c), TIfPostPhi) if last(c) && not ((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => -1.0
+      // if not last, we need to apply the transtivity?
+
+
+      // CtxOrdInd specialized for TElse
+      case (TElse(ctx1), TElse(ctx2)) => {
+        val deenv = appDec(unTElse, eenv)
+        val dbenv = appDec2(unTElse, benv) 
+        val dcenv = appDec2(unTElse, cenv)
+        partialORderTCtx(deenv, dbenv, dcenv).partialCompare(ctx1,ctx2)
+      }
+      
+      // CtxOrdElse 
+      case (TElse(c), TIfPostPhi) if last(c) && not ((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => -1.0
+      // if not last, we need to apply the transtivity?
+
+      // CtxOrdThen - dual 
+      case (TIfPostPhi, TThen(c)) => -partialCompare(y,x) 
+      case (TIfPostPhi, TElse(c)) => -partialCompare(y,x) 
+
+      // CtxOrdWhileEntry1 
+      case (TWhilePrePhi, TWhile(_)) => -1.0 // _ or Box? todo: check!!
+
+      // CtxOrdWhileExit2
       case (TWhilePrePhi, TWhilePostPhi) => -1.0
-      case (TWhile(_), TWhilePrePhi) => 1.0
-      case (TWhile(ctx1), TWhile(ctx2)) => partialCompare(ctx1, ctx2)
+
+      // CtxOrdWhileEntry2
+      case (TWhile(c), TWhilePrePhi) if last(c) && not ((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => -1.0
+      // if not last, we need to apply the transtranstivitytivity?
+
+      // CtxOrdInd specialized for TWhile
+      case (TWhile(ctx1), TWhile(ctx2)) => {
+        val deenv = appDec(unTWhile, eenv)
+        val dbenv = appDec2(unTWhile, benv) 
+        val dcenv = appDec2(unTWhile, cenv)
+        partialORderTCtx(deenv, dbenv, dcenv).partialCompare(ctx1,ctx2)
+      }
+
       case (TWhile(_), TWhilePostPhi) => -1.0
-      case (TWhilePostPhi, TWhilePrePhi) => 1.0
-      case (TWhilePostPhi, TWhile(_)) => 1.0
+      // CtxOrdWhileExit2 - dual
+      case (TWhilePostPhi, TWhilePrePhi) => -partialCompare(y,x) 
+      case (TWhilePostPhi, TWhile(c)) => -partialCompare(y,x) 
 
       case (TTry(ctx1), TTry(ctx2)) => partialCompare(ctx1, ctx2)
       case (TTry(_), TTryPeriPhi) => -1.0
@@ -567,12 +700,12 @@ object SSAKL {
     * 
     * It is a partial function since it has a partial order.
     * 
-    * For all ctx from the same program, the LUB (and GLB) exist
+    * For all ctx from the same program, the LUB exist
     * 
     * combine(x,y) finds the LUB of x and y, i.e. join
     */
 
-  implicit val semilatticeTCtx:Semilattice[TCtx] = new Semilattice[TCtx] {
+  implicit def semilatticeTCtx(eenv:EEnv, benv:BEnv, cenv:CEnv):Semilattice[TCtx] = new Semilattice[TCtx] {
     override def combine(x: TCtx, y: TCtx): TCtx = (x,y) match {
       case (_, _) if (eqTCtx.eqv(x,y)) => x 
       case (TBox, a) => a
@@ -617,13 +750,13 @@ object SSAKL {
   }
 
 
-  def Rlt(eenv:List[TCtx], ctx:TCtx, vm:VarMap, x:Name):Option[Name] = R(eenv, ctx, vm, x, 
+  def Rlt(eenv:List[TCtx], ctx:TCtx, vm:VarMap, x:Name, default:Name):Name = R(eenv, ctx, vm, x, default, 
     {
       case ((tctx1, tctx2))  => (partialOrderTCtx.partialCompare(tctx1, tctx2) == -1.0)
     }
   )
 
-    def Rleq(eenv:List[TCtx], ctx:TCtx, vm:VarMap, x:Name):Option[Name] = R(eenv, ctx, vm, x, 
+  def Rleq(eenv:List[TCtx], ctx:TCtx, vm:VarMap, x:Name, default:Name):Name = R(eenv, ctx, vm, x, default, 
     {
       case ((tctx1, tctx2))  => ((partialOrderTCtx.partialCompare(tctx1, tctx2) == -1.0) || (partialOrderTCtx.partialCompare(tctx1, tctx2) == 0.0))
     }
@@ -632,36 +765,41 @@ object SSAKL {
   /**
     * Compute the name from the lub of all the reachable context until ctx
     *
-    * @param eenv
+    * @param eenv - exception throwing program contexts
+    * @param benv - break statement contexts
+    * @param cenv - continue statement contexts
     * @param ctx
     * @param vm
     * @param x
+    * @param default - default value in case of empty set.
     * @param cmp - modifier to switch between leq or lt
-    * @return optional target name, though it should never be None
+    * @return - return the name of the variable that is the most recent dominator of x
     */
-  def R(eenv:List[TCtx], ctx:TCtx, vm:VarMap, x:Name, cmp:(TCtx,TCtx) => Boolean):Option[Name] = vm.get(x) match {
-    case None => None // though this should never happen
+  def R(eenv:EEnv, benv:BEnv, cenv:CEnv, ctx:TCtx, vm:VarMap, x:Name, default:Name, cmp:(TCtx,TCtx) => Boolean):Name = vm.get(x) match {
+    case None => default
     case Some(trs) => {
       val tcvs = for { 
         (sctx, (tctx, tx)) <- trs.toList
-        if (cmp(tctx, ctx) && (!block(tctx, eenv, ctx)))
+        if (cmp(tctx, ctx))
       } yield (tctx, tx)
 
       // partial function, but lub should be in the set.
       def comb(px:(TCtx,Name), py:(TCtx,Name)):(TCtx, Name) = (px, py) match {
-        case ((cx, vx), (cy, vy)) if (semilatticeTCtx.combine(cx, cy) == cx) => (cx, vx)
-        case ((cx, vx), (cy, vy)) if (semilatticeTCtx.combine(cx, cy) == cy) => (cy, vy)
+        case ((cx, vx), (cy, vy)) if (semilatticeTCtx(eenv, benv, cenv).combine(cx, cy) == cx) => (cx, vx)
+        case ((cx, vx), (cy, vy)) if (semilatticeTCtx(eenv, benv, cenv).combine(cx, cy) == cy) => (cy, vy)
         
       }
 
       tcvs match {
-        case Nil => None // this should not happen.
+        case Nil => default
         case (tcv::tcvs) => tcvs.foldLeft(tcv)((x,y) => comb(x,y)) match {
           case (_, vx) => Some(vx)
         }
       }
     }
   }
+
+  /*
 
   def block(src:TCtx, eenv:List[TCtx], tar:TCtx):Boolean = {
     val eenv1 = for { 
@@ -675,7 +813,7 @@ object SSAKL {
     val eenvCl = closure(eenv)
     eenvCl.contains(src)
   }
-
+  */
   /**
     * Building a closure of a set of (blocking) contexts
     *  
@@ -716,6 +854,7 @@ object SSAKL {
     * @return the closture of the list of contexts in the blockage
     */
   
+    /*
   def closure(curr:List[TCtx]):List[TCtx] = {
     val next = go(curr, curr.toSet).toSet
 
@@ -877,6 +1016,8 @@ object SSAKL {
     }), (TCatch(_))::ctrs)
     case TTryPostPhi => None
   }
+  */
+
 
   /**
     * kmethodDecl - converts a method to SSA method declaration
