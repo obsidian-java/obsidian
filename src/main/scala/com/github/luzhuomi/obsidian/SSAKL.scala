@@ -377,6 +377,7 @@ object SSAKL {
     * @param m
     * @return
     */
+  /*
   def addeenv(tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
     st <- get
     st1 <- m.pure(st match {
@@ -385,7 +386,7 @@ object SSAKL {
     _  <- put(st1)
   } yield ()
 
-  
+  */
   
   /**
     * addNestedVarDecls - add an entry to the nested var decls in the state
@@ -427,6 +428,13 @@ object SSAKL {
     _  <- put(st1)
   } yield ()
   
+  /**
+    * addAEnv - add an context to the list of all program context env
+    *
+    * @param tctx 
+    * @param m
+    * @return
+    */
   def addAEnv(tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get 
     st1  <- m.pure(st match {
@@ -439,6 +447,15 @@ object SSAKL {
   } yield ()
 
 
+  /**
+    * addEEv - add the given context to the list of throwing context in the state
+    *
+    * @param tctx
+    * @param m
+    * @return
+  */
+  
+
   def addEEnv(tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get 
     st1  <- m.pure(st match {
@@ -450,6 +467,14 @@ object SSAKL {
     _  <- put(st1)
   } yield ()
 
+  /**
+    * addBEnv - and a pair of target contexts into the break environment
+    *
+    * @param bctx - context where the break statement is 
+    * @param tctx - context where the while/switch statement that the break statement is targeting at
+    * @param m
+    * @return
+    */
 
   def addBEnv(bctx:TCtx, tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get 
@@ -461,6 +486,16 @@ object SSAKL {
     })
     _  <- put(st1)
   } yield ()
+
+  /**
+    * addCEnv - and a pair of target contexts into the continue environment
+    *
+    * @param bctx - context where the continue statement is 
+    * @param tctx - context where the while statement that the continue statement is targeting at
+    * @param m
+    * @return
+    */
+
 
   def addCEnv(bctx:TCtx, tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get 
@@ -634,6 +669,13 @@ object SSAKL {
     case TTail(c) => isLast(c)
     case _ => false
   }
+
+  
+  /** follow - get the following program context 
+   *
+   * 
+   */
+  def follow(tctx:TCtx, aenv:AEnv):Option[TCtx] = None // todo
   
   // besides the eenv, cenv, and benv, we need to pass the list of all TCtxts in the given code excluding the phi locations.
   // the reason that the < relation is non syntax-directed, we need to know what is the next sibling context to apply the transitivity rule!
@@ -689,8 +731,11 @@ object SSAKL {
       
       // CtxOrdThen 
       case (TThen(c), TIfPostPhi) if isLast(c) && !((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => -1.0
-      // if not last, we need to apply the transtivity?
-
+      // if not last, we need to apply the transtivity
+      case (TThen(c), TIfPostPhi) if !isLast(c) && !((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => follow(c, appDec(unTThen, aenv)) match {
+        case Some(n) => partialOrderTCtx(aenv, eenv, benv, cenv).partialCompare(TThen(n), TIfPostPhi)
+        case None  => Double.NaN
+      }
 
       // CtxOrdInd specialized for TElse
       case (TElse(ctx1), TElse(ctx2)) => {
@@ -703,7 +748,11 @@ object SSAKL {
       
       // CtxOrdElse 
       case (TElse(c), TIfPostPhi) if isLast(c) && !((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => -1.0
-      // if not last, we need to apply the transtivity?
+      // if not last, we need to apply the transtivity
+      case (TElse(c), TIfPostPhi) if !isLast(c) && !((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => follow(c, appDec(unTElse, aenv)) match {
+        case Some(n) => partialOrderTCtx(aenv, eenv, benv, cenv).partialCompare(TElse(n), TIfPostPhi)
+        case None  => Double.NaN
+      }
 
       // CtxOrdThen - dual 
       case (TIfPostPhi, TThen(c)) => -partialCompare(y,x) 
@@ -717,7 +766,12 @@ object SSAKL {
 
       // CtxOrdWhileEntry2
       case (TWhile(c), TWhilePrePhi) if isLast(c) && !((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => -1.0
-      // if not last, we need to apply the transtranstivitytivity?
+      // if not last, we need to apply the transtivity
+      case (TWhile(c), TWhilePrePhi) if !isLast(c) && !((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => follow(c, appDec(unTWhile, aenv)) match {
+        case Some(n) => partialOrderTCtx(aenv, eenv, benv, cenv).partialCompare(TWhile(n), TWhilePrePhi)
+        case None  => Double.NaN
+      }
+      // refactoring frontier
 
       // CtxOrdInd specialized for TWhile
       case (TWhile(ctx1), TWhile(ctx2)) => {
@@ -728,7 +782,7 @@ object SSAKL {
         partialOrderTCtx(daenv, deenv, dbenv, dcenv).partialCompare(ctx1,ctx2)
       }
 
-      case (TWhile(_), TWhilePostPhi) => -1.0
+      case (TWhile(_), TWhilePostPhi) => -1.0 
       // CtxOrdWhileExit2 - dual
       case (TWhilePostPhi, TWhilePrePhi) => -partialCompare(y,x) 
       case (TWhilePostPhi, TWhile(c)) => -partialCompare(y,x) 
@@ -1427,7 +1481,7 @@ object SSAKL {
           _  <- addAEnv(tctx)
         lbl  <- toLbl(tctx)
         exp1 <- kexp(exp, tctx)
-        _    <- addeenv(tctx)
+        _    <- addEEnv(tctx)
         _    <- setECtx(tctx)
       } yield SSABlock(lbl, SSAThrow(exp1))
 
@@ -1474,7 +1528,7 @@ object SSAKL {
           phis_post <- mkPhi(stTryOut, stCatchOut, lbl3)
           _         <- extendAllVarsWithContextAndLabel(ctx, tctx3, lbl3)
           _         <- setECtx(tctx)
-          _         <- eenvFromState(st).traverse( ctx => addeenv(ctx))
+          _         <- eenvFromState(st).traverse( ctx => addEEnv(ctx))
         } yield SSABlock(lbl, SSATry(try_stmts, phis_peri, param, catch_stmts, phis_post))
       } 
       case Try(_, Nil, _) => m.raiseError("SSA construction failed, there is no catch in a try statement")
