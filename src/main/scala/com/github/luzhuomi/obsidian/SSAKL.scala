@@ -665,21 +665,11 @@ object SSAKL {
   }})
 
   // check whether a context is the last of a sequence, w.r.t. to the list all program contexts in the same immediate lexical scope
-  def isLast(tctx:TCtx, aenv:AEnv):Boolean = tctx match {
-    case TLast(c) => { 
-      val daenv = appDec(unTLast, aenv) 
-      c match {
-        case TBox => true 
-        case TIfPostPhi => true
-        case TWhilePostPhi => true 
-        case TTryPostPhi => true 
-        case _ => false
-      }
-    }
-    case TTail(c) => isLast(c, appDec(unTTail, aenv))
-    case _ => false
-  }
 
+  def isLast(tctx:TCtx, aenv:AEnv):Boolean = follow(tctx,aenv) match {
+    case None => true 
+    case Some(_) => false
+  }
 
   def ifElseEnv(aenv:AEnv):Boolean = aenv match {
     case (TThen(_)) :: tl => true 
@@ -722,24 +712,17 @@ object SSAKL {
    */
   
   def follow(tctx:TCtx, aenv:AEnv):Option[TCtx] = tctx match {
-    case TBox => None // lift the ones from TLast here?
+    case TBox if ifElseEnv(aenv) => Some(TIfPostPhi)
+    case TBox if whileEnv(aenv) => Some(TWhilePostPhi)
+    case TBox if tryEnv(aenv) => Some(TTryPostPhi)
+    case TBox if seqEnv(aenv) => Some(TTail(TBox))
+    case TBox if aenv.length > 0 => Some(TLast(TBox))
+    case TBox => None
     case TLast(c) => {
       val daenv = appDec(unTLast, aenv)         
-      c match {
-        case TBox if ifElseEnv(daenv) => { // not a simple statement
-          Some(TLast(TIfPostPhi))
-        }
-        case TBox if whileEnv(daenv) => {
-          Some(TLast(TWhilePostPhi))
-        }
-        case TBox if tryEnv(daenv) => {
-          Some(TLast(TTryPostPhi))
-        }
-        case TBox => None // what else can it be? we don't consider nested { }
-        case _  => follow(c, daenv) match {
-          case Some(n) => Some(TLast(n))
-          case None => None
-        }
+      follow(c,daenv) match {
+        case Some(n) => Some(TLast(n))
+        case None => None
       }
     }
     case THead(c) => Some(TTail(TBox)) // fast-forward to the tail without stepping through c
