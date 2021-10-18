@@ -703,29 +703,95 @@ object SSAKL {
     case _ => false
   }
 
+  def seqEnv(aenv:AEnv):Boolean = aenv match {
+    case THead(_) :: tl => true
+    case TTail(_) :: tl => true 
+    case _ => false
+  }
+
+  def lastEnv(aenv:AEnv):Boolean = aenv match {
+    case TLast(_) :: tl => true
+    case _ => false
+  }
+
   // refactoring frontier
   // isLast(c) == true iff follow(c) == None
   /** follow - get the following program context 
    *
-   * 
+   * follow is only called when tctx is not in eenv ++ dom(benv) ++ dom(cenv)
    */
   
   def follow(tctx:TCtx, aenv:AEnv):Option[TCtx] = tctx match {
+    case TBox => None // lift the ones from TLast here?
     case TLast(c) => {
       val daenv = appDec(unTLast, aenv)         
-      (c,daenv) match {
-        case (TBox, _) if ifElseEnv(daenv) => { // not a simple statement
+      c match {
+        case TBox if ifElseEnv(daenv) => { // not a simple statement
           Some(TLast(TIfPostPhi))
         }
-        case (TBox, _) if whileEnv(daenv) => {
+        case TBox if whileEnv(daenv) => {
           Some(TLast(TWhilePostPhi))
         }
-        case (TBox, _) if tryEnv(daenv) => {
+        case TBox if tryEnv(daenv) => {
           Some(TLast(TTryPostPhi))
         }
-        case (TBox, _) => None // what else can it be? we don't consider nested { }
-      } 
+        case TBox => None // what else can it be? we don't consider nested { }
+        case _  => follow(c, daenv) match {
+          case Some(n) => Some(TLast(n))
+          case None => None
+        }
+      }
     }
+    case THead(c) => Some(TTail(TBox)) // fast-forward to the tail without stepping through c
+    case TTail(c) => {
+      val daenv = appDec(unTTail, aenv)
+      follow(c, daenv) match {
+        case Some(n) => Some(TTail(n))
+        case None => None
+      }
+    }
+    case TThen(c) => {
+      val daenv = appDec(unTThen, aenv)
+      follow(c, daenv) match  {
+        case Some(n) => Some(TThen(n))
+        case None => Some(TIfPostPhi)
+      }
+    }
+    case TElse(c) => {
+      val daenv = appDec(unTElse, aenv)
+      follow(c, daenv) match {
+        case Some(n) => Some(TElse(n))
+        case None => Some(TIfPostPhi)
+      }
+    }
+    case TIfPostPhi => None
+    case TTry(c) => {
+      val daenv = appDec(unTTry, aenv)
+      follow(c, daenv) match {
+        case Some(n) => Some(TTry(n))
+        case None => Some(TTryPostPhi)
+      }
+    }
+    case TTryPeriPhi => follow(TCatch(TBox), aenv)
+    
+    case TCatch(c) => {
+      val daenv = appDec(unTCatch, aenv)
+      follow(c, daenv) match {
+        case Some(n) => Some(TCatch(n))
+        case None => Some(TTryPostPhi)
+      }
+    }
+    case TTryPostPhi => None
+    case TWhile(c) => {
+      val daenv = appDec(unTCatch, aenv) 
+      follow(c, daenv) match {
+        case Some(n) => Some(TWhile(n))
+        case None => Some(TWhilePostPhi) // there is no statement between TWhilePrePhi and TWhilePostPhi 
+      }
+    }
+    case TWhilePrePhi => Some(TWhilePostPhi)
+    case TWhilePostPhi => None
+    
   } 
   // besides the eenv, cenv, and benv, we need to pass the list of all TCtxts in the given code excluding the phi locations.
   // the reason that the < relation is non syntax-directed, we need to know what is the next sibling context to apply the transitivity rule!
@@ -864,7 +930,7 @@ object SSAKL {
       case (TTry(c), TTryPeriPhi) if eenv.contains(x) => -1.0 // (CtxOrdTry1)
 
       // apply transtivity until we can fire (CtxOrdTry1) or fail at the last 
-      case (TTry(c), TTryPeriPhi) if !isLast(c, appDec(unTTry, aenv)) => follow(c, appDec(unTTry, aenv)) match {
+      case (TTry(c), TTryPeriPhi) if !isLast(c, appDec(unTTry, aenv)) && !((dom(benv) ++ dom(cenv)).contains(x)) => follow(c, appDec(unTTry, aenv)) match {
         case Some(n) => partialOrderTCtx(aenv, eenv, benv, cenv).partialCompare(TTry(n), TTryPeriPhi)
         case None  => Double.NaN
       }
@@ -873,7 +939,7 @@ object SSAKL {
 
       case (TTry(c1), TCatch(c2)) if eenv.contains(x) => -1.0 // (CtxOrdTry1) and (CtxOrdCatch1) with transitivity
       // apply transtivity until we can fire previous case or fail at the last 
-      case (TTry(c1), TCatch(c2)) if !isLast(c1, appDec(unTTry, aenv)) => follow(c1, appDec(unTTry, aenv)) match {
+      case (TTry(c1), TCatch(c2)) if !isLast(c1, appDec(unTTry, aenv)) && !((dom(benv) ++ dom(cenv)).contains(x)) => follow(c1, appDec(unTTry, aenv)) match {
         case Some(n1) => partialOrderTCtx(aenv, eenv, benv, cenv).partialCompare(TTry(n1), TCatch(c2))
         case None => Double.NaN
       }
