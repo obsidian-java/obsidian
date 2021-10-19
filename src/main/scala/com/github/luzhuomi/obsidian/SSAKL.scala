@@ -318,7 +318,7 @@ object SSAKL {
 
       override def handleErrorWith[A](fa: SSAResult[A])(f: ErrorM => SSAResult[A]): SSAResult[A] =
         fa match {
-          case SSAError(s) => f(s)
+          case SS(AError(s) => f(s)
           case SSAOk(a) => SSAOk(a)
         }
     }
@@ -1005,8 +1005,12 @@ object SSAKL {
     * 
     * maybe we need to define a version that return Option[TCtx]? how to signal failure
     * 
-    * this function is partial, probably not very useful.
+    * this function is partial, probably not very useful. 
+    * Semilattice[A] assume that the set of values in A is a semilattice. but the entire set of TCtx is not a semilattice, 
+    * Only some subset of TCtx satisfies the criteria of semilattice.
     */
+
+  /*
 
   implicit def semilatticeTCtx(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv):Semilattice[TCtx] = new Semilattice[TCtx] {
     override def combine(x: TCtx, y: TCtx): TCtx = (x,y) match {
@@ -1186,7 +1190,29 @@ object SSAKL {
     }
 
   }
+  */
 
+  /**
+    * combine - return the lub from the set
+    *
+    * @param cs
+    * @return
+    */
+  def combine[A](cs:List[(TCtx,A)], aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv) :List[(TCtx,A)] = cs match {
+    case Nil => Nil
+    case x::Nil => x::Nil
+    case (x::xs) => {
+      val ys = xs.filter(  y => !(partialOrderTCtx(aenv,eenv,benv, cenv).partialCompare(y._1,x._1) == -1.0))
+      if (ys.exists( y => partialOrderTCtx(aenv,eenv,benv,cenv).partialCompare(x._1,y._1) == -1.0))
+      { 
+        combine(ys, aenv, eenv, benv, cenv) 
+      }
+      else {
+        x::combine(ys, aenv, eenv, benv, cenv)
+      }
+      
+    }
+  } 
 
   def Rlt(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv, ctx:TCtx, vm:VarMap, x:Name):Option[Name] = R(aenv, eenv, benv, cenv, ctx, vm, x, 
     {
@@ -1215,7 +1241,7 @@ object SSAKL {
     * @param cmp - modifier to switch between leq or lt
     * @return - return the name of the variable that is the most recent dominator of x
     */
-  def R(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv, ctx:TCtx, vm:VarMap, x:Name, cmp:(TCtx,TCtx) => Boolean):Option[Name] = vm.get(x) match {
+  def R(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv, ctx:TCtx, vm:VarMap, x:Name, cmp:(TCtx,TCtx) => Boolean):Option[Name] = vm.get(x) match { // perhaps we should report the error properly
     case None => None
     case Some(trs) => {
       val tcvs = for { 
@@ -1223,6 +1249,7 @@ object SSAKL {
         if (cmp(tctx, ctx))
       } yield (tctx, tx)
 
+      /* not using the builtin semilattice class
       // partial function, but lub should be in the set.
       def comb(px:(TCtx,Name), py:(TCtx,Name)):(TCtx, Name) = (px, py) match {
         case ((cx, vx), (cy, vy)) if (semilatticeTCtx(aenv, eenv, benv, cenv).combine(cx, cy) == cx) => (cx, vx)
@@ -1235,7 +1262,13 @@ object SSAKL {
         case (tcv::tcvs) => tcvs.foldLeft(tcv)((x,y) => comb(x,y)) match {
           case (_, vx) => Some(vx)
         }
+      }      
+      */
+      combine(tcvs, aenv,eenv, benv,cenv) match {
+        case (lub,n)::Nil => Some(n)
+        case _ => None
       }
+
     }
   }
 
