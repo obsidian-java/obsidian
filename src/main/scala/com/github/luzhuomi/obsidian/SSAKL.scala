@@ -256,15 +256,15 @@ object SSAKL {
     methodInvs: List[(TCtx, MethodInvocation)]
   )
 
-  def eenvFromState(st:State):List[TCtx] = st match {
+  def eenvFromState(st:State):EEnv = st match {
     case State(_, _, aenv, eenv, _, _, _, _) => eenv
   }
 
-  def benvFromState(st:State):List[(TCtx,TCtx)] = st match {
+  def benvFromState(st:State):BEnv = st match {
     case State(_, _, aenv, _, benv, _, _, _) => benv
   }
 
-  def cenvFromState(st:State):List[(TCtx,TCtx)] = st match {
+  def cenvFromState(st:State):CEnv = st match {
     case State(_, _, aenv, _, _, cenv, _, _) => cenv
   }
 
@@ -480,7 +480,7 @@ object SSAKL {
     st <- get 
     st1  <- m.pure(st match {
       case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs) => {
-        val benv1 = (benv.toSet + ((bctx,tctx))).toList
+        val benv1 = (benv.toSet + ((bctx,Some(tctx)))).toList
         State(varMap, eCtx, aenv, eenv, benv1, cenv, nDecls, methInvs)
       }
     })
@@ -501,7 +501,7 @@ object SSAKL {
     st <- get 
     st1  <- m.pure(st match {
       case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs) => {
-        val cenv1 = (cenv.toSet + ((bctx,tctx))).toList
+        val cenv1 = (cenv.toSet + ((bctx,Some(tctx)))).toList
         State(varMap, eCtx, aenv, eenv, benv, cenv1, nDecls, methInvs)
       }
     })
@@ -601,8 +601,23 @@ object SSAKL {
 
   type AEnv = List[TCtx]
   type EEnv = List[TCtx] 
-  type BEnv = List[(TCtx, TCtx)] 
-  type CEnv = List[(TCtx, TCtx)]
+  type BEnv = List[(TCtx, Option[TCtx])] // when it is None, it means out of the current lexical scope, do we need to keep track of the list of "negative" ctx constructors? 
+  type CEnv = List[(TCtx, Option[TCtx])] 
+  // the reason that it might go out of scope when we apply the CtxOrdInd rule with deconstructor, 
+  /*
+
+  Let benv = [ (TWhile(TThen(TLast(TBox)), TBox]
+
+
+  TThen(TLast(TBox)) <_appDec2(unTWhile, benv) TIfPostPhi
+  --------------------------------------------------------
+  TWhile(TThen(TLast(TBox))) <_benv TWhile(TIfPostPhi)
+
+  which should not whole
+
+  the old implemntation of appDec2(unTWhile, benv) yields an empty list, coz the codomain does not contain TWhile tag.
+  the refined implementation, yields a non-empty list [(TThen(TLast(TBox)), Nothing)]
+  */
 
 
   // return the domain of a mapping
@@ -659,10 +674,17 @@ object SSAKL {
     case None => Nil
   })
 
-  def appDec2(dec:TCtx => Option[TCtx], ts:List[(TCtx,TCtx)]):List[(TCtx,TCtx)] = ts.flatMap({ case (c1,c2) => (dec(c1), dec(c2)) match {
-    case (Some(c3), Some(c4)) => List((c3,c4))
-    case (_, _) => Nil
-  }})
+  def appDec2(dec:TCtx => Option[TCtx], ts:BEnv):BEnv = ts.flatMap({ 
+    case (c1,Some(c2)) => (dec(c1), dec(c2)) match {
+      case (Some(c3), Some(c4)) => List((c3,Some(c4)))
+      case (Some(c3), None) => List((c3,None))
+      case (None, _) => Nil
+    }
+    case (c1, None) => dec(c1) match {
+      case Some(c3) => List((c3, None))
+      case None => Nil
+    }
+  })
 
   // check whether a context is the last of a sequence, w.r.t. to the list all program contexts in the same immediate lexical scope
 
@@ -704,7 +726,7 @@ object SSAKL {
     case _ => false
   }
 
-  // refactoring frontier
+
   // isLast(c) == true iff follow(c) == None
   /** follow - get the following program context 
    *
@@ -859,6 +881,7 @@ object SSAKL {
 
       // CtxOrdThen - dual 
       case (TIfPostPhi, TThen(c)) => -partialCompare(y,x) 
+       // CtxOrdElse - dual 
       case (TIfPostPhi, TElse(c)) => -partialCompare(y,x) 
 
       // CtxOrdWhileEntry1 
@@ -870,7 +893,7 @@ object SSAKL {
       // CtxOrdWhileEntry2
       case (TWhile(c), TWhilePrePhi) if isLast(c, appDec(unTWhile, aenv)) && !((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => -1.0
       case (TWhile(c), TWhilePrePhi) if isLast(c, appDec(unTWhile, aenv)) && (eenv.contains(x)) => Double.NaN
-      case (TWhile(c), TWhilePrePhi) if isLast(c, appDec(unTWhile, aenv)) && (dom(cenv.filter({case ((_,ctx)) => ctx == TBox})).contains(x)) => -1.0 // CtxOrdWhileEntry3
+      case (TWhile(c), TWhilePrePhi) if isLast(c, appDec(unTWhile, aenv)) && (dom(cenv.filter({case ((_,ctx)) => ctx == Some(TBox)})).contains(x)) => -1.0 // CtxOrdWhileEntry3
       case (TWhile(c), TWhilePrePhi) if isLast(c, appDec(unTWhile, aenv)) => Double.NaN   
       // if not last, we need to apply the transtivity
       case (TWhile(c), TWhilePrePhi) if !isLast(c, appDec(unTWhile, aenv)) && !((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => follow(c, appDec(unTWhile, aenv)) match {
@@ -878,7 +901,7 @@ object SSAKL {
         case None  => Double.NaN
       }
       case (TWhile(c), TWhilePrePhi) if !isLast(c, appDec(unTWhile, aenv)) && (eenv.contains(x)) => Double.NaN // is this possible?
-      case (TWhile(c), TWhilePrePhi) if !isLast(c, appDec(unTWhile, aenv)) && (dom(cenv.filter({case ((_,ctx)) => ctx == TBox})).contains(x)) => -1.0 // CtxOrdWhileEntry3, is this possible?
+      case (TWhile(c), TWhilePrePhi) if !isLast(c, appDec(unTWhile, aenv)) && (dom(cenv.filter({case ((_,ctx)) => ctx == Some(TBox)})).contains(x)) => -1.0 // CtxOrdWhileEntry3, is this possible?
       case (TWhile(c), TWhilePrePhi) if !isLast(c, appDec(unTWhile, aenv)) => Double.NaN // is this possible?
 
 
@@ -894,7 +917,7 @@ object SSAKL {
 
 
       case (TWhile(c), TWhilePostPhi) if eenv.contains(x) => Double.NaN 
-      case (TWhile(c), TWhilePostPhi) if dom((benv ++ cenv).filter({case ((_,ctx)) => ctx != TBox})).contains(x) => Double.NaN 
+      case (TWhile(c), TWhilePostPhi) if dom((benv ++ cenv).filter({case ((_,ctx)) => ctx != Some(TBox)})).contains(x) => Double.NaN 
       case (TWhile(c), TWhilePostPhi) => -1.0 // (CtxOrdWhileExit1) and (CtxOrdWhileEntry2) (CtxOrdWhileEntry3) with transivitity 
       // CtxOrdWhileExit2 - dual
       case (TWhilePostPhi, TWhilePrePhi) => -partialCompare(y,x) 
@@ -979,47 +1002,186 @@ object SSAKL {
     * For all ctx from the same program, the LUB exist
     * 
     * combine(x,y) finds the LUB of x and y, i.e. join
+    * 
+    * maybe we need to define a version that return Option[TCtx]? how to signal failure
+    * 
+    * this function is partial, probably not very useful.
     */
 
   implicit def semilatticeTCtx(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv):Semilattice[TCtx] = new Semilattice[TCtx] {
     override def combine(x: TCtx, y: TCtx): TCtx = (x,y) match {
       case (_, _) if (eqTCtx.eqv(x,y)) => x 
+      // CtxOrdHole
       case (TBox, a) => a
       case (a, TBox) => a
-      case (TLast(ctx1), TLast(ctx2)) => TLast(combine(ctx1, ctx2))
+      // CtxOrdInd specialized for Last
+      case (TLast(ctx1), TLast(ctx2)) => {
+        val daenv = appDec(unTLast, aenv)
+        val deenv = appDec(unTLast, eenv)
+        val dbenv = appDec2(unTLast, benv) 
+        val dcenv = appDec2(unTLast, cenv)
+        TLast(semilatticeTCtx(daenv, deenv, dbenv, dcenv).combine(ctx1, ctx2))
+      }
 
-      case (THead(ctx1), THead(ctx2)) => THead(combine(ctx1, ctx2))
-      case (THead(_), TTail(_)) => y 
-      case (TTail(ctx1), TTail(ctx2)) => TTail(combine(ctx1, ctx2))
-      case (TTail(_), THead(_)) => x
-      
-      case (TThen(ctx1), TThen(ctx2)) => TThen(combine(ctx1, ctx2))
-      case (TThen(_), TIfPostPhi) => TIfPostPhi 
-      case (TElse(ctx1), TElse(ctx2)) => TElse(combine(ctx1, ctx2))
-      case (TElse(_), TIfPostPhi) => TIfPostPhi
+      // CtxOrdInd specialized for Head
+      case (THead(ctx1), THead(ctx2)) => {
+        val daenv = appDec(unTHead, aenv)
+        val deenv = appDec(unTHead, eenv)
+        val dbenv = appDec2(unTHead, benv) 
+        val dcenv = appDec2(unTHead, cenv)
+        THead(semilatticeTCtx(daenv, deenv, dbenv, dcenv).combine(ctx1, ctx2))
+      }
+      // CtxOrdSeq 
+      case (THead(_), TTail(_)) if !((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => y
+      // what if x is in eenv or dom of benv and cenv? 
+      // how to ensure this never happen?
 
-      case (TWhilePrePhi, TWhile(_)) => y 
+      // CtxOrdInd specialized for Tail 
+      case (TTail(ctx1), TTail(ctx2)) => {
+        val daenv = appDec(unTTail, aenv)
+        val deenv = appDec(unTTail, eenv)
+        val dbenv = appDec2(unTTail, benv) 
+        val dcenv = appDec2(unTTail, cenv)
+        TTail(semilatticeTCtx(daenv, deenv, dbenv, dcenv).combine(ctx1, ctx2))
+      }
+
+      // CtxOrdSeq - dual
+      case (TTail(_), THead(_)) => combine(y, x) 
+
+      // CtxOrdInd specialized for Then      
+      case (TThen(ctx1), TThen(ctx2)) => {
+        val daenv = appDec(unTThen, aenv)
+        val deenv = appDec(unTThen, eenv)
+        val dbenv = appDec2(unTThen, benv) 
+        val dcenv = appDec2(unTThen, cenv)
+        TThen(semilatticeTCtx(daenv, deenv, dbenv, dcenv).combine(ctx1, ctx2))
+      } 
+
+      // CtxOrdThen
+      case (TThen(c), TIfPostPhi) if isLast(c, appDec(unTThen, aenv)) && !((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => TIfPostPhi
+      // if c in env or dom of benv and cenv? 
+      // how to ensure this never happen?
+
+      // if not last, we apply transtivity
+      case (TThen(c), TIfPostPhi) if !isLast(c, appDec(unTThen, aenv)) && !((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => follow(c, appDec(unTThen, aenv)) match {
+        case Some(n) => semilatticeTCtx(aenv, eenv, benv, cenv).combine(TThen(n), TIfPostPhi)
+        // case None => // we failed?
+      }
+
+      // CtxOrdInd specialized for Else      
+      case (TElse(ctx1), TElse(ctx2)) => { 
+        val daenv = appDec(unTElse, aenv)
+        val deenv = appDec(unTElse, eenv)
+        val dbenv = appDec2(unTElse, benv) 
+        val dcenv = appDec2(unTElse, cenv)
+        TElse(semilatticeTCtx(daenv, deenv, dbenv, dcenv).combine(ctx1, ctx2))
+      }
+
+
+      case (TElse(c), TIfPostPhi) if isLast(c, appDec(unTElse, aenv)) && !((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => TIfPostPhi
+      // if c in env or dom of benv and cenv? 
+      // how to ensure this never happen?
+
+      // if not last, we need to apply the transtivity until we find the last
+      case (TElse(c), TIfPostPhi) if !isLast(c, appDec(unTElse, aenv)) && !((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => follow(c, appDec(unTElse, aenv)) match {
+        case Some(n) => semilatticeTCtx(aenv, eenv, benv, cenv).combine(TElse(n), TIfPostPhi)
+        // case None  => // we failed?
+      }
+      // CtxOrdThen - dual
+      case (TIfPostPhi, TThen(c)) => combine(TThen(c), TIfPostPhi)
+      // CtxOrdThen - dual
+      case (TIfPostPhi, TElse(c)) => combine(TElse(c), TIfPostPhi)
+
+      // CtxOrdWhileEntry1
+      case (TWhilePrePhi, TWhile(_)) => y
+
+      // CtxOrdWhileExit2  
       case (TWhilePrePhi, TWhilePostPhi) => TWhilePostPhi
-      case (TWhile(_),  TWhilePrePhi) => x
-      case (TWhile(ctx1), TWhile(ctx2)) => TWhile(combine(ctx1, ctx2))
-      case (TWhile(_),  TWhilePostPhi) => TWhilePostPhi
-      case (TWhilePostPhi, TWhilePrePhi) => TWhilePostPhi
-      case (TWhilePostPhi, TWhile(_)) => TWhilePostPhi
 
-      case (TTry(ctx1), TTry(ctx2)) => TTry(combine(ctx1, ctx2))
-      case (TTry(_), TTryPeriPhi) => TTryPeriPhi
-      case (TTry(_), TCatch(_)) => y
-      case (TTry(_), TTryPostPhi) => TTryPostPhi
-      case (TTryPeriPhi, TTry(_)) => TTryPeriPhi 
+      // CtxOrdWhileEntry2 
+      case (TWhile(c), TWhilePrePhi) if isLast(c, appDec(unTWhile, aenv)) && !((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => x
+      // case (TWhile(c), TWhilePrePhi) if isLast(c, appDec(unTWhile, aenv)) && (eenv.contains(x)) => we failed?
+      case (TWhile(c), TWhilePrePhi) if isLast(c, appDec(unTWhile, aenv)) && (dom(cenv.filter({case ((_,ctx)) => ctx == Some(TBox)})).contains(x)) => x // CtxOrdWhileEntry3
+      // case (TWhile(c), TWhilePrePhi) if isLast(c, appDec(unTWhile, aenv)) => we failed?
+      // if not last, we need to apply the transtivity
+      case (TWhile(c), TWhilePrePhi) if !isLast(c, appDec(unTWhile, aenv)) && !((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => follow(c, appDec(unTWhile, aenv)) match {
+        case Some(n) => semilatticeTCtx(aenv, eenv, benv, cenv).combine(TWhile(n), TWhilePrePhi)
+        // case None  => we failed?
+      }
+      // case (TWhile(c), TWhilePrePhi) if !isLast(c, appDec(unTWhile, aenv)) && (eenv.contains(x)) => we failed?
+      case (TWhile(c), TWhilePrePhi) if !isLast(c, appDec(unTWhile, aenv)) && (dom(cenv.filter({case ((_,ctx)) => ctx == Some(TBox)})).contains(x)) => x // CtxOrdWhileEntry3, is this possible?
+      // case (TWhile(c), TWhilePrePhi) if !isLast(c, appDec(unTWhile, aenv)) => we failed?
+
+      case (TWhile(ctx1), TWhile(ctx2)) => {
+        val daenv = appDec(unTWhile, aenv)
+        val deenv = appDec(unTWhile, eenv)
+        val dbenv = appDec2(unTWhile, benv) 
+        val dcenv = appDec2(unTWhile, cenv)
+        TWhile(semilatticeTCtx(daenv, deenv, dbenv, dcenv).combine(ctx1,ctx2))
+      }
+        
+      // case (TWhile(c),  TWhilePostPhi) if eenv.contains(x) => We failed?
+      case (TWhile(c), TWhilePostPhi) if !eenv.contains(x) && !dom((benv++cenv).filter({ case ((_, ctx)) => ctx != Some(TBox)})).contains(x) => x 
+      // CtxOrdWhileExit2 - dual
+      case (TWhilePostPhi, TWhilePrePhi) => x  
+      case (TWhilePostPhi, TWhile(_)) => combine(y,x)
+
+      // CtxOrdInd specialized for TTry
+      case (TTry(ctx1), TTry(ctx2)) => {
+        val daenv = appDec(unTTry, aenv)
+        val deenv = appDec(unTTry, eenv)
+        val dbenv = appDec2(unTTry, benv) 
+        val dcenv = appDec2(unTTry, cenv)
+        TTry(semilatticeTCtx(daenv, deenv, dbenv, dcenv).combine(ctx1,ctx2))
+      }
+ 
+      case (TTry(c), TTryPeriPhi) if eenv.contains(x) => TTryPeriPhi // (CtxOrdTry1)
+      // apply transtivity until we can fire (CtxOrdTry1) or fail at the last 
+      case (TTry(c), TTryPeriPhi) if !isLast(c, appDec(unTTry, aenv)) && !((dom(benv) ++ dom(cenv)).contains(x)) => follow(c, appDec(unTTry, aenv)) match {
+        case Some(n) => semilatticeTCtx(aenv, eenv, benv, cenv).combine(TTry(n), TTryPeriPhi) // problem should we wrap it with TTail? or TIF?
+        // case None  => Double.NaN we failed?
+      }
+
+      case (TTry(c1), TCatch(c2)) if eenv.contains(x) => y // (CtxOrdTry1) and (CtxOrdCatch1) with transitivity
+      // c1 must be the last
+      // case (TTry(c1), TCatch(c2)) => Double.NaN 
+
+      // (CtxOrdTry2), we don't check x is contained in eenv, because even if it is in eenv, we apply transtivity to get the same result
+      case (TTry(c), TTryPostPhi) if !dom(benv ++ cenv).contains(x) => y
+      // case (TTry(c), TTryPostPhi) => TTryPostPhi we failed?
+
+      // dual of the above
+      case (TTryPeriPhi, TTry(_)) => combine(y,x)
+       // (CtxOrdCatch1) 
       case (TTryPeriPhi, TCatch(_)) => y
-      case (TTryPeriPhi, TTryPostPhi) => TTryPostPhi
-      case (TCatch(_), TTry(_)) => x 
-      case (TCatch(_), TTryPeriPhi) => x
-      case (TCatch(ctx1), TCatch(ctx2)) => TCatch(combine(ctx1, ctx2))
-      case (TCatch(_), TTryPostPhi) => TTryPostPhi
-      case (TTryPostPhi, TTry(_)) => TTryPostPhi
-      case (TTryPostPhi, TTryPeriPhi) => TTryPostPhi
-      case (TTryPostPhi, TCatch(_)) => TTryPostPhi
+      // (CtxOrdCatch1) and transivitiy, no throw in the catch block
+      case (TTryPeriPhi, TTryPostPhi) => combine(TCatch(TBox),TTryPostPhi) // we still need to step through the catch block to ensure no break or continue
+
+      // dual of the above
+      case (TCatch(_), TTry(_)) => combine(y,x)
+      case (TCatch(_), TTryPeriPhi) => combine(y,x)
+
+      // CtxOrdInd specialized for TCatch
+      case (TCatch(ctx1), TCatch(ctx2)) => {
+        val daenv = appDec(unTCatch, aenv)
+        val deenv = appDec(unTCatch, eenv)
+        val dbenv = appDec2(unTCatch, benv) 
+        val dcenv = appDec2(unTCatch, cenv)
+        TCatch(semilatticeTCtx(daenv, deenv, dbenv, dcenv).combine(ctx1,ctx2))
+      } 
+
+      case (TCatch(c), TTryPostPhi) if isLast(c, appDec(unTCatch, aenv)) && !((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => y // (CtxOrdCatch2)
+       // apply transtivity until we can fire previous case or fail at the last 
+      case (TCatch(c), TTryPostPhi) if !isLast(c, appDec(unTCatch, aenv)) && !((eenv ++ dom(benv) ++ dom(cenv)).contains(x)) => follow(c, appDec(unTCatch, aenv)) match {
+        case Some(n) => semilatticeTCtx(aenv, eenv, benv, cenv).combine(TCatch(n), TTryPostPhi)  // problem should we wrap it with TTail? or TIF?
+        // case None => Double.NaN we failed?
+      }
+      // case (TCatch(_), TTryPostPhi) => TTryPostPhi failed?
+
+      // dual of the above
+      case (TTryPostPhi, TTry(_)) => combine(y,x)
+      case (TTryPostPhi, TTryPeriPhi) => combine(y,x)
+      case (TTryPostPhi, TCatch(_)) => combine(y,x)
 
     }
 
