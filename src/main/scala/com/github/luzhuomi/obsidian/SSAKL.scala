@@ -10,6 +10,13 @@ import com.github.luzhuomi.obsidian.ASTPath._
 import scala.collection.immutable
 import com.github.luzhuomi.obsidian.ASTUtils._
 
+/**
+ * TODO
+ * 1. fix the VarMap, we need one more inner map
+ * 2. fix interval 
+ * 3. fix the while conversion vm3 part.
+ * */
+
 // Kenny's version of SSA
 /**
   * Assumption: nested declaration contains no repetitive variable name
@@ -207,7 +214,7 @@ object SSAKL {
 
   case object TTryPostPhi extends TCtx 
 
-
+  
 
   def putTCtx(outter:TCtx, inner:TCtx): TCtx = outter match {
     case TBox => inner 
@@ -224,12 +231,24 @@ object SSAKL {
 
 
   // variable mapping 
-  type VarMap = Map[Name, Map[SCtx, (TCtx, Name)]]
+  // old and wrong
+  // type VarMap = Map[Name, Map[SCtx, (TCtx, Name)]]
+  type VarMap = Map[Name, Map[TCtx, (SCtx, Name)]]
   
   def unionVarMap(vm1:VarMap, vm2:VarMap):VarMap = vm2.toList.foldLeft(vm1)( (vm, kv) => kv match {
     case (name, m) => vm.get(name) match {
       case None => vm + (name -> m)
       case Some(m2) => vm + (name -> (m ++ m2))
+    }
+  })
+
+  def listToVarMap(l:List[(Name, (TCtx, (SCtx, Name)))]):VarMap = l.foldLeft(Map():VarMap)( (vm, kv) => kv match {
+    case (name, (tctx, (sctx, tname))) => vm.get(name) match {
+      case None => vm + (name -> (tctx -> (sctx, tname)))
+      case Some(m2) => m2.get(tctx) match {
+        case None => vm + (name ->  (m2 + (tctx -> (sctx, tname))))
+        case Some((sctx1, name1)) => vm // duplicate?
+      }
     }
   })
   
@@ -318,7 +337,7 @@ object SSAKL {
 
       override def handleErrorWith[A](fa: SSAResult[A])(f: ErrorM => SSAResult[A]): SSAResult[A] =
         fa match {
-          case SS(AError(s) => f(s)
+          case SSAError(s) => f(s)
           case SSAOk(a) => SSAOk(a)
         }
     }
@@ -624,6 +643,14 @@ object SSAKL {
 
   def dom[A,B](m:List[(A,B)]):List[A] = m.map{
     case (a,b) => a
+  }
+
+  // exclude entries based on a value in the codomain
+
+  def codexclude[A,B](m:List[(A,Option[B])],v:B):List[(A,Option[B])] = m.flatMap{
+    case (a,None) => List((a,None))
+    case (a,Some(b)) if b == v => Nil
+    case (a,Some(b)) => List((a,Some(b)))
   }
 
   // list of extractors
@@ -1214,13 +1241,13 @@ object SSAKL {
     }
   } 
 
-  def Rlt(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv, ctx:TCtx, vm:VarMap, x:Name):Option[Name] = R(aenv, eenv, benv, cenv, ctx, vm, x, 
+  def Rlt(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv, ctx:TCtx, vm:VarMap, x:Name):List[(TCtx,Name)] = R(aenv, eenv, benv, cenv, ctx, vm, x, 
     {
       case ((tctx1, tctx2))  => (partialOrderTCtx(aenv, eenv, benv, cenv).partialCompare(tctx1, tctx2) == -1.0)
     }
   ) 
 
-  def Rleq(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv, ctx:TCtx, vm:VarMap, x:Name):Option[Name] = R(aenv, eenv, benv, cenv, ctx, vm, x, 
+  def Rleq(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv, ctx:TCtx, vm:VarMap, x:Name):List[(TCtx,Name)] = R(aenv, eenv, benv, cenv, ctx, vm, x, 
     {
       case ((tctx1, tctx2))  => { 
         val pot = partialOrderTCtx(aenv, eenv, benv, cenv)
@@ -1228,6 +1255,16 @@ object SSAKL {
       }
     })
 
+  def RleqBounded(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv, lctx:TCtx, uctx:TCtx, vm:VarMap, x:Name):List[(TCtx,Name)] = RBounded(aenv, eenv, benv, cenv, lctx, uctx, vm, x,
+    {
+      case ((tctx1, tctx2))  => (partialOrderTCtx(aenv, eenv, benv, cenv).partialCompare(tctx1, tctx2) == -1.0)
+    }, 
+    {
+      case ((tctx1, tctx2))  => { 
+        val pot = partialOrderTCtx(aenv, eenv, benv, cenv)
+        ((pot.partialCompare(tctx1, tctx2) == -1.0) || (pot.partialCompare(tctx1, tctx2) == 0.0))
+      }
+    })
   /**
     * Compute the name from the lub of all the reachable context until ctx
     *  it defers from the paper, which takes in a default value, we return None in case the set of contexts an empty set. The defaulting should be handled at the call site.
@@ -1241,8 +1278,8 @@ object SSAKL {
     * @param cmp - modifier to switch between leq or lt
     * @return - return the name of the variable that is the most recent dominator of x
     */
-  def R(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv, ctx:TCtx, vm:VarMap, x:Name, cmp:(TCtx,TCtx) => Boolean):Option[Name] = vm.get(x) match { // perhaps we should report the error properly
-    case None => None
+  def R(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv, ctx:TCtx, vm:VarMap, x:Name, cmp:(TCtx,TCtx) => Boolean):List[(TCtx,Name)] = vm.get(x) match { // perhaps we should report the error properly
+    case None => Nil
     case Some(trs) => {
       val tcvs = for { 
         (sctx, (tctx, tx)) <- trs.toList
@@ -1264,13 +1301,21 @@ object SSAKL {
         }
       }      
       */
-      combine(tcvs, aenv,eenv, benv,cenv) match {
-        case (lub,n)::Nil => Some(n)
-        case _ => None
-      }
-
+      combine(tcvs, aenv,eenv, benv,cenv) 
     }
   }
+
+  // a variant of the R, with lower bound and upper bound, instead of just having an upper bound
+  def RBounded(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv, lctx:TCtx, uctx:TCtx, vm:VarMap, x:Name, lcmp:(TCtx,TCtx) => Boolean, ucmp:(TCtx,TCtx) => Boolean):List[(TCtx,Name)] = vm.get(x) match {
+    case None => Nil
+    case Some(trs) => {
+      val tcvs = for {
+        (sctx, (tctx, tx)) <- trs.toList
+        if ((lcmp(lctx, tctx)) && (ucmp(tctx, uctx)))
+      } yield (tctx, tx)
+      combine(tcvs, aenv,eenv, benv,cenv) 
+    }
+  } 
 
   /*
 
@@ -1583,8 +1628,9 @@ object SSAKL {
       st <- get
       exp1 <- st match {
         case State(vm, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs) => Rlt(aenv, eenv, benv, cenv, ctx, vm, name) match {
-          case None => m.raiseError("SSA construction failed, Rlt failed during expression conversion.")
-          case Some(name1) => m.pure(ExpName(name1))
+          case Nil => m.raiseError("SSA construction failed, Rlt failed to find a lub during expression conversion. None exists.")
+          case (c,name1)::Nil => m.pure(ExpName(name1))
+          case _::_ => m.raiseError("SSA construction failed, Rlt failed to find a lub during expression conversion. More than one candidates found.")
         }
       }
     } yield exp1
@@ -1900,17 +1946,19 @@ object SSAKL {
         tctx_pre <- m.pure(putTCtx(tctx, TWhilePrePhi))
         lbl0  <- toLbl(tctx_pre)
         phis_pre  <- st match {
-          case State(vm, eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs) if (eenv.contains(eCtx)) => 
+          case State(vm, eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs) 
+          if ((eenv++dom(benv++cenv)).contains(eCtx)) => // is this still possible? it means the while statement is dead code
             vm.keySet.toList.traverse( v => for {
               v_lbl <- mkName(v, lbl0)
             } yield Phi(v, v_lbl, Map()))
           case State(vm, eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs) => 
             vm.keySet.toList.traverse( v => for {
               v_lbl <- mkName(v, lbl0)
-              rhs <- m.pure(Rleq(aenv, eenv, benv, cenv, eCtx, vm, v) match {
-                case None => (Map():Map[Label, Name])
-                case Some(n) => Map(lblp -> n)
-              })
+              rhs <- Rleq(aenv, eenv, benv, cenv, eCtx, vm, v) match {
+                case Nil => m.raiseError("SSA construction failed, Rleq failed to find a lub during the while stmt conversion. None found.")
+                case (c,n)::Nil => m.pure(Map(lblp -> n))
+                case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub during the while stmt conversion. More than one candidates found.")
+              }
             } yield Phi(v, v_lbl, rhs))
         }
         stBodyIn <- st match {
@@ -1922,7 +1970,7 @@ object SSAKL {
             case (v, sctx, tctx2, v_lbl) => vm1.get(v) match {
               case None => vm1
               case Some(m) => vm1 + (v -> (m + (sctx -> (tctx2, v_lbl))))
-            }}), tctx_pre, aenv,  Nil, benv, cenv, nestedDecls, methInvs)
+            }}), tctx_pre, aenv, eenv, benv, cenv, nestedDecls, methInvs)
         }
         _ <- put(stBodyIn)
         exp1 <- kexp(exp, tctx)
@@ -1931,17 +1979,27 @@ object SSAKL {
         stBodyOut <- get
 
         phis_pre_updated <- stBodyOut match {
-          case State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, nestedDecls2, methInvs2) if (eenv2.contains(eCtx2)) => m.pure(phis_pre)
-          case State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, nestedDecls2, methInvs2) => for { 
-            lbl2 <- toLbl(eCtx2)
-          } yield phis_pre.map( phi => phi match {
-            case Phi(v, v_lbl, rhs_map) => Rleq(aenv2, eenv2, benv2, cenv2, eCtx2, vm2, v) match {
-              case None => Phi(v, v_lbl, rhs_map)
-              case Some(n) => Phi(v, v_lbl, rhs_map + (lbl2 -> n))
+          // the first two cases from the tech report.
+          case State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, nestedDecls2, methInvs2) if ((eenv2 ++ dom(benv2 ++ codexclude(cenv2, tctx))).contains(eCtx2)) => for {
+            phis_pre2 <- phis_pre.traverse( phi => updatePhiFromCEnv(phi, stBodyOut, tctx, tctx_pre))
+          } yield phis_pre2
+          // the third case from the tech report.
+          case State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, nestedDecls2, methInvs2) => {
+            def go(lbl:Label, phi:Phi):SState[State,Phi] = phi match {
+              case Phi(v, v_lbl, rhs_map) => RleqBounded(aenv2, eenv2, benv2, cenv2, tctx_pre, eCtx2, vm2, v) match {
+                case Nil => m.pure(Phi(v, v_lbl, rhs_map + (lbl -> v_lbl))) // default value
+                case (c,n)::Nil => m.pure(Phi(v, v_lbl, rhs_map + (lbl -> n)))
+                case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub during the while stmt conversion. More than one candidates found.")
+              }
             }
-          })
+            for { 
+              lbl2 <- toLbl(eCtx2)
+              phis_pre1 <- phis_pre.traverse(go(lbl2,_))
+              phis_pre2 <- phis_pre1.traverse( phi => updatePhiFromCEnv(phi, stBodyOut, tctx, tctx_pre))
+            } yield phis_pre2
+          } 
+          
         }
-
         tctx3 <- m.pure(putTCtx(tctx, TWhilePostPhi))
         lbl3  <- toLbl(tctx3)
         phis_post <- stBodyOut match {
@@ -1950,12 +2008,20 @@ object SSAKL {
             v_lbl0 <- mkName(v, lbl0)
           } yield Phi(v, v_lbl3, Map(lbl0 -> v_lbl0)))
         }
+        // update with the break statements
+        phis_post2 <- phis_post.traverse(phi => updatePhiFromBEnv(phi,stBodyOut,tctx))
+        vm3        <- (stBodyIn,stBodyOut) match {
+          case (State(vm1,eCtx1,aenv1,eenv1, benv1, cenv1, nestedDecls1, methInvs1), State(vm2,eCtx2,aenv2,eenv2, benv2, cenv2, nestedDecls2, methInvs2)) => {
+            val ctxs = eenv ++ dom(codexclude(benv2,tctx) ++ codexcclude(cenv2,tctx))
+            intervals <- ctxs.traverse( ctx => {
+            }) 
+          }
+        }
         _          <- extendAllVarsWithContextAndLabel(ctx, tctx3, lbl3)
-        _          <- setECtx(tctx)
-      } yield SSABlock(lbl, SSAWhile(phis_pre_updated, exp1, body_stmts, phis_post))
+        _          <- setECtx(tctx3)
+      } yield SSABlock(lbl, SSAWhile(phis_pre_updated, exp1, body_stmts, phis_post2))
     }
   } 
-
   def paramIdtoName(fp:FormalParam):Name = fp match {
     case FormalParam(mods, ty, arity, var_decl_id) => Name(List(idFromVarDeclId(var_decl_id)))
   }
@@ -2044,7 +2110,58 @@ object SSAKL {
     } yield phis
   }
 
-  
+  def updatePhiFromCEnv(phi:Phi, st:State, parentctx:TCtx,lctx:TCtx)(implicit m:MonadError[SSAState,ErrorM]):SState[State,Phi] = (st,phi) match {
+      case (State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, nestedDecls2, methInvs2), Phi(v,v_vlbl,rhs_map)) => { 
+      {
+        def go(ctxk:TCtx):SState[State, (Label, Name)] = for {
+          lbl_k <- toLbl(ctxk)
+          name <- RleqBounded(aenv2, eenv2, benv2, cenv2, lctx, ctxk, vm2, v) match {
+            case Nil => m.pure(v_vlbl) // as default, since the set could be empty, which still lattice
+            case ((c,n)::Nil) => m.pure(n)
+            case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub during the while stmt conversion. More than one candidates found.")
+          }
+        } yield (lbl_k,name)
+        val cenv2_filtered_dom = cenv2.filter( (x:(TCtx,Option[TCtx])) => x._2 == Some(parentctx)).map(p=>p._1)
+        for { 
+          rhs_tb_added <- cenv2_filtered_dom.traverse(go)
+          rhs_map_updated <- m.pure(rhs_tb_added.foldLeft(rhs_map)((m,p)=>m + (p._1 -> p._2)))
+        } yield Phi(v, v_vlbl, rhs_map_updated)
+      }
+    }
+  }
+
+
+  def updatePhiFromBEnv(phi:Phi, st:State, parentctx:TCtx)(implicit m:MonadError[SSAState,ErrorM]):SState[State,Phi] = (st,phi) match {
+      case (State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, nestedDecls2, methInvs2), Phi(v,v_vlbl,rhs_map)) => { 
+      {
+        def go(ctxb:TCtx):SState[State, (Label, Name)] = for {
+          lbl_b <- toLbl(ctxb)
+          name <- Rleq(aenv2, eenv2, benv2, cenv2, ctxb, vm2, v) match {
+            case Nil => m.pure(v_vlbl) // as default, since the set could be empty, which still lattice
+            case ((c,n)::Nil) => m.pure(n)
+            case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub during the while stmt conversion. More than one candidates found.")
+          }
+        } yield (lbl_b,name)
+        val benv2_filtered_dom = benv2.filter( (x:(TCtx,Option[TCtx])) => x._2 == Some(parentctx)).map(p=>p._1)
+        for { 
+          rhs_tb_added <- benv2_filtered_dom.traverse(go)
+          rhs_map_updated <- m.pure(rhs_tb_added.foldLeft(rhs_map)((m,p)=>m + (p._1 -> p._2)))
+        } yield Phi(v, v_vlbl, rhs_map_updated)
+      }
+    }
+  }
+  // frontier
+  def interval(vm:VarMap, aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv, lctx:TCtx, uctx:TCtx, lcmp:(TCtx,TCtx) => Boolean, ucmp:(TCtx,TCtx) => Boolean):VarMap = {
+    val vs = vm.keys
+    vs.foldLeft(Map():VarMap)( (m, v) => m.get(v) match {
+      case Some(trs) => {
+        val tcvs = for {
+          (sctx, (tctx, tx)) <- trs.toList
+          if ((lcmp(lctx, tctx)) && (ucmp(tctx, uctx)))
+        } yield (v, (sctx, (tctx, tx)))
+        
+    }) 
+  }
 
   /**
     * kstmtBlock - a special version just to handle StmtBlock, when the statement encloses a block of statements, we convert them using kBlock
