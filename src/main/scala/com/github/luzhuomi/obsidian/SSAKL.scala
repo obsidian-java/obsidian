@@ -12,9 +12,8 @@ import com.github.luzhuomi.obsidian.ASTUtils._
 
 /**
  * TODO
- * 1. fix the VarMap, we need one more inner map
- * 2. fix interval 
- * 3. fix the while conversion vm3 part.
+ * 1. add the src label i to target context mapping to the state
+ * 2. add the cases for break and continue
  * */
 
 // Kenny's version of SSA
@@ -244,7 +243,7 @@ object SSAKL {
 
   def listToVarMap(l:List[(Name, (TCtx, (SCtx, Name)))]):VarMap = l.foldLeft(Map():VarMap)( (vm, kv) => kv match {
     case (name, (tctx, (sctx, tname))) => vm.get(name) match {
-      case None => vm + (name -> (tctx -> (sctx, tname)))
+      case None => vm + (name -> Map(tctx -> (sctx, tname)))
       case Some(m2) => m2.get(tctx) match {
         case None => vm + (name ->  (m2 + (tctx -> (sctx, tname))))
         case Some((sctx1, name1)) => vm // duplicate?
@@ -389,7 +388,23 @@ object SSAKL {
     _   <- put(st1)
   } yield ()
 
+
   /**
+    * setVM - set the given VarMap in the state
+    *
+    * @param vm
+    * @param m
+    * @return
+    */
+  def setVM(vm:VarMap)(implicit m:MonadError[SSAState, ErrorM]): SState[State, Unit] = for {
+    st <- get
+    st1 <- m.pure(st match {
+      case State(_,eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs) => State(vm, eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs)
+    })
+    _   <- put(st1)
+  } yield ()
+
+ /**
     * addeenv - add the given context to the list of throwing context in the state
     *
     * @param tctx
@@ -553,11 +568,11 @@ object SSAKL {
       case State(vm0, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs) => for {
         entries <- vm0.keySet.toList.traverse(v => for {
           v_lbl <- mkName(v, lbl)
-        } yield (v, sctx, tctx, v_lbl ))
+        } yield (v, tctx, sctx, v_lbl ))
       } yield State(entries.foldLeft(vm0)((vm, ent) => ent match {
-        case (v, sctx, tctx, v_lbl) => vm.get(v) match {
+        case (v, tctx, sctx, v_lbl) => vm.get(v) match {
           case None => vm
-          case Some(m) => vm + (v -> (m + (sctx -> (tctx, v_lbl))))
+          case Some(m) => vm + (v -> (m + (tctx -> (sctx, v_lbl))))
         }
       }), eCtx, aenv, eenv, benv, cenv, nDecls, methInvs)
     }
@@ -1282,7 +1297,7 @@ object SSAKL {
     case None => Nil
     case Some(trs) => {
       val tcvs = for { 
-        (sctx, (tctx, tx)) <- trs.toList
+        (tctx, (sctx, tx)) <- trs.toList
         if (cmp(tctx, ctx))
       } yield (tctx, tx)
 
@@ -1310,7 +1325,7 @@ object SSAKL {
     case None => Nil
     case Some(trs) => {
       val tcvs = for {
-        (sctx, (tctx, tx)) <- trs.toList
+        (tctx, (sctx, tx)) <- trs.toList
         if ((lcmp(lctx, tctx)) && (ucmp(tctx, uctx)))
       } yield (tctx, tx)
       combine(tcvs, aenv,eenv, benv,cenv) 
@@ -1567,11 +1582,11 @@ object SSAKL {
           case (x, ctxm) => tbl.get(x) match {
             case None => m.pure(Nil:List[SSAStmt])
             case Some((ty,mods)) => { 
-              def go(q:(SCtx, (TCtx, Name))):SState[State, SSAStmt] = q match {
-                case (ctx, (tctx, xlbl@Name(List(id)))) => {
+              def go(q:(TCtx, (SCtx, Name))):SState[State, SSAStmt] = q match {
+                case (tctx, (ctx, xlbl@Name(List(id)))) => {
                   m.pure(SSAVarDecls(mods, ty, List(VarDecl(VarId(id), None))))
                 }
-                case (ctx, (tctx, xlbl)) => {
+                case (tctx, (ctx, xlbl)) => {
                   m.raiseError("SSA construction failed, genVarDecls - the renamed variable is a not a simple id.")
                 }
               }
@@ -1747,8 +1762,8 @@ object SSAKL {
               lbl <- toLbl(tctx) 
               xlbl <- mkName(x,lbl)
               vm1 <- vm.get(x) match {
-                case None => m.pure(vm + (x -> (ctx -> (tctx, xlbl))))
-                case Some(im) => m.pure(vm + (x -> (im + (ctx -> (tctx, xlbl)))))
+                case None => m.pure(vm + (x -> (tctx -> (ctx, xlbl))))
+                case Some(im) => m.pure(vm + (x -> (im + (tctx -> (ctx, xlbl)))))
               }
             } yield SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(NameLhs(xlbl), op, rhs1)))))
           }
@@ -1920,8 +1935,8 @@ object SSAKL {
             } yield State((entries.foldLeft(vm1)((vm, ent) => ent match {
               case (v, sctx, tctx, v_lbl) => vm.get(v) match {
                 case None => vm
-                case Some(m) => vm + (v -> (m + (sctx -> (tctx, v_lbl))))
-              }}) + ((paramIdtoName(param)) -> Map(ctx -> ((catch_tctx, paramIdtoName(param)))))), 
+                case Some(m) => vm + (v -> (m + (tctx -> (sctx, v_lbl))))
+              }}) + ((paramIdtoName(param)) -> Map(catch_tctx -> ((ctx, paramIdtoName(param)))))), 
               tctx1p, aenv1, Nil, benv1, cenv1, nestedDecls1, methInvs1)
             }
           catch_stmts <- kBlock(catch_blk, catch_ctx)
@@ -1965,11 +1980,11 @@ object SSAKL {
           case State(vm, eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs) => for {
             entries <- vm.keySet.toList.traverse( v => for {
               v_lbl <- mkName(v, lbl0)
-            } yield (v, ctx, tctx_pre, v_lbl))
+            } yield (v, tctx_pre, ctx, v_lbl))
           } yield State(entries.foldLeft(vm)((vm1, ent) => ent match {
-            case (v, sctx, tctx2, v_lbl) => vm1.get(v) match {
+            case (v, tctx2, sctx, v_lbl) => vm1.get(v) match {
               case None => vm1
-              case Some(m) => vm1 + (v -> (m + (sctx -> (tctx2, v_lbl))))
+              case Some(m) => vm1 + (v -> (m + (tctx2  -> (sctx, v_lbl))))
             }}), tctx_pre, aenv, eenv, benv, cenv, nestedDecls, methInvs)
         }
         _ <- put(stBodyIn)
@@ -2012,11 +2027,12 @@ object SSAKL {
         phis_post2 <- phis_post.traverse(phi => updatePhiFromBEnv(phi,stBodyOut,tctx))
         vm3        <- (stBodyIn,stBodyOut) match {
           case (State(vm1,eCtx1,aenv1,eenv1, benv1, cenv1, nestedDecls1, methInvs1), State(vm2,eCtx2,aenv2,eenv2, benv2, cenv2, nestedDecls2, methInvs2)) => {
-            val ctxs = eenv ++ dom(codexclude(benv2,tctx) ++ codexcclude(cenv2,tctx))
-            intervals <- ctxs.traverse( ctx => {
-            }) 
+            val ctxs = eenv2 ++ dom(codexclude(benv2,tctx) ++ codexclude(cenv2,tctx))
+            val intervals = ctxs.map( ctx => interval_leq(vm2,aenv2,eenv2,benv2,cenv2,tctx_pre,ctx) ) 
+            m.pure(intervals.foldLeft(vm1)((m1,m2) => unionVarMap(m1,m2))) 
           }
         }
+        _          <- setVM(vm3)
         _          <- extendAllVarsWithContextAndLabel(ctx, tctx3, lbl3)
         _          <- setECtx(tctx3)
       } yield SSABlock(lbl, SSAWhile(phis_pre_updated, exp1, body_stmts, phis_post2))
@@ -2037,33 +2053,36 @@ object SSAKL {
     */
 
   def mkPhi(st1:State, st2:State, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State, List[Phi]] = (st1, st2) match {
-    case (State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1,  _, _), State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, _, _)) if (eenv1.contains(eCtx1) && eenv2.contains(eCtx2)) => for {
+    case (State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1,  _, _), State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, _, _)) if ((eenv1 ++ dom(benv1 ++ cenv1)).contains(eCtx1)) && ((eenv2 ++ dom(benv2 ++ cenv2)).contains(eCtx2)) => for {
+      // do we still need this case? it means dead code
       vs <- m.pure(vm1.keySet ++ vm2.keySet)
       phis <- vs.toList.traverse( v => for {
         vlbl <- mkName(v, lbl)
       } yield Phi(v, vlbl, Map()))
     } yield phis
-    case (State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1, _, _), State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, _, _)) if (!eenv1.contains(eCtx1) && eenv2.contains(eCtx2)) => for {
+    case (State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1, _, _), State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, _, _)) if !((eenv1 ++ dom(benv1 ++ cenv1)).contains(eCtx1)) && ((eenv2 ++ dom(benv2 ++ cenv2)).contains(eCtx2)) => for {
       vs <- m.pure(vm1.keySet)
       phis <- vs.toList.traverse( v => for {
         vlbl <- mkName(v, lbl)
         lbl1 <- toLbl(eCtx1)
-        oname <- m.pure(Rleq(aenv1, eenv1, benv1, cenv1, eCtx1, vm1, v))
-      } yield Phi(v, vlbl, oname match {
-        case None => Map()
-        case Some(n) => Map(lbl1 -> n)
-      }))
+        name <- Rleq(aenv1, eenv1, benv1, cenv1, eCtx1, vm1, v) match {
+          case Nil => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). None exists.")
+          case (c,n)::Nil => m.pure(n)
+          case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). More than one candidates found.")
+        }
+      } yield Phi(v, vlbl, Map(lbl1 -> name)))  
     } yield phis
-    case (State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1, _, _), State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2,_, _)) if (eenv1.contains(eCtx1) && !eenv2.contains(eCtx2)) => for {
+    case (State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1, _, _), State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2,_, _)) if ((eenv1 ++ dom(benv1 ++ cenv1)).contains(eCtx1)) && !((eenv2 ++ dom(benv2 ++ cenv2)).contains(eCtx2)) => for {
       vs <- m.pure(vm2.keySet)
       phis <- vs.toList.traverse( v => for {
         vlbl <- mkName(v, lbl)
         lbl2 <- toLbl(eCtx2)
-        oname <- m.pure(Rleq(aenv2, eenv2, benv2, cenv2, eCtx2, vm2, v))
-      } yield Phi(v, vlbl, oname match {
-        case None => Map()
-        case Some(n) => Map(lbl2 -> n)
-      }))
+        name <- Rleq(aenv2, eenv2, benv2, cenv2, eCtx2, vm2, v) match {
+          case Nil => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). None exists.")
+          case (c,n)::Nil => m.pure(n)
+          case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). More than one candidates found.")          
+        }
+      } yield Phi(v, vlbl, Map(lbl2 -> name)))
     } yield phis  
     case (State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1, _, _), State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2,_, _)) => for {
       vs <- m.pure(vm1.keySet ++ vm2.keySet)
@@ -2071,14 +2090,17 @@ object SSAKL {
         vlbl <- mkName(v, lbl)
         lbl1 <- toLbl(eCtx1)
         lbl2 <- toLbl(eCtx2)
-        oname1 <- m.pure(Rleq(aenv1, eenv1, benv1, cenv1, eCtx1, vm1, v))
-        oname2 <- m.pure(Rleq(aenv2, eenv2, benv2, cenv2, eCtx2, vm2, v))
-      } yield Phi(v, vlbl, (oname1, oname2) match {
-        case (Some(n1), Some(n2)) => Map(lbl1 -> n1, lbl2 -> n2) // do we need the remaining 3 cases?
-        case (None, None) => Map()
-        case (Some(n1), None) => Map(lbl1 -> n1)
-        case (None, Some(n2)) => Map(lbl2 -> n2)
-      }))
+        name1 <- Rleq(aenv1, eenv1, benv1, cenv1, eCtx1, vm1, v) match {
+          case Nil => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). None exists.")
+          case (c,n)::Nil => m.pure(n)
+          case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). More than one candidates found.")          
+        }
+        name2 <- Rleq(aenv2, eenv2, benv2, cenv2, eCtx2, vm2, v) match {
+          case Nil => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). None exists.")
+          case (c,n)::Nil => m.pure(n)
+          case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). More than one candidates found.")            
+        }
+      } yield Phi(v, vlbl, Map(lbl1 -> name1, lbl2 -> name2)))
     } yield phis  
   }
 
@@ -2092,22 +2114,25 @@ object SSAKL {
     * @return
     */
   def mkPhisFromThrows(st:State, parenteenv:EEnv, parentbenv:BEnv, parentcenv:CEnv, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State, List[Phi]] = st match {
-    case State(vm, eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs) => for {
-      vs <- m.pure(vm.keySet.toList)
-      phis <- vs.traverse( v => for {
-        vlbl <- mkName(v, lbl)
-        lbls_onames <- eenv.traverse( ctx => for {
-          lbl1 <- toLbl(ctx)
-          on   <- m.pure(Rleq(aenv, parenteenv, parentbenv, parentcenv, ctx, vm, v))
-        } yield (lbl1,on))
-        rhs <- m.pure(
-          lbls_onames
-          .foldLeft(Map():Map[Label,Name])((m,p) => p match {
-            case (lbl, None) => m 
-            case (lbl, Some(n)) => m + (lbl -> n)
-          }))
-      } yield Phi(v, vlbl, rhs))
-    } yield phis
+    case State(vm, eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs) => { 
+      def go(ctx:TCtx, v:Name):SState[State,(Label,Name)] = for {
+        lbl1 <- toLbl(ctx)
+        n    <- Rleq(aenv, parenteenv, parentbenv, parentcenv, ctx, vm, v) match {
+          case Nil => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhisFromThrows(). None exists.")
+          case (c,n)::Nil => m.pure(n)
+          case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhisFromThrows(). More than one candidates found.")            
+        }
+      } yield (lbl1,n)
+      for {
+        vs <- m.pure(vm.keySet.toList)
+        phis <- vs.traverse( v => for {
+          vlbl <- mkName(v, lbl)
+          lbls_names <- eenv.traverse(go(_,v))
+        } yield Phi(v, vlbl, lbls_names.foldLeft(Map():Map[Label,Name])((m,p) => p match {
+          case (lbl, n) => m + (lbl -> n)
+        })))
+      } yield phis
+    }
   }
 
   def updatePhiFromCEnv(phi:Phi, st:State, parentctx:TCtx,lctx:TCtx)(implicit m:MonadError[SSAState,ErrorM]):SState[State,Phi] = (st,phi) match {
@@ -2150,18 +2175,36 @@ object SSAKL {
       }
     }
   }
-  // frontier
+
+  // build a sub VarMap from the given one, so that all target ctxt are in the interval
   def interval(vm:VarMap, aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv, lctx:TCtx, uctx:TCtx, lcmp:(TCtx,TCtx) => Boolean, ucmp:(TCtx,TCtx) => Boolean):VarMap = {
     val vs = vm.keys
     vs.foldLeft(Map():VarMap)( (m, v) => m.get(v) match {
       case Some(trs) => {
         val tcvs = for {
-          (sctx, (tctx, tx)) <- trs.toList
+          (tctx, (sctx, tx)) <- trs.toList
           if ((lcmp(lctx, tctx)) && (ucmp(tctx, uctx)))
-        } yield (v, (sctx, (tctx, tx)))
-        
-    }) 
+        } yield (tctx, (sctx, tx))
+        val rhs = tcvs.map( p => p._1 -> p._2 ).toMap
+        m + ( v -> rhs )
+      }
+      case None => m 
+    })
   }
+
+  def interval_leq(vm:VarMap, aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv, lctx:TCtx, uctx:TCtx):VarMap = interval(vm, aenv, eenv, benv, cenv, lctx, uctx, 
+    {
+      case ((tctx1, tctx2))  => { 
+        val pot = partialOrderTCtx(aenv, eenv, benv, cenv)
+        ((pot.partialCompare(tctx1, tctx2) == -1.0) || (pot.partialCompare(tctx1, tctx2) == 0.0))
+      }
+    }, 
+    {
+      case ((tctx1, tctx2))  => { 
+        val pot = partialOrderTCtx(aenv, eenv, benv, cenv)
+        ((pot.partialCompare(tctx1, tctx2) == -1.0) || (pot.partialCompare(tctx1, tctx2) == 0.0))
+      }
+    }) 
 
   /**
     * kstmtBlock - a special version just to handle StmtBlock, when the statement encloses a block of statements, we convert them using kBlock
