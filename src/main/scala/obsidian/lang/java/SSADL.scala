@@ -1,4 +1,4 @@
-package com.github.luzhuomi.obsidian
+package obsidian.lang.java
 
 
 import cats.kernel.Semilattice
@@ -16,13 +16,13 @@ import obsidian.lang.java.ASTUtils._
  * 2. look into inter method exception 
  * */
 
-// Kenny's version of SSA
+//  Declarative SSA construction algorithm
 /**
   * Assumption: nested declaration contains no repetitive variable name
   *   source program is desguared, flattened and label.
   */
 
-object SSAKL {
+object SSADL {
   case class SSAMethodDecl(
     modifiers: List[Modifier],
     type_params: List[TypeParam],
@@ -278,6 +278,8 @@ object SSAKL {
     methodInvs: List[(TCtx, MethodInvocation)],
     srcLabelEnv: Map[Ident, SCtx]
   )
+
+  val initState:State = State(Map(), TBox, List(), List(), List(), List(), List(), List(), Map())
 
   def eenvFromState(st:State):EEnv = st match {
     case State(_, _, aenv, eenv, _, _, _, _,_ ) => eenv
@@ -584,7 +586,7 @@ object SSAKL {
     * @param ctx
     * @return
     */
-  def toLbl(ctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Label] = toLbl2(Nil, ctx)(m)
+  def toLbl(ctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Label] = toLbl2(List(0), ctx)(m)
 
   def toLbl2(p:ASTPath, ctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Label] = ctx match {
     case TBox => m.pure(Label(p, None))
