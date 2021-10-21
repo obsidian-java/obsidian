@@ -23,10 +23,32 @@ public static void main(String [] args) {
 }
     """
     val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
-    val F_METHODSTR ="""
-
-    """
-    // val f_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(F_METHODSTR)).get.get 
+    val ssa = SSAMethodDecl(
+                List(Public, Static),List(),None,Ident("main"),
+                List(FormalParam(List(),RefType_(ArrayType(RefType_(ClassRefType(ClassType(List((Ident("String"),List()))))))),false,VarId(Ident("args")))),List(),None,
+                SSAMethodBody(
+                    List(
+                    SSABlock(SSADL.Label(List(0),None),SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_2")),None)))),
+                    SSABlock(SSADL.Label(List(0),None),SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_4_")),None)))),
+                    SSABlock(SSADL.Label(List(0),None),SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_4___")),None)))),
+                    SSABlock(SSADL.Label(List(0),None),SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_3")),None)))),
+                    SSABlock(SSADL.Label(List(0),None),SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_4_")),None)))),
+                    SSABlock(SSADL.Label(List(0),None),SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_4___")),None)))),
+                    SSABlock(SSADL.Label(List(0),None),SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_0")),None)))),
+                    SSABlock(SSADL.Label(List(1),None),SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_1")),None)))),
+                    SSABlock(SSADL.Label(List(2),None),SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_2")))),EqualA,Lit(IntLit(0))))))),
+                    SSABlock(SSADL.Label(List(3),None),SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("s_3")))),EqualA,Lit(IntLit(0))))))),
+                    SSABlock(SSADL.Label(List(4),None),SSAWhile(List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_4_"))),
+                                                                        Map(SSADL.Label(List(3),None) -> Name(List(Ident("x_2"))),
+                                                                            SSADL.Label(List(4, 0, 0),None) -> Name(List(Ident("x_4_"))))),
+                                                                    Phi(Name(List(Ident("s"))),Name(List(Ident("s_4_"))),
+                                                                        Map(SSADL.Label(List(3),None) -> Name(List(Ident("s_3"))),
+                                                                            SSADL.Label(List(4, 0, 0),None) -> Name(List(Ident("s_4_0_0")))))),
+                                                                BinOp(ExpName(Name(List(Ident("x_2")))),LThan,Lit(IntLit(10))),
+                                                                List(
+                                                                    SSABlock(SSADL.Label(List(4, 0, 0),None),SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("s_4_0_0")))),EqualA,BinOp(ExpName(Name(List(Ident("x_4_")))),Add,ExpName(Name(List(Ident("s_4_"))))))))))),
+                                                                    List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_4___"))),Map(SSADL.Label(List(4),Some(Pre)) -> Name(List(Ident("x_4_"))))), 
+                                                                        Phi(Name(List(Ident("s"))),Name(List(Ident("s_4___"))), Map(SSADL.Label(List(4),Some(Pre)) -> Name(List(Ident("s_4_")))))))), SSABlock(SSADL.Label(List(5),None),SSAReturn(None)))))
     test("TestFlatten1") {
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
@@ -36,7 +58,10 @@ public static void main(String [] args) {
                         val d_methodDecl = Desugar.dsgOps.desugar(f_methodDecl)
                         SSADL.kmethodDecl(d_methodDecl).run(SSADL.initState) match {
                             case SSADL.SSAError(message) => fail(message)
-                            case SSADL.SSAOk((st, ssa_methodDecl)) => println(ssa_methodDecl)
+                            case SSADL.SSAOk((st, ssa_methodDecl)) => { 
+                                // println(ssa_methodDecl)
+                                assert(ssa == ssa_methodDecl)
+                            }
                         }
                   }
               }
