@@ -1644,7 +1644,7 @@ object SSADL {
       st <- get
       exp1 <- st match {
         case State(vm, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs, srcLblEnv) => Rlt(aenv, eenv, benv, cenv, ctx, vm, name) match {
-          case Nil => m.raiseError("SSA construction failed, Rlt failed to find a lub during expression conversion. None exists.")
+          case Nil => m.raiseError(s"SSA construction failed, Rlt failed to find a lub for ${name} during expression conversion. None exists. ${ctx}, ${vm.toList}")
           case (c,name1)::Nil => m.pure(ExpName(name1))
           case _::_ => m.raiseError("SSA construction failed, Rlt failed to find a lub during expression conversion. More than one candidates found.")
         }

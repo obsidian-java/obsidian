@@ -13,8 +13,10 @@ import obsidian.lang.java.SSADL._
 class TestSSADL1 extends FunSuite with Matchers {
     val METHODSTR = """
 public static void main(String [] args) {
-	int x = 0;
-    int s = 0;
+	int x; 
+    int s;
+    x = 0;
+    s = 0;
     while (x < 10) {
         s = x + s;
     }
