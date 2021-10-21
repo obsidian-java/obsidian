@@ -1,4 +1,4 @@
-package com.github.luzhuomi.obsidian
+package obsidian.lang.java
 
 import scala.collection.Map._
 import com.github.luzhuomi.scalangj.Syntax._

@@ -1,7 +1,7 @@
-package com.github.luzhuomi.obsidian
+package obsidian.lang.java
 
-import com.github.luzhuomi.obsidian.CFG._
-import com.github.luzhuomi.obsidian.SSA._
+import obsidian.lang.java.CFG._
+import obsidian.lang.java.SSA._
 import com.github.luzhuomi.scalangj.Lexer
 import com.github.luzhuomi.scalangj.Parser._
 import com.github.luzhuomi.scalangj.Syntax._

@@ -6,14 +6,14 @@ import cats._
 import cats.implicits._
 import cats.data.StateT
 import com.github.luzhuomi.scalangj.Syntax._
-import com.github.luzhuomi.obsidian.ASTPath._
+import obsidian.lang.java.ASTPath._
 import scala.collection.immutable
-import com.github.luzhuomi.obsidian.ASTUtils._
+import obsidian.lang.java.ASTUtils._
 
 /**
  * TODO
- * 1. add the src label i to target context mapping to the state
- * 2. add the cases for break and continue
+ * 1. create test cases
+ * 2. look into inter method exception 
  * */
 
 // Kenny's version of SSA

@@ -1,11 +1,11 @@
-package com.github.luzhuomi.obsidian
+package obsidian.lang.java
 
 
 import cats._
 import cats.implicits._
 
 import cats.data.State
-import com.github.luzhuomi.obsidian.CFG.{AssignmentsNode, CFG, HasVarcfgOps, Node, NodeId, getLVars, getRVars, getSuccs}
+import obsidian.lang.java.CFG.{AssignmentsNode, CFG, HasVarcfgOps, Node, NodeId, getLVars, getRVars, getSuccs}
 import com.github.luzhuomi.scalangj.Syntax.{Ident, MethodDecl}
 
 import scala.annotation.tailrec
