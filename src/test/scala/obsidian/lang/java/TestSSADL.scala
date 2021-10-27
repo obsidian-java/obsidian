@@ -76,7 +76,7 @@ public static void main(String [] args) {
 class TestSSADL2 extends FunSuite with Matchers {
     val METHODSTR = """
 public static boolean add(int v) {
-    int [] new_vals=null; 
+    int [] vals=null; 
     int i=0; 
     boolean res=false; 
     try {
@@ -85,14 +85,14 @@ public static boolean add(int v) {
         if (this.size < this.cap) {
           this.vals[this.size] = v; this.size = this.size + 1;
         } else {
-          new_vals = new int[this.cap];
+          vals = new int[this.cap];
           i = 0;
           while (i < this.cap-1) {
-            new_vals[i] = this.vals[i+1];
+            vals[i] = this.vals[i+1];
             i = i + 1;
           }
-          new_vals[this.cap-1] = v;
-          this.vals = new_vals;
+          vals[this.cap-1] = v;
+          this.vals = vals;
         }
       }
       res = true;
