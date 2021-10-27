@@ -49,7 +49,7 @@ public static void main(String [] args) {
                                                                     SSABlock(SSADL.Label(List(4, 0, 0),None),SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("s_4_0_0")))),EqualA,BinOp(ExpName(Name(List(Ident("x_4_")))),Add,ExpName(Name(List(Ident("s_4_"))))))))))),
                                                                     List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_4___"))),Map(SSADL.Label(List(4),Some(Pre)) -> Name(List(Ident("x_4_"))))), 
                                                                         Phi(Name(List(Ident("s"))),Name(List(Ident("s_4___"))), Map(SSADL.Label(List(4),Some(Pre)) -> Name(List(Ident("s_4_")))))))), SSABlock(SSADL.Label(List(5),None),SSAReturn(None)))))
-    test("TestFlatten1") {
+    test("TestSSADL1") {
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
                 Flatten.flatMethodDecl(methodDecl).run(Flatten.initStateInfo) match {
@@ -67,6 +67,69 @@ public static void main(String [] args) {
               }
             }
             case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")           
+        }
+    }
+}
+
+
+
+class TestSSADL2 extends FunSuite with Matchers {
+    val METHODSTR = """
+public static boolean add(int v) {
+    int [] new_vals=null; 
+    int i=0; 
+    boolean res=false; 
+    try {
+      if (this.cap < 1){throw new Exception();}
+      else {
+        if (this.size < this.cap) {
+          this.vals[this.size] = v; this.size = this.size + 1;
+        } else {
+          new_vals = new int[this.cap];
+          i = 0;
+          while (i < this.cap-1) {
+            new_vals[i] = this.vals[i+1];
+            i = i + 1;
+          }
+          new_vals[this.cap-1] = v;
+          this.vals = new_vals;
+        }
+      }
+      res = true;
+    } catch (Exception e) {
+      println("Failed with zero capacity.");
+    }
+    return res;
+}
+    """
+    // val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
+
+    test("TestSSADL2") {
+        classBodyStatement.apply(new Lexer.Scanner(METHODSTR)) match {
+            case Error(msg, next) => fail(msg)
+            case Failure(msg, next) => fail(msg)
+            case Success(result, next) => result match {
+                case None => fail("parsing successful but no result.")
+                case Some(methoddecl) => methoddecl match {
+                    case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
+                        Flatten.flatMethodDecl(methodDecl).run(Flatten.initStateInfo) match {
+                            case Flatten.FlatError(message) => fail(message)
+                            case Flatten.FlatOk((st, f_methodDecl)) => {
+                                val d_methodDecl = Desugar.dsgOps.desugar(f_methodDecl)
+                                SSADL.kmethodDecl(d_methodDecl).run(SSADL.initState) match {
+                                    case SSADL.SSAError(message) => fail(message)
+                                    case SSADL.SSAOk((st, ssa_methodDecl)) => { 
+                                        println(ssa_methodDecl)
+                                        // assert(ssa == ssa_methodDecl)
+                                    }
+                                }
+                        }
+                    }
+                    }
+                    case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")           
+                }
+            }
+            case _: NoSuccess => fail("parsing failed")
         }
     }
 }
