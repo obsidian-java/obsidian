@@ -28,17 +28,17 @@ public static void main(String [] args) {
                 List(FormalParam(List(),RefType_(ArrayType(RefType_(ClassRefType(ClassType(List((Ident("String"),List()))))))),false,VarId(Ident("args")))),List(),None,
                 SSAMethodBody(
                     List(
-                    SSABlock(SSADL.Label(List(0),None),SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_2")),None)))),
-                    SSABlock(SSADL.Label(List(0),None),SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_4_")),None)))),
-                    SSABlock(SSADL.Label(List(0),None),SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_4___")),None)))),
-                    SSABlock(SSADL.Label(List(0),None),SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_3")),None)))),
-                    SSABlock(SSADL.Label(List(0),None),SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_4_")),None)))),
-                    SSABlock(SSADL.Label(List(0),None),SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_4___")),None)))),
-                    SSABlock(SSADL.Label(List(0),None),SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_0")),None)))),
-                    SSABlock(SSADL.Label(List(1),None),SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_1")),None)))),
-                    SSABlock(SSADL.Label(List(2),None),SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_2")))),EqualA,Lit(IntLit(0))))))),
-                    SSABlock(SSADL.Label(List(3),None),SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("s_3")))),EqualA,Lit(IntLit(0))))))),
-                    SSABlock(SSADL.Label(List(4),None),SSAWhile(List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_4_"))),
+                    SSABlock(SSADL.Label(List(0),None),List(SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_2")),None))),
+                                                            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_4_")),None))),
+                                                            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_4___")),None))),
+                                                            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_3")),None))),
+                                                            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_4_")),None))),
+                                                            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_4___")),None))),
+                                                            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_0")),None))))),
+                    SSABlock(SSADL.Label(List(1),None),List(SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_1")),None))))),
+                    SSABlock(SSADL.Label(List(2),None),List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_2")))),EqualA,Lit(IntLit(0)))))))),
+                    SSABlock(SSADL.Label(List(3),None),List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("s_3")))),EqualA,Lit(IntLit(0)))))))),
+                    SSABlock(SSADL.Label(List(4),None),List(SSAWhile(List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_4_"))),
                                                                         Map(SSADL.Label(List(3),None) -> Name(List(Ident("x_2"))),
                                                                             SSADL.Label(List(4, 0, 0),None) -> Name(List(Ident("x_4_"))))),
                                                                     Phi(Name(List(Ident("s"))),Name(List(Ident("s_4_"))),
@@ -46,9 +46,10 @@ public static void main(String [] args) {
                                                                             SSADL.Label(List(4, 0, 0),None) -> Name(List(Ident("s_4_0_0")))))),
                                                                 BinOp(ExpName(Name(List(Ident("x_2")))),LThan,Lit(IntLit(10))),
                                                                 List(
-                                                                    SSABlock(SSADL.Label(List(4, 0, 0),None),SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("s_4_0_0")))),EqualA,BinOp(ExpName(Name(List(Ident("x_4_")))),Add,ExpName(Name(List(Ident("s_4_"))))))))))),
+                                                                    SSABlock(SSADL.Label(List(4, 0, 0),None),List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("s_4_0_0")))),EqualA,BinOp(ExpName(Name(List(Ident("x_4_")))),Add,ExpName(Name(List(Ident("s_4_")))))))))))),
                                                                     List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_4___"))),Map(SSADL.Label(List(4),Some(Pre)) -> Name(List(Ident("x_4_"))))), 
-                                                                        Phi(Name(List(Ident("s"))),Name(List(Ident("s_4___"))), Map(SSADL.Label(List(4),Some(Pre)) -> Name(List(Ident("s_4_")))))))), SSABlock(SSADL.Label(List(5),None),SSAReturn(None)))))
+                                                                        Phi(Name(List(Ident("s"))),Name(List(Ident("s_4___"))), Map(SSADL.Label(List(4),Some(Pre)) -> Name(List(Ident("s_4_"))))))))), 
+                    SSABlock(SSADL.Label(List(5),None),List(SSAReturn(None))))))
     test("TestSSADL1") {
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
@@ -73,26 +74,29 @@ public static void main(String [] args) {
 
 
 
-class TestSSADL2 extends FunSuite with Matchers {
+class TestSSADL2 extends FunSuite with Matchers { // todo, declaration with init does not work yet!
     val METHODSTR = """
 public static boolean add(int v) {
-    int [] vals=null; 
-    int i=0; 
-    boolean res=false; 
+    int [] nvals; 
+    int i; 
+    boolean res;
+    nvals = null;
+    i=0;
+    res=false;
     try {
       if (this.cap < 1){throw new Exception();}
       else {
         if (this.size < this.cap) {
           this.vals[this.size] = v; this.size = this.size + 1;
         } else {
-          vals = new int[this.cap];
+          nvals = new int[this.cap];
           i = 0;
           while (i < this.cap-1) {
-            vals[i] = this.vals[i+1];
+            nvals[i] = this.vals[i+1];
             i = i + 1;
           }
-          vals[this.cap-1] = v;
-          this.vals = vals;
+          nvals[this.cap-1] = v;
+          this.vals = nvals;
         }
       }
       res = true;

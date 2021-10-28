@@ -40,7 +40,7 @@ object SSADL {
 
   case class SSABlock(
     label: Label,
-    stmt: SSAStmt
+    stmts: List[SSAStmt]
   )
 
   sealed trait SSAStmt 
@@ -412,6 +412,14 @@ object SSADL {
     _   <- put(st1)
   } yield ()
   
+  def removeVarFromVM(v:Name)(implicit m:MonadError[SSAState, ErrorM]): SState[State, Unit] = for {
+    st <- get
+    st1 <- m.pure(st match {
+      case State(vm ,eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs, srcLabelEnv) => State(vm - v, eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs,srcLabelEnv)
+    })
+    _ <- put(st1)
+  } yield ()
+
   /**
     * addNestedVarDecls - add an entry to the nested var decls in the state
     *
@@ -1566,13 +1574,22 @@ object SSADL {
   def kmethodDecl(md:MethodDecl)(implicit m:MonadError[SSAState, ErrorM]):SState[State, SSAMethodDecl] = md match {
     case MethodDecl(modifiers, type_params, return_ty, fname, formal_params, ex_types, exp, body) => body match {
       case MethodBody(None) => m.pure(SSAMethodDecl(modifiers, type_params, return_ty, fname, formal_params, ex_types, exp, SSAMethodBody(Nil)))
-      case MethodBody(Some(block)) => for {
-        blocks <- kBlock(block, SBox) 
-        _ <- addAEnv(TBox)
-        lbl <- toLbl(TBox) 
-        varDeclsStmts <- genVarDecls 
-        varDecls <- m.pure(varDeclsStmts.map(vds => SSABlock(lbl, vds)))
-      } yield SSAMethodDecl(modifiers, type_params, return_ty, fname, formal_params, ex_types, exp, SSAMethodBody(varDecls ++ blocks))
+      case MethodBody(Some(block)) => {
+        val vm = formal_params.foldLeft(Map():VarMap)((vm, param) => {
+          vm + ((paramIdtoName(param)) -> Map(TBox -> (SBox, paramIdtoName(param))))
+        })
+        for {
+          _ <- setVM(vm)
+          blocks <- kBlock(block, SBox) 
+          _ <- addAEnv(TBox)
+          lbl <- toLbl(TBox) 
+          varDeclsStmts <- genVarDecls 
+          varDecls <- m.pure(varDeclsStmts match {
+            case Nil => Nil
+            case (s::ss) => List(SSABlock(lbl, varDeclsStmts))
+            })
+        } yield SSAMethodDecl(modifiers, type_params, return_ty, fname, formal_params, ex_types, exp, SSAMethodBody(varDecls ++ blocks))
+      }
     }
   }
 
@@ -1661,7 +1678,12 @@ object SSADL {
       case SuperFieldAccess(id) => m.pure(e)
       case ClassFieldAccess(n, id) => m.pure(e)
     }
-    case InstanceCreation(type_args, type_decl, args, body) => m.raiseError("SSA construction failed, instance creation is not supported.")
+    case InstanceCreation(type_args, type_decl, args, body) => 
+     
+      for {
+        args1 <- args.traverse(arg => kexp(arg, ctx))
+        // not modifying the body. 
+      } yield InstanceCreation(type_args, type_decl, args1, body)
     case InstanceOf(e, ref_type) => for {
       e1 <- kexp(e, ctx)
     } yield InstanceOf(e1, ref_type) 
@@ -1738,7 +1760,7 @@ object SSADL {
         exp1 <- kexp(exp, tctx)
         msg1 <- msg.traverse( m => kexp(m, tctx))
         _    <- setECtx(tctx)
-      } yield SSABlock(lbl, SSAAssert(exp1, msg1))
+      } yield SSABlock(lbl, List(SSAAssert(exp1, msg1)))
 
       case BasicFor(init, loop_cond, post_update, stmt) => m.raiseError("SSA construction failed, BasicFor should have been desugared.")
 
@@ -1756,7 +1778,7 @@ object SSADL {
               target_tctx <- m.pure(kctx(sctx))
               target_lbl <- toLbl(target_tctx) 
               _          <- addBEnv(tctx, target_tctx)
-            } yield SSABlock(lbl, SSABreak(target_lbl))
+            } yield SSABlock(lbl, List(SSABreak(target_lbl)))
           }
         }
       } yield r
@@ -1773,7 +1795,7 @@ object SSADL {
               target_tctx <- m.pure(kctx(sctx))
               target_lbl <- toLbl(target_tctx) 
               _          <- addCEnv(tctx, target_tctx)
-            } yield SSABlock(lbl, SSAContinue(target_lbl))
+            } yield SSABlock(lbl, List(SSAContinue(target_lbl)))
           }
         }
       } yield r
@@ -1784,7 +1806,7 @@ object SSADL {
         _    <- addAEnv(tctx)
         lbl <- toLbl(tctx)
         _   <- setECtx(tctx)
-      } yield (SSABlock(lbl, SSAEmpty))
+      } yield (SSABlock(lbl, List(SSAEmpty)))
 
       case ExpStmt(Assign(lhs, op, rhs)) => lhs match {
         case NameLhs(x) => for {
@@ -1800,7 +1822,7 @@ object SSADL {
                 case Some(im) => vm + (x -> (im + (tctx -> (ctx, xlbl))))
               })
               _ <- setVM(vm1)
-            } yield SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(NameLhs(xlbl), op, rhs1)))))
+            } yield SSABlock(lbl, List(SSAAssignments(List(ExpStmt(Assign(NameLhs(xlbl), op, rhs1))))))
           }
           _    <- setECtx(tctx)        
         } yield b
@@ -1812,19 +1834,19 @@ object SSADL {
             lbl <- toLbl(tctx)
             e2  <- kexp(e1, tctx)
             _    <- setECtx(tctx)
-          } yield SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(FieldLhs(PrimaryFieldAccess(e2, id)), op, rhs1)))))
+          } yield SSABlock(lbl, List(SSAAssignments(List(ExpStmt(Assign(FieldLhs(PrimaryFieldAccess(e2, id)), op, rhs1))))))
           case SuperFieldAccess(id) => for {
             _  <- addAEnv(tctx)
             rhs1 <- kexp(rhs, tctx)
             lbl <- toLbl(tctx)
             _    <- setECtx(tctx)
-          } yield SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(FieldLhs(SuperFieldAccess(id)), op, rhs1)))))
+          } yield SSABlock(lbl, List(SSAAssignments(List(ExpStmt(Assign(FieldLhs(SuperFieldAccess(id)), op, rhs1))))))
           case ClassFieldAccess(name, id) => for {
             _  <- addAEnv(tctx)
             rhs1 <- kexp(rhs, tctx)
             lbl <- toLbl(tctx)
             _    <- setECtx(tctx)
-          } yield SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(FieldLhs(ClassFieldAccess(name,id)), op, rhs1)))))
+          } yield SSABlock(lbl, List(SSAAssignments(List(ExpStmt(Assign(FieldLhs(ClassFieldAccess(name,id)), op, rhs1))))))
         }
 
         case ArrayLhs(ArrayIndex(e,es)) => for {
@@ -1834,7 +1856,7 @@ object SSADL {
           es1 <- es.traverse( e => kexp(e, tctx))
           lbl <- toLbl(tctx)
           _    <- setECtx(tctx)
-        } yield SSABlock(lbl, SSAAssignments(List(ExpStmt(Assign(ArrayLhs(ArrayIndex(e1,es1)), op, rhs1)))))
+        } yield SSABlock(lbl, List(SSAAssignments(List(ExpStmt(Assign(ArrayLhs(ArrayIndex(e1,es1)), op, rhs1))))))
         
       }
 
@@ -1874,7 +1896,7 @@ object SSADL {
         exp1 <- kexp(exp, tctx)
         lbl  <- toLbl(tctx)
         _    <- setECtx(tctx)
-      } yield SSABlock(lbl, SSAExps(List(ExpStmt(exp1))))
+      } yield SSABlock(lbl, List(SSAExps(List(ExpStmt(exp1)))))
 
       case IfThen(exp, stmt) => m.raiseError("SSA construction failed, If then statment should have been desugared.")
 
@@ -1908,7 +1930,7 @@ object SSADL {
         phis       <- mkPhi(stThenOut, stElseOut, lbl2)
         _          <- extendAllVarsWithContextAndLabel(ctx, tctx, lbl2)
         _          <- setECtx(tctx)
-      } yield SSABlock(lbl, SSAIf(exp1, then_stmts, else_stmts, phis))
+      } yield SSABlock(lbl, List(SSAIf(exp1, then_stmts, else_stmts, phis)))
       
       case Labeled(id, stmt) => for {
         _ <- addSrcLabel(id, ctx)
@@ -1922,12 +1944,12 @@ object SSADL {
           exp1 <- kexp(exp,tctx) 
           _    <- setECtx(tctx)
 
-        } yield SSABlock(lbl, SSAReturn(Some(exp1)))
+        } yield SSABlock(lbl, List(SSAReturn(Some(exp1))))
         case None => for {
           _  <- addAEnv(tctx)
           lbl  <- toLbl(tctx)
           _    <- setECtx(tctx)
-        } yield SSABlock(lbl, SSAReturn(None))
+        } yield SSABlock(lbl, List(SSAReturn(None)))
       }
 
       case StmtBlock(blk) => m.raiseError("SSA construction failed, Statement Block should not be handled here.") // todo
@@ -1941,7 +1963,7 @@ object SSADL {
         exp1 <- kexp(exp, tctx)
         _    <- addEEnv(tctx)
         _    <- setECtx(tctx)
-      } yield SSABlock(lbl, SSAThrow(exp1))
+      } yield SSABlock(lbl, List(SSAThrow(exp1)))
 
 
       case Try(try_blk, Catch(param, catch_blk)::Nil, finally_blk) => finally_blk match {
@@ -1977,7 +1999,9 @@ object SSADL {
               }}) + ((paramIdtoName(param)) -> Map(catch_tctx -> ((ctx, paramIdtoName(param)))))), 
               tctx1p, aenv1, Nil, benv1, cenv1, nestedDecls1, methInvs1, srcLblEnv1)
             }
+          _           <- put(stCatchIn)
           catch_stmts <- kBlock(catch_blk, catch_ctx)
+          _          <- removeVarFromVM(paramIdtoName(param))
           stCatchOut <- get
           
           tctx3 <- m.pure(putTCtx(tctx, TTryPostPhi))
@@ -1987,7 +2011,7 @@ object SSADL {
           _         <- extendAllVarsWithContextAndLabel(ctx, tctx3, lbl3)
           _         <- setECtx(tctx)
           _         <- eenvFromState(st).traverse( ctx => addEEnv(ctx))
-        } yield SSABlock(lbl, SSATry(try_stmts, phis_peri, param, catch_stmts, phis_post))
+        } yield SSABlock(lbl, List(SSATry(try_stmts, phis_peri, param, catch_stmts, phis_post)))
       } 
       case Try(_, Nil, _) => m.raiseError("SSA construction failed, there is no catch in a try statement")
       case Try(_, _::_, _) => m.raiseError("SSA construction failed, Multiple catch clauses encountered, which should have been merged.")
@@ -2073,7 +2097,7 @@ object SSADL {
         _          <- setVM(vm3)
         _          <- extendAllVarsWithContextAndLabel(ctx, tctx3, lbl3)
         _          <- setECtx(tctx3)
-      } yield SSABlock(lbl, SSAWhile(phis_pre_updated, exp1, body_stmts, phis_post2))
+      } yield SSABlock(lbl, List(SSAWhile(phis_pre_updated, exp1, body_stmts, phis_post2)))
     }
   } 
   def paramIdtoName(fp:FormalParam):Name = fp match {
@@ -2104,7 +2128,7 @@ object SSADL {
         vlbl <- mkName(v, lbl)
         lbl1 <- toLbl(eCtx1)
         name <- Rleq(aenv1, eenv1, benv1, cenv1, eCtx1, vm1, v) match {
-          case Nil => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). None exists.")
+          case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub in mkPhi() for ${v}. None exists. ${vm1}")
           case (c,n)::Nil => m.pure(n)
           case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). More than one candidates found.")
         }
@@ -2116,7 +2140,7 @@ object SSADL {
         vlbl <- mkName(v, lbl)
         lbl2 <- toLbl(eCtx2)
         name <- Rleq(aenv2, eenv2, benv2, cenv2, eCtx2, vm2, v) match {
-          case Nil => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). None exists.")
+          case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub in mkPhi() for ${v}. None exists. ${vm2}")
           case (c,n)::Nil => m.pure(n)
           case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). More than one candidates found.")          
         }
@@ -2129,12 +2153,12 @@ object SSADL {
         lbl1 <- toLbl(eCtx1)
         lbl2 <- toLbl(eCtx2)
         name1 <- Rleq(aenv1, eenv1, benv1, cenv1, eCtx1, vm1, v) match {
-          case Nil => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). None exists.")
+          case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub in mkPhi() for ${v}. None exists. ${vm1}")
           case (c,n)::Nil => m.pure(n)
           case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). More than one candidates found.")          
         }
         name2 <- Rleq(aenv2, eenv2, benv2, cenv2, eCtx2, vm2, v) match {
-          case Nil => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). None exists.")
+          case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub in mkPhi() for ${v}. None exists. ${vm2}")
           case (c,n)::Nil => m.pure(n)
           case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). More than one candidates found.")            
         }
@@ -2329,7 +2353,7 @@ object SSADL {
     // array id should not be renamed and should not be merged in phis, we keep them inplace as 
     lbl <- toLbl(tctx)
     varDecls1 <- kVarDecls(varDecls, tctx)
-  } yield SSABlock(lbl, SSAVarDecls(mods, ty, varDecls1))
+  } yield SSABlock(lbl, List(SSAVarDecls(mods, ty, varDecls1)))
   
   def recordVarDecls(mods:List[Modifier], ty:Type, varDecls:List[VarDecl], tCtx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,Unit] = varDecls match {
     case Nil => m.pure(())
