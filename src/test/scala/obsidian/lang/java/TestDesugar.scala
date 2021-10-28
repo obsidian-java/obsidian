@@ -293,7 +293,6 @@ public static void main (String[] args)
       throw exception_desugared;
     }
   }
-  finally {  }
 }
     """
     val d_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(D_METHODSTR)).get.get

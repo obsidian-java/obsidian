@@ -1584,13 +1584,20 @@ object SSADL {
           _ <- addAEnv(TBox)
           lbl <- toLbl(TBox) 
           varDeclsStmts <- genVarDecls 
+          /*
           varDecls <- m.pure(varDeclsStmts match {
             case Nil => Nil
             case (s::ss) => List(SSABlock(lbl, varDeclsStmts))
             })
-        } yield SSAMethodDecl(modifiers, type_params, return_ty, fname, formal_params, ex_types, exp, SSAMethodBody(varDecls ++ blocks))
+            */
+        } yield SSAMethodDecl(modifiers, type_params, return_ty, fname, formal_params, ex_types, exp, SSAMethodBody(prependVarDecls(lbl, varDeclsStmts, blocks)))
       }
     }
+  }
+
+  def prependVarDecls(lbl:Label, vDecls:List[SSAStmt], blocks:List[SSABlock]):List[SSABlock] = blocks match {
+    case Nil => List(SSABlock(lbl, vDecls))
+    case (SSABlock(lbl, stmts))::bs => SSABlock(lbl, vDecls ++ stmts)::bs
   }
 
   

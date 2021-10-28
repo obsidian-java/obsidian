@@ -24,7 +24,7 @@ public static void main(String [] args) {
     """
     val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
     val ssa = SSAMethodDecl(
-                List(Public, Static),List(),None,Ident("main"),
+                List(Public, Static),List(),None,Ident("main"), //TODO maybe we should store formal parameter somewhere separately from the VarMap
                 List(FormalParam(List(),RefType_(ArrayType(RefType_(ClassRefType(ClassType(List((Ident("String"),List()))))))),false,VarId(Ident("args")))),List(),None,
                 SSAMethodBody(
                     List(
@@ -38,7 +38,9 @@ public static void main(String [] args) {
                     SSABlock(SSADL.Label(List(1),None),List(SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_1")),None))))),
                     SSABlock(SSADL.Label(List(2),None),List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_2")))),EqualA,Lit(IntLit(0)))))))),
                     SSABlock(SSADL.Label(List(3),None),List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("s_3")))),EqualA,Lit(IntLit(0)))))))),
-                    SSABlock(SSADL.Label(List(4),None),List(SSAWhile(List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_4_"))),
+                    SSABlock(SSADL.Label(List(4),None),List(SSAWhile(List(
+                                                                    Phi(Name(List(Ident("args"))),Name(List(Ident("args_4_"))),Map(SSADL.Label(List(3),None) -> Name(List(Ident("args"))), SSADL.Label(List(4, 0, 0),None) -> Name(List(Ident("args_4_"))))),
+                                                                    Phi(Name(List(Ident("x"))),Name(List(Ident("x_4_"))),
                                                                         Map(SSADL.Label(List(3),None) -> Name(List(Ident("x_2"))),
                                                                             SSADL.Label(List(4, 0, 0),None) -> Name(List(Ident("x_4_"))))),
                                                                     Phi(Name(List(Ident("s"))),Name(List(Ident("s_4_"))),
@@ -47,7 +49,9 @@ public static void main(String [] args) {
                                                                 BinOp(ExpName(Name(List(Ident("x_2")))),LThan,Lit(IntLit(10))),
                                                                 List(
                                                                     SSABlock(SSADL.Label(List(4, 0, 0),None),List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("s_4_0_0")))),EqualA,BinOp(ExpName(Name(List(Ident("x_4_")))),Add,ExpName(Name(List(Ident("s_4_")))))))))))),
-                                                                    List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_4___"))),Map(SSADL.Label(List(4),Some(Pre)) -> Name(List(Ident("x_4_"))))), 
+                                                                    List(
+                                                                    Phi(Name(List(Ident("args"))),Name(List(Ident("args_4___"))),Map(SSADL.Label(List(4),Some(Pre)) -> Name(List(Ident("args_4_"))))),
+                                                                    Phi(Name(List(Ident("x"))),Name(List(Ident("x_4___"))),Map(SSADL.Label(List(4),Some(Pre)) -> Name(List(Ident("x_4_"))))), 
                                                                         Phi(Name(List(Ident("s"))),Name(List(Ident("s_4___"))), Map(SSADL.Label(List(4),Some(Pre)) -> Name(List(Ident("s_4_"))))))))), 
                     SSABlock(SSADL.Label(List(5),None),List(SSAReturn(None))))))
     test("TestSSADL1") {
@@ -133,7 +137,6 @@ public static boolean add(int v) {
                     case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")           
                 }
             }
-            case _: NoSuccess => fail("parsing failed")
         }
     }
 }
