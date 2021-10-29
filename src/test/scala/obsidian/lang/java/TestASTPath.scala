@@ -1,10 +1,10 @@
-package com.github.luzhuomi.obsidian
+package obsidian.lang.java
 
 import com.github.luzhuomi.scalangj.Lexer
 import com.github.luzhuomi.scalangj.Parser._
 import com.github.luzhuomi.scalangj.Syntax._
-import com.github.luzhuomi.obsidian._ 
-import com.github.luzhuomi.obsidian.ASTPath._
+import obsidian.lang.java._ 
+import obsidian.lang.java.ASTPath._
 
 import org.scalatest.{FunSuite, Matchers}
 

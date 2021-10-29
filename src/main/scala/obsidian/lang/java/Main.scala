@@ -1,4 +1,4 @@
-package com.github.luzhuomi.obsidian
+package obsidian.lang.java
 
 import com.github.luzhuomi.scalangj.Parser._
 import com.github.luzhuomi.scalangj.Pretty._

@@ -1,13 +1,12 @@
-package com.github.luzhuomi.obsidian
-
+package obsidian.lang.java
 
 import cats._
 import cats.implicits._
 
 import cats.data.StateT
 import cats.{ApplicativeError, Functor, MonadError}
-import com.github.luzhuomi.obsidian.ASTPath.ASTPath
-import com.github.luzhuomi.obsidian.SSA.{DomTree, Phi, SDomTable}
+import obsidian.lang.java.ASTPath.ASTPath
+import obsidian.lang.java.SSA.{DomTree, Phi, SDomTable}
 import com.github.luzhuomi.scalangj.Syntax.{Ident, MethodDecl}
 
 import scala.annotation.tailrec

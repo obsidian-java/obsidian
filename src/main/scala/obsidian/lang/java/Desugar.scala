@@ -1,9 +1,9 @@
-package com.github.luzhuomi.obsidian
+package obsidian.lang.java
 
 import scala.collection.Map._
 import com.github.luzhuomi.scalangj.Syntax._
 import com.github.luzhuomi.scalangj.Syntax
-import com.github.luzhuomi.obsidian.ASTUtils._
+import obsidian.lang.java.ASTUtils._
 
 
 /**
@@ -384,13 +384,14 @@ object Desugar {
           case Synchronized(exp, blk) => Synchronized(dsgOps.desugar(exp), dsgOps.desugar(blk))
           case Throw(exp) => Throw(dsgOps.desugar(exp))
           // collapse catches into 1 catch with if else and instance of
-          //       add an empty finally block if it is None
+          //       add an empty finally block if it is None (update, not doing this anymore as finally does not work well with break and continue)
+          //  TODO: we should lift and clone the finally block to all the exits 
           case Try(try_blk, catches, finally_blk) => {
             val catches_p = catches.map(c => dsgOps.desugar(c))
             val catches_merged = mergeCatches(catches_p)
             val finally_blk_p = finally_blk.map(b => dsgOps.desugar(b)) match {
               case Some(b) => Some(b)
-              case None => Some(Block(Nil))
+              case None => None // Some(Block(Nil))
             }
             Try(dsgOps.desugar(try_blk), List(catches_merged), finally_blk_p)
           }
