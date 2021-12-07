@@ -2546,47 +2546,5 @@ object SSADL {
   */
 
 
-  trait CountPhi[A] {
-    def cntPhi(a:A):Int
-  }
 
-  object countPhiOps {
-    def cntPhi[A](a:A)(implicit cp:CountPhi[A]):Int = cp.cntPhi(a)
-  }
-
-  implicit def declCntPhi:CountPhi[SSAMethodDecl] = new CountPhi[SSAMethodDecl] {
-    override def cntPhi(a:SSAMethodDecl):Int = a match {
-      case SSAMethodDecl(mods, ty_params, ty, id, fps, ex_types, exp, body) => 
-        countPhiOps.cntPhi(body)
-    }
-  }
-
-  implicit def bodyCntphi:CountPhi[SSAMethodBody] = new CountPhi[SSAMethodBody] {
-    override def cntPhi(a:SSAMethodBody):Int = a match {
-      case SSAMethodBody(blocks) => blocks.map(countPhiOps.cntPhi(_)).sum
-    }
-  }
-
-  implicit def blockCntPhi:CountPhi[SSABlock] = new CountPhi[SSABlock] {
-    override def cntPhi(a:SSABlock):Int = a match {
-      case SSABlock(lbl, stmts) => stmts.map(countPhiOps.cntPhi(_)).sum
-    }
-  }
-
-  implicit def stmtCntPhi:CountPhi[SSAStmt] = new CountPhi[SSAStmt] {
-    override def cntPhi(a:SSAStmt):Int = a match {
-      case SSAVarDecls(mods, ty, varDecls) => 0
-      case SSAAssert(exp, msg) => 0
-      case SSAAssignments(stmts) => 0
-      case SSAExps(stmts) => 0
-      case SSAReturn(_) => 0
-      case SSAThrow(_) => 0
-      case SSABreak(_) => 0
-      case SSAContinue(_) => 0
-      case SSAEmpty => 0
-      case SSATry(tryStmts, phiCatch, param, catchStmts, phiFinally) => phiCatch.size + phiFinally.size + tryStmts.map(countPhiOps.cntPhi(_)).sum + catchStmts.map(countPhiOps.cntPhi(_)).sum  
-      case SSAWhile(phiEntr, exp, stmts, phiExit) => phiEntr.size + phiExit.size + stmts.map(countPhiOps.cntPhi(_)).sum
-      case SSAIf(e, thenStmts, elseStmts, phiExit) => phiExit.size + thenStmts.map(countPhiOps.cntPhi(_)).sum + elseStmts.map(countPhiOps.cntPhi(_)).sum
-    }
-  }
 }
