@@ -1673,7 +1673,7 @@ object SSADL {
         case State(vm, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs, srcLblEnv) => Rlt(aenv, eenv, benv, cenv, ctx, vm, name) match {
           case Nil => m.raiseError(s"SSA construction failed, Rlt failed to find a lub for ${name} during expression conversion. None exists. ${ctx}, ${vm.toList}")
           case (c,name1)::Nil => m.pure(ExpName(name1))
-          case _::_ => m.raiseError("SSA construction failed, Rlt failed to find a lub during expression conversion. More than one candidates found.")
+          case _::_ => m.raiseError(s"SSA construction failed, Rlt failed to find a lub for ${name} during expression conversion. More than one candidates found. ${ctx}, ${vm.toList}")
         }
       }
     } yield exp1
@@ -1935,7 +1935,7 @@ object SSADL {
         lbl2       <- toLbl(tctx2)
 
         phis       <- mkPhi(stThenOut, stElseOut, lbl2)
-        _          <- extendAllVarsWithContextAndLabel(ctx, tctx, lbl2)
+        _          <- extendAllVarsWithContextAndLabel(ctx, tctx2, lbl2)
         _          <- setECtx(tctx)
       } yield SSABlock(lbl, List(SSAIf(exp1, then_stmts, else_stmts, phis)))
       
