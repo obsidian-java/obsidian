@@ -1768,12 +1768,19 @@ object MinSSAL {
 
         tctx3 <- m.pure(putTCtx(tctx, TWhilePostPhi))
         lbl3  <- m.pure(tctx3)
-        phis_post <- stBodyOut match {
-          case State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, nestedDecls2, methInvs2, srcLblEnv2) => vm2.keySet.toList.traverse( v => for {
-            v_lbl3 <- mkName(v, lbl3)
-            v_lbl1 <- mkName(v, lbl1)
-          } yield Phi(v, v_lbl3, Map(lbl1 -> v_lbl1)))
-        }
+        phis_post <- (st, stBodyIn, stBodyOut) match { // vm3 // todo: what about those from eenv
+            case (State(vm0, eCtx0, aenv0, eenv0, benv0, cenv0, nestedDecls0, methInvs0, srcLblEnv0),
+                State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1, nestedDecls1, methInvs1, srcLblEnv1),
+                State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, nestedDecls2, methInvs2, srcLblEnv2)) => {
+                  val vs = (diffVarMap(vm2,vm1)).keySet // dom3(vm2 - vm1)
+                  for {
+                    phis <- vs.toList.traverse( v => for {
+                      v_lbl3 <- mkName(v, lbl3)
+                      v_lbl1 <- mkName(v, lbl1)
+                    } yield Phi(v, v_lbl3, Map(lbl1 -> v_lbl1)))
+                  } yield phis
+                }
+              }
         // update with the break statements
         phis_post2 <- phis_post.traverse(phi => updatePhiFromBEnv(phi,stBodyOut,tctx))
         vm3        <- (stBodyIn,stBodyOut) match {
