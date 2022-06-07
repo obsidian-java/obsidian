@@ -1055,21 +1055,25 @@ object MinSSAL {
       }
       
     }
-  } 
-
-  def Rlt(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv, ctx:TCtx, vm:VarMap, x:Name):List[(TCtx,Name)] = R(aenv, eenv, benv, cenv, ctx, vm, x, 
-    {
-      case ((tctx1, tctx2))  => (partialOrderTCtx(aenv, eenv, benv, cenv).partialCompare(tctx1, tctx2) == -1.0)
+  }
+  
+  
+  def Rlt(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv, ctx:TCtx, vm:VarMap, x:Name):List[(TCtx,Name)] = { 
+    def cmp(p:(TCtx,TCtx)):Boolean = p match {
+      case (tctx1, tctx2)  => (partialOrderTCtx(aenv, eenv, benv, cenv).partialCompare(tctx1, tctx2) == -1.0)
     }
-  ) 
+    R(aenv, eenv, benv, cenv, ctx, vm, x, cmp)
+  }
 
-  def Rleq(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv, ctx:TCtx, vm:VarMap, x:Name):List[(TCtx,Name)] = R(aenv, eenv, benv, cenv, ctx, vm, x, 
-    {
-      case ((tctx1, tctx2))  => { 
-        val pot = partialOrderTCtx(aenv, eenv, benv, cenv)
-        ((pot.partialCompare(tctx1, tctx2) == -1.0) || (pot.partialCompare(tctx1, tctx2) == 0.0))
+  def Rleq(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv, ctx:TCtx, vm:VarMap, x:Name):List[(TCtx,Name)] = {
+    def cmp(p:(TCtx,TCtx)):Boolean = p match {
+        case ((tctx1, tctx2))  => { 
+          val pot = partialOrderTCtx(aenv, eenv, benv, cenv)
+          ((pot.partialCompare(tctx1, tctx2) == -1.0) || (pot.partialCompare(tctx1, tctx2) == 0.0))
+        }
       }
-    })
+    R(aenv, eenv, benv, cenv, ctx, vm, x, cmp)
+  }
 
   /**
     * Compute the name from the lub of all the reachable context until ctx
@@ -1084,7 +1088,7 @@ object MinSSAL {
     * @param cmp - modifier to switch between leq or lt
     * @return - return the name of the variable that is the most recent dominator of x
     */
-  def R(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv, ctx:TCtx, vm:VarMap, x:Name, cmp:(TCtx,TCtx) => Boolean):List[(TCtx,Name)] = vm.get(x) match { // perhaps we should report the error properly
+  def R(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv, ctx:TCtx, vm:VarMap, x:Name, cmp:((TCtx,TCtx)) => Boolean):List[(TCtx,Name)] = vm.get(x) match { // perhaps we should report the error properly
     case None => Nil
     case Some(trs) => {
       val tcvs = for { 
@@ -1614,7 +1618,7 @@ object MinSSAL {
         _    <- setECtx(tctx)
       } yield SSABlock(lbl, List(SSAThrow(exp1)))
 
-
+      /* TODO fix me
       case Try(try_blk, Catch(param, catch_blk)::Nil, finally_blk) => finally_blk match {
         case Some(b) => m.raiseError("SSA construction failed, Try catch finally should be desugared to Try catch.")
         case None    => for {
@@ -1661,7 +1665,7 @@ object MinSSAL {
           _         <- setECtx(tctx)
           _         <- eenvFromState(st).traverse( ctx => addEEnv(ctx))
         } yield SSABlock(lbl, List(SSATry(try_stmts, phis_peri, param, catch_stmts, phis_post)))
-      } 
+      } */
       case Try(_, Nil, _) => m.raiseError("SSA construction failed, there is no catch in a try statement")
       case Try(_, _::_, _) => m.raiseError("SSA construction failed, Multiple catch clauses encountered, which should have been merged.")
       case While(exp, stmt) => for {
@@ -1674,7 +1678,7 @@ object MinSSAL {
         // lbl1_0  <- m.pure(tctx_pre0) // not in used, we use option 2
         lbl1  <- m.pure(tctx_pre1)
 
-        phis_pre  <- st match {
+        phis_pre  <- st match { // phi_bar
           case State(vm0, eCtx0, aenv0, eenv0, benv0, cenv0, nestedDecls0, methInvs0, srcLblEnv0) 
           if ((eenv0++dom(benv0++cenv0)).contains(eCtx0)) => // is this still possible? it means the while statement is dead code
             vm0.keySet.toList.traverse( v => for {
@@ -1690,7 +1694,7 @@ object MinSSAL {
               }
             } yield Phi(v, v_lbl, rhs))
         }
-        stBodyIn <- st match {
+        stBodyIn <- st match { // creating vm1
           case State(vm0, eCtx0, aenv0, eenv0, benv0, cenv0, nestedDecls0, methInvs0, srcLblEnv0) => for {
             entries <- vm0.keySet.toList.traverse( v => for {
               v_lbl <- mkName(v, lbl1)
@@ -1707,7 +1711,7 @@ object MinSSAL {
         body_stmts <- kstmtBlock(stmt, body_ctx)
         stBodyOut <- get
 
-        phis_pre_updated <- (st, stBodyIn, stBodyOut) match {
+        phis_pre_updated <- (st, stBodyIn, stBodyOut) match { // phi_bar'
           // todo check the case for break and continue
           case (State(vm0, eCtx0, aenv0, eenv0, benv0, cenv0, nestedDecls0, methInvs0, srcLblEnv0),
                State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1, nestedDecls1, methInvs1, srcLblEnv1), 
@@ -1718,7 +1722,7 @@ object MinSSAL {
           case (State(vm0, eCtx0, aenv0, eenv0, benv0, cenv0, nestedDecls0, methInvs0, srcLblEnv0),
                 State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1, nestedDecls1, methInvs1, srcLblEnv1),
                 State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, nestedDecls2, methInvs2, srcLblEnv2)) => {
-            val vs = diffVarMap(vm2,vm1).keySet // dom3(vm2- vm1)
+            val vs = diffVarMap(vm2,vm1).keySet // dom3(vm2- vm1) // TODO: do we need to exclude those in benv and cenv?
             for {
               phis <- vs.toList.traverse (v => for { 
                 v_lbl <- mkName(v, lbl1)
@@ -1739,32 +1743,36 @@ object MinSSAL {
             } yield phis2
           }
         }
-        subst <- (st, stBodyIn, stBodyOut) match { 
-          // todo check the case for break and continue // no need?
-          // 
-          case (State(vm0, eCtx0, aenv0, eenv0, benv0, cenv0, nestedDecls0, methInvs0, srcLblEnv0),
-                State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1, nestedDecls1, methInvs1, srcLblEnv1),
-                State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, nestedDecls2, methInvs2, srcLblEnv2)) => for {
-                  vs <- m.pure(diffVarMap(vm2, vm1).keySet) // dom3(vm2 - vm1)
-                  no_update <- m.pure(vm0.keySet - vs)
-                  s <- no_update.traverse( v => for {
-                    v_lbl1 <- mkName(v,lbl1) // the v_l1 to be renamed back to the original
-                    v_ori <- Rleq(aenv0, eenv0, benv0, cenv0, eCtx0, vm0, v) match {
-                      case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub during the while stmt conversion.")
-                      case (c,n)::Nil => m.pure(n)
-                      case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub during the while stmt conversion. More than one candidates found.")          
-                    }
-                  } yield (v_lbl1, v_or))
-                } yield s.foldLeft(empty)((m,p) => (m + (p._0 -> p._1)))
-          }
+        subst <- mkSubstFromStates(st, stBodyIn, stBodyOut, lbl1) // theta
         // to be cobntinue here.
+        body_stmts_s <- m.pure(body_stmts.map(appSubst(subst, _))) // theta(B)
+
+        // vm3 // todo what about cenv and benv
+        vm3 <- (st, stBodyIn, stBodyOut) match { // vm3 
+            case (State(vm0, eCtx0, aenv0, eenv0, benv0, cenv0, nestedDecls0, methInvs0, srcLblEnv0),
+                State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1, nestedDecls1, methInvs1, srcLblEnv1),
+                State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, nestedDecls2, methInvs2, srcLblEnv2)) => {
+                  val vs = (diffVarMap(vm2,vm1)).keySet // dom3(vm2 - vm1)
+                  for {
+                    entries <- vs.toList.traverse( v => for {
+                      v_lbl <- mkName(v, lbl1)
+                    } yield (v, tctx_pre1, ctx, v_lbl))
+                  } yield entries.foldLeft(vm0 ++ diffVarMap(vm2,vm1))((vm3, ent) => ent match {
+                      case (v, tctx11, sctx, v_lbl) => vm3.get(v) match {
+                        case None => vm3
+                        case Some(m) => vm1 + (v -> (m + (tctx11  -> (sctx, v_lbl))))
+                      }
+                  }) 
+                }
+        }
+
         tctx3 <- m.pure(putTCtx(tctx, TWhilePostPhi))
-        lbl3  <- toLbl(tctx3)
+        lbl3  <- m.pure(tctx3)
         phis_post <- stBodyOut match {
           case State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, nestedDecls2, methInvs2, srcLblEnv2) => vm2.keySet.toList.traverse( v => for {
             v_lbl3 <- mkName(v, lbl3)
-            v_lbl0 <- mkName(v, lbl0)
-          } yield Phi(v, v_lbl3, Map(lbl0 -> v_lbl0)))
+            v_lbl1 <- mkName(v, lbl1)
+          } yield Phi(v, v_lbl3, Map(lbl1 -> v_lbl1)))
         }
         // update with the break statements
         phis_post2 <- phis_post.traverse(phi => updatePhiFromBEnv(phi,stBodyOut,tctx))
@@ -1778,7 +1786,7 @@ object MinSSAL {
         _          <- setVM(vm3)
         _          <- extendAllVarsWithContextAndLabel(ctx, tctx3, lbl3)
         _          <- setECtx(tctx3)
-      } yield SSABlock(lbl, List(SSAWhile(phis_pre_updated, exp1, body_stmts, phis_post2)))
+      } yield SSABlock(lbl, List(SSAWhile(phis_pre_updated, exp1, body_stmts_s, phis_post2)))
     }
   } 
 
@@ -1977,6 +1985,41 @@ object MinSSAL {
       }
     }
   }
+
+  /**
+    * make substitution for while conversion
+    *
+    * @param st0 - input state to the entire statement
+    * @param st1 - input state to the while body
+    * @param st2 - output state from the while body
+    * @param lbl1 - preWhilePhi^0 
+    * @param m
+    * @return
+    */
+
+  def mkSubstFromStates(st0:State, st1:State, st2:State, lbl1:Label)(implicit m:MonadError[SSAState,ErrorM]):SState[State,Map[Name,Name]] = (st0, st1, st2) match { 
+    // todo check the case for break and continue // no need?
+    // 
+    case (State(vm0, eCtx0, aenv0, eenv0, benv0, cenv0, nestedDecls0, methInvs0, srcLblEnv0),
+          State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1, nestedDecls1, methInvs1, srcLblEnv1),
+          State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, nestedDecls2, methInvs2, srcLblEnv2)) => {
+            val vs = diffVarMap(vm2, vm1).keySet // dom3(vm2 - vm1)
+            val no_update = vm0.keySet -- vs
+            for {
+              ls <- no_update.toList.traverse(v => for {
+                v_lbl1 <- mkName(v,lbl1) // the v_l1 to be renamed back to the original
+                v_ori <- Rleq(aenv0, eenv0, benv0, cenv0, eCtx0, vm0, v) match {
+                  // case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub during the while stmt conversion.")
+                  case (c,n)::Nil => m.pure(n)
+                  // case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub during the while stmt conversion. More than one candidates found.")          
+                }
+              } yield (v_lbl1, v_ori))
+           } yield ls.foldLeft(Map():Map[Name,Name])((m,p:(Name,Name)) => (m + (p._1 -> p._2)))
+    }
+  }
+
+  // TODO
+  def appSubst(subst:Map[Name,Name], b:SSABlock): SSABlock = b
 
 
 
