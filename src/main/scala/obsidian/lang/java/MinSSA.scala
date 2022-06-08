@@ -126,7 +126,6 @@ object MinSSAL {
 
 
 
-  // TODO
 
   trait SubstName[A] {
     def appSubst(subst:Map[Name,Name], a:A):A
@@ -173,14 +172,85 @@ object MinSSAL {
     }
   }
 
+  implicit def appSubstStmt:SubstName[Stmt] = new SubstName[Stmt] {
+    override def appSubst(subst:Map[Name, Name], stmt:Stmt):Stmt = stmt match { 
+      // we only need to apply subst to expression statment and assignment statement, 
+      // the rest are either desugared away or not stratefied into the SSA AST
+      case Assert(exp, msg) => stmt
+      case BasicFor(init, loop_cond, post_update, stmt1) => stmt
+      case Break(id) => stmt
+      case Continue(id) => stmt 
+      case Do(stmt1, exp) => stmt 
+      case Empty => stmt
+      case EnhancedFor(modifiers, ty, id, exp, stmt1) => stmt 
+      case ExpStmt(exp) => ExpStmt(snOps.appSubst(subst, exp))
+      case IfThen(exp, stmt1) => stmt 
+      case IfThenElse(exp, then_stmt, else_stmt) => stmt 
+      case Labeled(id, stmt1) => stmt 
+      case Return(exp) => stmt 
+      case StmtBlock(blk) => stmt 
+      case Switch(exp, blocks) => stmt 
+      case Synchronized(exp, blk) => stmt 
+      case Throw(exp) => stmt 
+      case Try(try_blk, catches, finally_blk) => stmt 
+      case While(exp, stmt1) => stmt 
+    }
+  }
+
   implicit def appSubstPhi:SubstName[Phi] = new SubstName[Phi] {
     override def appSubst(subst:Map[Name,Name], p:Phi):Phi = p match {
       case Phi(srcVar, renVar, rhs) => Phi(srcVar, renVar, snOps.appSubst(subst, rhs))
     }
   }
 
+  implicit def appSubstExp:SubstName[Exp] = new SubstName[Exp] {
+    override def appSubst(subst:Map[Name,Name], e:Exp):Exp = e match {
+      case ArrayAccess(ArrayIndex(e,es)) => ArrayAccess(ArrayIndex(snOps.appSubst(subst,e), snOps.appSubst(subst,es)))
+      case Cast(ty, e) => Cast(ty, snOps.appSubst(subst, e))
+      case ArrayCreate(ty, exps, num_dims) => ArrayCreate(ty, snOps.appSubst(subst, exps), num_dims)
+      case ArrayCreateInit(ty, size, ArrayInit(v_inits)) => ArrayCreateInit(ty, size, ArrayInit(snOps.appSubst(subst, v_inits)))
+      case Assign(lhs, op, rhs) => Assign(snOps.appSubst(subst, lhs), op, snOps.appSubst(subst, rhs))
+    }
+  }
+
+  implicit def appSubstVarInit:SubstName[VarInit] = new SubstName[VarInit] { 
+    override def appSubst(subst:Map[Name, Name], v_init:VarInit):VarInit = v_init match {
+      case InitExp(e) => InitExp(snOps.appSubst(subst, e))
+      case InitArray(array_init) => InitArray(snOps.appSubst(subst, array_init)) 
+    }
+  }
+
+  implicit def appSubstArrayInit:SubstName[ArrayInit] = new SubstName[ArrayInit] {
+    override def appSubst(subst:Map[Name, Name], array_init:ArrayInit):ArrayInit = array_init match {
+      case ArrayInit(var_inits) => ArrayInit(snOps.appSubst(subst, var_inits))
+    }
+  }
+
+  implicit def appSubstLhs:SubstName[Lhs] = new SubstName[Lhs] {
+    override def appSubst(subst:Map[Name, Name], lhs:Lhs):Lhs = lhs match {
+      case NameLhs(n) => NameLhs(snOps.appSubst(subst, n))
+      case FieldLhs(field_access) => FieldLhs(snOps.appSubst(subst, field_access))
+      case ArrayLhs(array_idx) => ArrayLhs(snOps.appSubst(subst, array_idx))
+    }
+  }
+
+  implicit def appSubstFieldAccess:SubstName[FieldAccess] = new SubstName[FieldAccess] {
+    override def appSubst(subst:Map[Name, Name], fieldAccess:FieldAccess):FieldAccess = fieldAccess match {
+      case ClassFieldAccess(name, id) => ClassFieldAccess(snOps.appSubst(subst, name), id)
+      case PrimaryFieldAccess(e, id) => PrimaryFieldAccess(snOps.appSubst(subst, e), id)
+      case SuperFieldAccess(id) => SuperFieldAccess(id)
+    }
+  }
+
+  implicit def appSubstArrayIdx:SubstName[ArrayIndex] = new SubstName[ArrayIndex] {
+    override def appSubst(subst: Map[Name,Name], a: ArrayIndex): ArrayIndex = a match {
+      case ArrayIndex(e,es) => ArrayIndex(snOps.appSubst(subst, e), snOps.appSubst(subst, es))
+    }
+  }
+
+
   implicit def appSubstName:SubstName[Name] = new SubstName[Name] {
-    override def appSusbt(subst:Map[Name,Name], n:Name):Name = subst.get(n) match {
+    override def appSubst(subst:Map[Name,Name], n:Name):Name = subst.get(n) match {
       case None => n
       case Some(rn) => rn
     }
@@ -309,9 +379,9 @@ object MinSSAL {
     }
   })
 
-  def varMapToList(vm:VarMap):List[(Name, (TCtx, (SCtx, Name)))] = vm.toList.flatMap( (n, m) => {
-    m.toList.map( (tctx, sctx_n2) => (n, (tctx, sctx_n2))) 
-  })
+  def varMapToList(vm:VarMap):List[(Name, (TCtx, (SCtx, Name)))] = vm.toList.flatMap( { case (n, m) => {
+    m.toList.map( { case (tctx, sctx_n2) => (n, (tctx, sctx_n2)) }) 
+  }} )
 
 
   /**
@@ -1806,7 +1876,7 @@ object MinSSAL {
         }
         subst <- mkSubstFromStates(st, stBodyIn, stBodyOut, lbl1) // theta
         // to be cobntinue here.
-        body_stmts_s <- m.pure(body_stmts.map(appSubst(subst, _))) // theta(B)
+        body_stmts_s <- m.pure(body_stmts.map(snOps.appSubst(subst, _))) // theta(B)
 
         // vm3 // todo what about cenv and benv and eenv
         vm3 <- (st, stBodyIn, stBodyOut) match { // vm3 
