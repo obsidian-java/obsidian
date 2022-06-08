@@ -34,7 +34,7 @@ object MinSSAL {
 
   type Label = TCtx 
 
-    sealed trait SSAStmt 
+  sealed trait SSAStmt 
   // to handle nested decl, not in the paper
   case class SSAVarDecls(mods:List[Modifier], ty:Type, varDecls:List[VarDecl]) extends SSAStmt
 
@@ -64,33 +64,33 @@ object MinSSAL {
     * 
     *
     * @param tryStmts: try blocks
-    * @param phiCatch: Phis before the catch block
-    * @param params: parameters for the catch block
+    * @param phi_peri: Phis before the catch block
+    * @param catchParam: parameters for the catch block
     * @param catchStmts: catch blocks
-    * @param phiFinally: Phis after the catch block
+    * @param phi_post: Phis after the catch block
     */
   case class SSATry(
     tryStmts:List[SSABlock], 
-    phiCatch: List[Phi],
-    param: FormalParam,
+    phi_peri: List[Phi],
+    catchParam: FormalParam,
     catchStmts:List[SSABlock],
-    phiFinally: List[Phi] 
+    phi_post: List[Phi] 
   ) extends SSAStmt
 
   
   /**
     * 
     *
-    * @param phiEntr: Phis at the entry of the while stmt
+    * @param phi_pre: Phis at the entry of the while stmt
     * @param exp: boolean expression
     * @param stmts
-    * @param phiExit: Phis at the exit of the while stmt
+    * @param phi_post: Phis at the exit of the while stmt
     */
   case class SSAWhile(
-    phiEntr: List[Phi],
+    phi_pre: List[Phi],
     exp: Exp,
     stmts:List[SSABlock],
-    phiExit: List[Phi]
+    phi_post: List[Phi]
   ) extends SSAStmt
 
 
@@ -99,13 +99,13 @@ object MinSSAL {
     * @param exp boolean expression
     * @param thenStmts then blocks
     * @param elseStmts else blocks
-    * @param phiExit: Phis at the exit of the while stmt
+    * @param phi_post: Phis at the exit of the while stmt
     */
   case class SSAIf(
     exp:Exp,
     thenStmts:List[SSABlock],
     elseStmts:List[SSABlock],
-    phiExit: List[Phi]
+    phi_post: List[Phi]
   ) extends SSAStmt
 
 
@@ -124,6 +124,67 @@ object MinSSAL {
     rhs:Map[Label, Name]
   )
 
+
+
+  // TODO
+
+  trait SubstName[A] {
+    def appSubst(subst:Map[Name,Name], a:A):A
+  }
+  object snOps {
+    def appSubst[A](subst:Map[Name,Name], a:A)(implicit sn:SubstName[A]):A = sn.appSubst(subst, a)
+  }
+  
+  implicit def appSubstList[A](implicit sna:SubstName[A]) = new SubstName[List[A]] {
+    override def appSubst(subst:Map[Name, Name], l:List[A]):List[A] = l.map(sna.appSubst(subst,_))
+  }
+
+  implicit def appSubstOption[A](implicit sna:SubstName[A]) = new SubstName[Option[A]] {
+    override def appSubst(subst:Map[Name, Name], o:Option[A]):Option[A] = o.map(sna.appSubst(subst,_))
+  }
+
+  implicit def appSusbtMap[K,A](implicit sna:SubstName[A]) = new SubstName[Map[K,A]] {
+    override def appSubst(subst:Map[Name, Name], m:Map[K, A]):Map[K, A] = m.map( { case (k,v) => (k, sna.appSubst(subst,v)) })
+  }
+
+  implicit def appSubstSSABlock:SubstName[SSABlock] = new SubstName[SSABlock] { 
+    override def appSubst(subst:Map[Name,Name], b:SSABlock): SSABlock = b match {
+      case SSABlock(lbl, stmts) => SSABlock(lbl, snOps.appSubst(subst, stmts))
+    }
+  }
+
+  implicit def appSubstSSAStmt:SubstName[SSAStmt] = new SubstName[SSAStmt] {
+    override def appSubst(subst:Map[Name,Name], s:SSAStmt): SSAStmt = s match {
+      case SSAVarDecls(mods, ty, varDecls) => s // nothing to substitute since vardecls appear at the start of a method
+      case SSAAssert(e, msg) => SSAAssert(snOps.appSubst(subst, e), snOps.appSubst(subst,msg))
+      case SSAAssignments(stmts) => SSAAssignments(snOps.appSubst(subst, stmts))
+      case SSAExps(es) => SSAExps(snOps.appSubst(subst, es))
+      case SSAReturn(o) => SSAReturn(snOps.appSubst(subst, o))
+      case SSAThrow(e) => SSAThrow(snOps.appSubst(subst,e))
+      case SSABreak(lbl) => s
+      case SSAContinue(lbl) => s 
+      case SSAEmpty => s 
+      case SSATry(tryStmts, phi_peri, catchParam, catchStmts, phi_post) => 
+        SSATry(snOps.appSubst(subst, tryStmts), snOps.appSubst(subst, phi_peri), catchParam, snOps.appSubst(subst, catchStmts), snOps.appSubst(subst, phi_post))
+      case SSAWhile(phi_pre,e, stmts, phi_post) => 
+        SSAWhile(snOps.appSubst(subst, phi_pre), snOps.appSubst(subst, e), snOps.appSubst(subst, stmts), snOps.appSubst(subst, phi_post))
+      case SSAIf(e, tStmts, eStmts, phi) => 
+        SSAIf(snOps.appSubst(subst, e), snOps.appSubst(subst, tStmts), snOps.appSubst(subst, eStmts), snOps.appSubst(subst, phi))
+    }
+  }
+
+  implicit def appSubstPhi:SubstName[Phi] = new SubstName[Phi] {
+    override def appSubst(subst:Map[Name,Name], p:Phi):Phi = p match {
+      case Phi(srcVar, renVar, rhs) => Phi(srcVar, renVar, snOps.appSubst(subst, rhs))
+    }
+  }
+
+  implicit def appSubstName:SubstName[Name] = new SubstName[Name] {
+    override def appSusbt(subst:Map[Name,Name], n:Name):Name = subst.get(n) match {
+      case None => n
+      case Some(rn) => rn
+    }
+  }
 
   /**
     * Source language Context
@@ -1747,7 +1808,7 @@ object MinSSAL {
         // to be cobntinue here.
         body_stmts_s <- m.pure(body_stmts.map(appSubst(subst, _))) // theta(B)
 
-        // vm3 // todo what about cenv and benv
+        // vm3 // todo what about cenv and benv and eenv
         vm3 <- (st, stBodyIn, stBodyOut) match { // vm3 
             case (State(vm0, eCtx0, aenv0, eenv0, benv0, cenv0, nestedDecls0, methInvs0, srcLblEnv0),
                 State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1, nestedDecls1, methInvs1, srcLblEnv1),
@@ -1783,15 +1844,16 @@ object MinSSAL {
               }
         // update with the break statements
         phis_post2 <- phis_post.traverse(phi => updatePhiFromBEnv(phi,stBodyOut,tctx))
+        /*
         vm3        <- (stBodyIn,stBodyOut) match {
           case (State(vm1,eCtx1,aenv1,eenv1, benv1, cenv1, nestedDecls1, methInvs1, srcLblEnv1), State(vm2,eCtx2,aenv2,eenv2, benv2, cenv2, nestedDecls2, methInvs2, srcLblEnv2)) => {
             val ctxs = eenv2 ++ dom(codexclude(benv2,tctx) ++ codexclude(cenv2,tctx))
             val intervals = ctxs.map( ctx => interval_leq(vm2,aenv2,eenv2,benv2,cenv2,tctx_pre,ctx) ) 
             m.pure(intervals.foldLeft(vm1)((m1,m2) => unionVarMap(m1,m2))) 
           }
-        }
+        }*/
         _          <- setVM(vm3)
-        _          <- extendAllVarsWithContextAndLabel(ctx, tctx3, lbl3)
+        _          <- extendVarsWithContextAndLabel(phis_post2.map(phi => phi match {case Phi(v, rn_v, rhs) => v}), ctx, tctx3, lbl3)
         _          <- setECtx(tctx3)
       } yield SSABlock(lbl, List(SSAWhile(phis_pre_updated, exp1, body_stmts_s, phis_post2)))
     }
@@ -1899,6 +1961,19 @@ object MinSSAL {
   } yield stmts
 
   /**
+    * prepand variable declaration to the current list of blocks
+    *
+    * @param lbl
+    * @param vDecls
+    * @param blocks
+    * @return
+    */
+  def prependVarDecls(lbl:Label, vDecls:List[SSAStmt], blocks:List[SSABlock]):List[SSABlock] = blocks match {
+    case Nil => List(SSABlock(lbl, vDecls))
+    case (SSABlock(lbl, stmts))::bs => SSABlock(lbl, vDecls ++ stmts)::bs
+  }
+
+  /**
     * Turn the list of nested declaration into a hash map (name -> (Type, [Modifier]))
     *
     * @param nestedDecls
@@ -1993,6 +2068,27 @@ object MinSSAL {
     }
   }
 
+
+  def updatePhiFromBEnv(phi:Phi, st:State, parentctx:TCtx)(implicit m:MonadError[SSAState,ErrorM]):SState[State,Phi] = (st,phi) match {
+      case (State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, nestedDecls2, methInvs2, srcLblEnv2), Phi(v,v_vlbl,rhs_map)) => { 
+      {
+        def go(ctxb:TCtx):SState[State, (Label, Name)] = for {
+          lbl_b <- m.pure(ctxb)
+          name <- Rleq(aenv2, eenv2, benv2, cenv2, ctxb, vm2, v) match {
+            case Nil => m.pure(v_vlbl) // as default, since the set could be empty, which still lattice
+            case ((c,n)::Nil) => m.pure(n)
+            case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub during the while stmt conversion. More than one candidates found.")
+          }
+        } yield (lbl_b,name)
+        val benv2_filtered_dom = benv2.filter( (x:(TCtx,Option[TCtx])) => x._2 == Some(parentctx)).map(p=>p._1)
+        for { 
+          rhs_tb_added <- benv2_filtered_dom.traverse(go)
+          rhs_map_updated <- m.pure(rhs_tb_added.foldLeft(rhs_map)((m,p)=>m + (p._1 -> p._2)))
+        } yield Phi(v, v_vlbl, rhs_map_updated)
+      }
+    }
+  }
+
   /**
     * make substitution for while conversion
     *
@@ -2025,8 +2121,7 @@ object MinSSAL {
     }
   }
 
-  // TODO
-  def appSubst(subst:Map[Name,Name], b:SSABlock): SSABlock = b
+
 
 
 
