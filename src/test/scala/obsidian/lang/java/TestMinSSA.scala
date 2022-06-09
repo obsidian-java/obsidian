@@ -8,8 +8,10 @@ import com.github.luzhuomi.scalangj.Parser._
 import com.github.luzhuomi.scalangj.Syntax._
 import com.github.luzhuomi.scalangj.Pretty._
 import obsidian.lang.java._ 
-// import obsidian.lang.java.Label._
+
 import obsidian.lang.java.MinSSA._
+
+// TODO: fix 1 and 2
 
 class TestMinSSA1 extends FunSuite with Matchers {
     val METHODSTR = """
