@@ -11,7 +11,7 @@ import scala.collection.immutable
 import obsidian.lang.java.ASTUtils._
 
 
-object MinSSAL {
+object MinSSA {
   case class SSAMethodDecl(
       modifiers: List[Modifier],
       type_params: List[TypeParam],
@@ -210,6 +210,38 @@ object MinSSAL {
       case ArrayCreate(ty, exps, num_dims) => ArrayCreate(ty, snOps.appSubst(subst, exps), num_dims)
       case ArrayCreateInit(ty, size, ArrayInit(v_inits)) => ArrayCreateInit(ty, size, ArrayInit(snOps.appSubst(subst, v_inits)))
       case Assign(lhs, op, rhs) => Assign(snOps.appSubst(subst, lhs), op, snOps.appSubst(subst, rhs))
+      case BinOp(e1, op, e2) => BinOp(snOps.appSubst(subst, e1), op, snOps.appSubst(subst,e2))
+      case ClassLit(ty) => ClassLit(ty)
+      case Cond(cond, true_exp, false_exp) => Cond(snOps.appSubst(subst,cond), snOps.appSubst(subst,true_exp), snOps.appSubst(subst, false_exp))
+      case ExpName(name) => ExpName(snOps.appSubst(subst,name))
+      case FieldAccess_(access) => FieldAccess_(snOps.appSubst(subst, access))
+      case InstanceCreation(type_args, type_decl, args, body) => e // no substitution
+      case InstanceOf(e, ref_type) => InstanceOf(snOps.appSubst(subst, e), ref_type)
+      case Lambda(params, body) => e // no substitution
+      case Lit(lit) => e 
+      case MethodInv(methodInv) => MethodInv(snOps.appSubst(subst, methodInv))
+      case MethodRef(name, id) => MethodRef(snOps.appSubst(subst, name), id)
+      case PostDecrement(exp) => PostDecrement(snOps.appSubst(subst, exp))
+      case PostIncrement(exp) => PostIncrement(snOps.appSubst(subst, exp))
+      case PreBitCompl(exp) => PreBitCompl(snOps.appSubst(subst, exp))
+      case PreDecrement(exp) => PreDecrement(snOps.appSubst(subst, exp))
+      case PreIncrement(exp) => PreIncrement(snOps.appSubst(subst, exp))
+      case PreMinus(exp) => PreMinus(snOps.appSubst(subst, exp))
+      case PreNot(exp) => PreNot(snOps.appSubst(subst,exp))
+      case PrePlus(exp) => PrePlus(snOps.appSubst(subst, exp))
+      case QualInstanceCreation(exp, type_args, id, args, body) => QualInstanceCreation(snOps.appSubst(subst, exp), type_args, id, args, body)
+      case ThisClass(name) => ThisClass(snOps.appSubst(subst, name))
+      case This => This    
+    }
+  }
+
+  implicit def appSubstMethodInv:SubstName[MethodInvocation] = new SubstName[MethodInvocation] {
+    override def appSubst(subst:Map[Name,Name], methodInv:MethodInvocation):MethodInvocation = methodInv match {
+      case ClassMethodCall(name, ref_types, id, args) => ClassMethodCall(snOps.appSubst(subst, name), ref_types, id, snOps.appSubst(subst, args))
+      case MethodCall(name, args) => MethodCall(snOps.appSubst(subst, name), snOps.appSubst(subst, args))
+      case PrimaryMethodCall(e, ref_types, id, args) => PrimaryMethodCall(snOps.appSubst(subst, e), ref_types, id, snOps.appSubst(subst, args))
+      case SuperMethodCall(ref_types, id, args) => SuperMethodCall(ref_types, id, snOps.appSubst(subst, args))
+      case TypeMethodCall(name, ref_types, id, args) => TypeMethodCall(snOps.appSubst(subst, name), ref_types, id, snOps.appSubst(subst, args))
     }
   }
 
@@ -2170,26 +2202,34 @@ object MinSSAL {
     * @return
     */
 
-  def mkSubstFromStates(st0:State, st1:State, st2:State, lbl1:Label)(implicit m:MonadError[SSAState,ErrorM]):SState[State,Map[Name,Name]] = (st0, st1, st2) match { 
+  def mkSubstFromStates(st0:State, st1:State, st2:State, lbl1:Label)(implicit m:MonadError[SSAState,ErrorM]):SState[State,Map[Name,Name]] = {
+    
+    def go(vs:List[Name], aenv:AEnv, eenv:EEnv, benv: BEnv, cenv: CEnv, eCtx:TCtx, vm:VarMap, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State,List[(Name,Name)]] = vs.traverse(v => for {
+          v_lbl1 <- mkName(v,lbl) // the v_l1 to be renamed back to the original
+          v_ori <- Rleq(aenv, eenv, benv, cenv, eCtx, vm, v) match {
+            case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub during the while stmt conversion.")
+            case (c,n)::Nil => m.pure(n)
+            case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub during the while stmt conversion. More than one candidates found.")          
+          }
+        } yield (v_lbl1, v_ori))
+          
+    (st0, st1, st2) match { 
     // todo check the case for break and continue // no need?
     // 
-    case (State(vm0, eCtx0, aenv0, eenv0, benv0, cenv0, nestedDecls0, methInvs0, srcLblEnv0),
-          State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1, nestedDecls1, methInvs1, srcLblEnv1),
-          State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, nestedDecls2, methInvs2, srcLblEnv2)) => {
-            val vs = diffVarMap(vm2, vm1).keySet // dom3(vm2 - vm1)
-            val no_update = vm0.keySet -- vs
-            for {
-              ls <- no_update.toList.traverse(v => for {
-                v_lbl1 <- mkName(v,lbl1) // the v_l1 to be renamed back to the original
-                v_ori <- Rleq(aenv0, eenv0, benv0, cenv0, eCtx0, vm0, v) match {
-                  // case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub during the while stmt conversion.")
-                  case (c,n)::Nil => m.pure(n)
-                  // case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub during the while stmt conversion. More than one candidates found.")          
-                }
-              } yield (v_lbl1, v_ori))
-           } yield ls.foldLeft(Map():Map[Name,Name])((m,p:(Name,Name)) => (m + (p._1 -> p._2)))
+      case (State(vm0, eCtx0, aenv0, eenv0, benv0, cenv0, nestedDecls0, methInvs0, srcLblEnv0),
+            State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1, nestedDecls1, methInvs1, srcLblEnv1),
+            State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, nestedDecls2, methInvs2, srcLblEnv2)) => {
+              val vs = diffVarMap(vm2, vm1).keySet // dom3(vm2 - vm1)
+              val no_update = vm0.keySet -- vs
+              for {
+                ls <- go(no_update.toList, aenv0, eenv0, benv0, cenv0, eCtx0, vm0, lbl1)
+              } yield ls.foldLeft(Map():Map[Name,Name])((m:Map[Name,Name],p:(Name,Name)) => (m + (p._1 -> p._2)))
+            }
     }
+  
   }
+    
+
 
 
 
