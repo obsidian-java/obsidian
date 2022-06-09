@@ -1907,8 +1907,10 @@ object MinSSA {
           }
         }
         subst <- mkSubstFromStates(st, stBodyIn, stBodyOut, lbl1) // theta
-        // to be cobntinue here.
-        body_stmts_s <- m.pure(body_stmts.map(snOps.appSubst(subst, _))) // theta(B)
+
+        body_stmts_s <- m.pure(snOps.appSubst(subst, body_stmts)) // theta(B)
+        exp1_s <- m.pure(snOps.appSubst(subst, exp1)) // theta(E)
+
 
         // vm3 // todo what about cenv and benv and eenv
         vm3 <- (st, stBodyIn, stBodyOut) match { // vm3 
@@ -1923,12 +1925,15 @@ object MinSSA {
                   } yield entries.foldLeft(vm0 ++ diffVarMap(vm2,vm1))((vm3, ent) => ent match {
                       case (v, tctx11, sctx, v_lbl) => vm3.get(v) match {
                         case None => vm3
-                        case Some(m) => vm1 + (v -> (m + (tctx11  -> (sctx, v_lbl))))
+                        case Some(m) => vm3 + (v -> (m + (tctx11  -> (sctx, v_lbl))))
                       }
                   }) 
                 }
         }
-
+        /*
+        _ <- m.pure(println("hello"))
+        _ <- m.pure(println(vm3))
+        */
         tctx3 <- m.pure(putTCtx(tctx, TWhilePostPhi))
         lbl3  <- m.pure(tctx3)
         phis_post <- (st, stBodyIn, stBodyOut) match { // vm3 // todo: what about those from eenv
@@ -1957,7 +1962,7 @@ object MinSSA {
         _          <- setVM(vm3)
         _          <- extendVarsWithContextAndLabel(phis_post2.map(phi => phi match {case Phi(v, rn_v, rhs) => v}), ctx, tctx3, lbl3)
         _          <- setECtx(tctx3)
-      } yield SSABlock(lbl, List(SSAWhile(phis_pre_updated, exp1, body_stmts_s, phis_post2)))
+      } yield SSABlock(lbl, List(SSAWhile(phis_pre_updated, exp1_s, body_stmts_s, phis_post2)))
     }
   } 
 

@@ -262,32 +262,26 @@ public static void f(int v) {
     """
     val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
     val ssa = SSAMethodDecl(List(Public, Static),List(),None,Ident("f"),List(FormalParam(List(),PrimType_(IntT),false,VarId(Ident("v")))),List(),None,
-        SSAMethodBody(List(SSABlock(THead(TBox),List(
-            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TWhile(TLast(TBox)))))")),None))), 
-            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TWhilePrePhi(1))))")),None))), 
-            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TWhilePostPhi)))")),None))), 
+    SSAMethodBody(List(SSABlock(THead(TBox),List(
+            SSAVarDecls(List(),PrimType_(IntT),List(
+                VarDecl(VarId(Ident("x_TTail(TTail(THead(TWhile(TLast(TBox)))))")),None))), 
+            SSAVarDecls(List(),PrimType_(IntT),List(
+                VarDecl(VarId(Ident("x_TTail(TTail(THead(TWhilePrePhi(1))))")),None))), 
+            SSAVarDecls(List(),PrimType_(IntT),List(
+                VarDecl(VarId(Ident("x_TTail(TTail(THead(TWhilePostPhi)))")),None))), 
             SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_THead(TBox)")),None))))), 
-            
-            SSABlock(TTail(THead(TBox)),List(SSAAssignments(
-                List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_TTail(THead(TBox))")))),EqualA,Lit(IntLit(0)))))))), 
-            SSABlock(TTail(TTail(THead(TBox))),List(
-                SSAWhile(
-                    List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_TTail(TTail(THead(TWhilePrePhi(1))))"))),
-                        Map(TTail(THead(TBox)) -> Name(List(Ident("x_TTail(THead(TBox))"))), 
-                            TTail(TTail(THead(TWhile(TLast(TBox))))) -> Name(List(Ident("x_TTail(TTail(THead(TWhile(TLast(TBox)))))"))))))
-                        ,
-                    BinOp(ExpName(Name(List(Ident("x_TTail(TTail(THead(TWhilePrePhi(1))))")))),GThan,ExpName(Name(List(Ident("v_TTail(TTail(THead(TWhilePrePhi(1))))"))))
-                    ),
-                    List(SSABlock(TTail(TTail(THead(TWhile(TLast(TBox))))),List(
-                        SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_TTail(TTail(THead(TWhile(TLast(TBox)))))")))),EqualA,BinOp(ExpName(Name(List(Ident("x_TTail(TTail(THead(TWhilePrePhi(1))))")))),Sub,ExpName(Name(List(Ident("v")))))))))))
-                        ),
-                    List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_TTail(TTail(THead(TWhilePostPhi)))"))),
-                        Map(TTail(TTail(THead(TWhilePrePhi(1)))) -> Name(List(Ident("x_TTail(TTail(THead(TWhilePrePhi(1))))"))))))))
-                    ), 
-                SSABlock(TTail(TTail(TTail(TLast(TBox)))),List(SSAReturn(None))))))
-
-
-
+        
+        SSABlock(TTail(THead(TBox)),List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_TTail(THead(TBox))")))),EqualA,Lit(IntLit(0)))))))), 
+        SSABlock(TTail(TTail(THead(TBox))),List(
+            SSAWhile(List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_TTail(TTail(THead(TWhilePrePhi(1))))"))),
+                Map(TTail(THead(TBox)) -> Name(List(Ident("x_TTail(THead(TBox))"))), 
+                    TTail(TTail(THead(TWhile(TLast(TBox))))) -> Name(List(Ident("x_TTail(TTail(THead(TWhile(TLast(TBox)))))")))))),
+                BinOp(ExpName(Name(List(Ident("x_TTail(TTail(THead(TWhilePrePhi(1))))")))),GThan,ExpName(Name(List(Ident("v"))))),
+                List(SSABlock(TTail(TTail(THead(TWhile(TLast(TBox))))),List(
+                    SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_TTail(TTail(THead(TWhile(TLast(TBox)))))")))),EqualA,BinOp(ExpName(Name(List(Ident("x_TTail(TTail(THead(TWhilePrePhi(1))))")))),Sub,ExpName(Name(List(Ident("v")))))))))))),
+                List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_TTail(TTail(THead(TWhilePostPhi)))"))),
+                Map(TTail(TTail(THead(TWhilePrePhi(1)))) -> Name(List(Ident("x_TTail(TTail(THead(TWhilePrePhi(1))))"))))))))), 
+        SSABlock(TTail(TTail(TTail(TLast(TBox)))),List(SSAReturn(None))))))
 
     test("TestMinSSA3") {
         methoddecl match {
@@ -299,8 +293,8 @@ public static void f(int v) {
                         MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.initState) match {
                             case MinSSA.SSAError(message) => fail(message)
                             case MinSSA.SSAOk((st, ssa_methodDecl)) => { 
-                                println(ssa_methodDecl)
-                                // assert(ssa == ssa_methodDecl)
+                                // println(ssa_methodDecl)
+                                assert(ssa == ssa_methodDecl)
                             }
                         }
                   }
@@ -325,3 +319,79 @@ public static void f(int v) {
     }
 }
 */
+
+
+class TestMinSSA4 extends FunSuite with Matchers {
+    val METHODSTR = """
+public static void f(int v) {
+	int x; 
+    x = 0;
+    if (x < 10) {
+        x = x + 1;
+    } else {
+        while (x > v) {
+            x = x - v;
+        }
+    }
+}    """
+    val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
+    
+    val ssa = SSAMethodDecl(List(Public, Static),List(),None,Ident("f"),List(FormalParam(List(),PrimType_(IntT),false,VarId(Ident("v")))),List(),None,
+        SSAMethodBody(List(
+            SSABlock(THead(TBox),List(
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TElse(TLast(TWhile(TLast(TBox)))))))")),None))), 
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TThen(TLast(TBox)))))")),None))), 
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePostPhi)))))")),None))), 
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePrePhi(1))))))")),None))), 
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TIfPostPhi)))")),None))), 
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(THead(TBox))")),None))), 
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_THead(TBox)")),None))))), 
+            SSABlock(TTail(THead(TBox)),List(
+                SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_TTail(THead(TBox))")))),EqualA,Lit(IntLit(0)))))))), 
+            SSABlock(TTail(TTail(THead(TBox))),List(
+                SSAIf(BinOp(ExpName(Name(List(Ident("x_TTail(THead(TBox))")))),LThan,Lit(IntLit(10))),
+                    List( // then
+                        SSABlock(TTail(TTail(THead(TThen(TLast(TBox))))),List(
+                            SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_TTail(TTail(THead(TThen(TLast(TBox)))))")))),EqualA,BinOp(ExpName(Name(List(Ident("x_TTail(THead(TBox))")))),Add,Lit(IntLit(1)))))))))
+                        ),
+                    List( // else 
+                        SSABlock(TTail(TTail(THead(TElse(TLast(TBox))))),List(
+                            SSAWhile(
+                                List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePrePhi(1))))))"))), // while entry phi
+                                    Map(TTail(THead(TBox)) -> Name(List(Ident("x_TTail(THead(TBox))"))), 
+                                        TTail(TTail(THead(TElse(TLast(TWhile(TLast(TBox))))))) -> Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhile(TLast(TBox)))))))")))))),
+                                BinOp(ExpName(Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePrePhi(1))))))")))),GThan,ExpName(Name(List(Ident("v"))))), // cond
+                                List(SSABlock(TTail(TTail(THead(TElse(TLast(TWhile(TLast(TBox))))))),List( // while body
+                                    SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhile(TLast(TBox)))))))")))),EqualA,BinOp(ExpName(Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePrePhi(1))))))")))),Sub,ExpName(Name(List(Ident("v")))))))))))
+                                    ),
+                                List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePostPhi)))))"))),
+                                    Map(TTail(TTail(THead(TElse(TLast(TWhilePrePhi(1)))))) -> Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePrePhi(1))))))")))))))))
+                        ),
+                    List( // if phi
+                        Phi(Name(List(Ident("x"))),Name(List(Ident("x_TTail(TTail(THead(TIfPostPhi)))"))),
+                            Map(TTail(TTail(THead(TThen(TLast(TBox))))) -> Name(List(Ident("x_TTail(TTail(THead(TThen(TLast(TBox)))))"))), 
+                                TTail(TTail(THead(TElse(TLast(TWhilePostPhi))))) -> Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePostPhi)))))"))))))))), 
+            SSABlock(TTail(TTail(TTail(TLast(TBox)))),List(SSAReturn(None))))))
+
+ 
+    test("TestMinSSA4") {
+        methoddecl match {
+            case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
+                Flatten.flatMethodDecl(methodDecl).run(Flatten.initStateInfo) match {
+                    case Flatten.FlatError(message) => fail(message)
+                    case Flatten.FlatOk((st, f_methodDecl)) => {
+                        val d_methodDecl = Desugar.dsgOps.desugar(f_methodDecl)
+                        MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.initState) match {
+                            case MinSSA.SSAError(message) => fail(message)
+                            case MinSSA.SSAOk((st, ssa_methodDecl)) => { 
+                                // println(ssa_methodDecl)
+                                assert(ssa == ssa_methodDecl)
+                            }
+                        }
+                  }
+              }
+            }
+            case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")           
+        }
+    }
+}
