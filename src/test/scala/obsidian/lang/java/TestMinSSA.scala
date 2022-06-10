@@ -26,36 +26,32 @@ public static void main(String [] args) {
 }
     """
     val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
-    val ssa = SSAMethodDecl(List(Public, Static),List(),None,Ident("main"),
-        List(FormalParam(List(),RefType_(ArrayType(RefType_(ClassRefType(ClassType(List((Ident("String"),List()))))))),
-        false,VarId(Ident("args")))),List(),None,
+    
+    val ssa = SSAMethodDecl(List(Public, Static),List(),None,Ident("main"),List(FormalParam(List(),RefType_(ArrayType(RefType_(ClassRefType(ClassType(List((Ident("String"),List()))))))),false,VarId(Ident("args")))),List(),None,
         SSAMethodBody(List(
-        SSABlock(THead(TBox),List(
-            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TBox)))")),None))), 
-            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1))))))")),None))), 
-            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox)))))))")),None))), 
-            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1))))))")),None))), 
-            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePostPhi)))))")),None))), 
-            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_THead(TBox)")),None))))), 
-        SSABlock(TTail(THead(TBox)),List(
-            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_TTail(THead(TBox))")),None))))), 
-        SSABlock(TTail(TTail(THead(TBox))),List(
-            SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_TTail(TTail(THead(TBox)))")))),EqualA,Lit(IntLit(0)))))))), 
-        SSABlock(TTail(TTail(TTail(THead(TBox)))),List(
-            SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("s_TTail(TTail(TTail(THead(TBox))))")))),EqualA,Lit(IntLit(0)))))))), 
-        SSABlock(TTail(TTail(TTail(TTail(THead(TBox))))),List(
-            SSAWhile(List(Phi(Name(List(Ident("s"))),Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1))))))"))),
-                            Map(TTail(TTail(TTail(THead(TBox)))) -> Name(List(Ident("s_TTail(TTail(TTail(THead(TBox))))"))), 
-                                TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox))))))) -> Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox)))))))"))))))
-                    ,BinOp(ExpName(Name(List(Ident("x_TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1))))))")))),LThan,Lit(IntLit(10)))
-                    ,List(SSABlock(TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox))))))),List(
-                        SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox)))))))")))),
-                                                    EqualA,BinOp(ExpName(Name(List(Ident("x_TTail(TTail(THead(TBox)))")))),Add,ExpName(Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1))))))")))))))))))
-                                                    )
-                    ,List(Phi(Name(List(Ident("s"))),Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePostPhi)))))")))
-                            ,Map(TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1)))))) -> Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1))))))")))))))
-                            )), 
-        SSABlock(TTail(TTail(TTail(TTail(TTail(TLast(TBox)))))),List(SSAReturn(None))))))
+            SSABlock(THead(TBox),List(
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TBox)))")),None))), 
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox)))))))")),None))), 
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1))))))")),None))), 
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePostPhi)))))")),None))), 
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_THead(TBox)")),None))))), 
+            SSABlock(TTail(THead(TBox)),List(
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_TTail(THead(TBox))")),None))))), 
+            SSABlock(TTail(TTail(THead(TBox))),List(
+                SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_TTail(TTail(THead(TBox)))")))),EqualA,Lit(IntLit(0)))))))), 
+            SSABlock(TTail(TTail(TTail(THead(TBox)))),List(
+                SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("s_TTail(TTail(TTail(THead(TBox))))")))),EqualA,Lit(IntLit(0)))))))), 
+            SSABlock(TTail(TTail(TTail(TTail(THead(TBox))))),List(
+                SSAWhile(
+                    List(Phi(Name(List(Ident("s"))),Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1))))))"))), // while entry phi
+                    Map(TTail(TTail(TTail(THead(TBox)))) -> Name(List(Ident("s_TTail(TTail(TTail(THead(TBox))))"))), 
+                        TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox))))))) -> Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox)))))))")))))),BinOp(ExpName(Name(List(Ident("x_TTail(TTail(THead(TBox)))")))),LThan,Lit(IntLit(10))),
+                    List(SSABlock(TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox))))))),List( // while body
+                        SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox)))))))")))),EqualA,BinOp(ExpName(Name(List(Ident("x_TTail(TTail(THead(TBox)))")))),Add,ExpName(Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1))))))")))))))))))),
+                    List(Phi(Name(List(Ident("s"))),Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePostPhi)))))"))), // while exit phi
+                    Map(TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1)))))) -> Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1))))))"))))))))), 
+            SSABlock(TTail(TTail(TTail(TTail(TTail(TLast(TBox)))))),List(SSAReturn(None))))))
+
     test("TestMinSSA1") {
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
@@ -81,7 +77,7 @@ public static void main(String [] args) {
 
 /* v should not be in the phi list */
 
-/*
+
 class TestMinSSA2 extends FunSuite with Matchers { // todo, declaration with init does not work yet!
     val METHODSTR = """
 public static boolean add(int v) {
@@ -111,121 +107,14 @@ public static boolean add(int v) {
 }
     """
     val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
-    val ssa = SSAMethodDecl(List(Public, Static),List(),Some(PrimType_(BooleanT)),Ident("add"),
-        List(FormalParam(List(),PrimType_(IntT),false,VarId(Ident("v")))),List(),None,
+    val ssa = SSAMethodDecl(List(Public, Static),List(),Some(PrimType_(BooleanT)),Ident("add"),List(FormalParam(List(),PrimType_(IntT),false,VarId(Ident("v")))),List(),None,
         SSAMethodBody(List(
-        SSABlock(THead(TBox),List(
-                SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(VarDecl(VarId(Ident("nvals_TTail(TTail(TTail(THead(TBox))))")),None))), 
-                SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(VarDecl(VarId(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(THead(TBox)))))))))))")),None))), 
-                SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(VarDecl(VarId(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))")),None))), 
-                SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(VarDecl(VarId(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")),None))), 
-                SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(VarDecl(VarId(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))")),None))), 
-                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox))))))))))))))))")),None))), 
-                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))")),None))), 
-                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(TTail(TTail(TTail(THead(TBox)))))")),None))), 
-                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePostPhi)))))))))))))")),None))), 
-                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))")),None))), 
-                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")),None))), 
-                SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox))))))))))")),None))), 
-                SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))")),None))), 
-                SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")),None))), 
-                SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident("res_TTail(TTail(TTail(TTail(TTail(THead(TBox))))))")),None))), 
-                SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))")),None))), 
-                SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox)))))))))")),None))), 
-                SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(VarDecl(VarId(Ident("nvals_THead(TBox)")),None))))), 
-        SSABlock(TTail(THead(TBox)),List(
-            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(THead(TBox))")),None))))), 
-        SSABlock(TTail(TTail(THead(TBox))),List(
-            SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident("res_TTail(TTail(THead(TBox)))")),None))))), 
-        SSABlock(TTail(TTail(TTail(THead(TBox)))),List(
-            SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("nvals_TTail(TTail(TTail(THead(TBox))))")))),EqualA,Lit(NullLit))))))), 
-        SSABlock(TTail(TTail(TTail(TTail(THead(TBox))))),List(
-            SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("i_TTail(TTail(TTail(TTail(THead(TBox)))))")))),EqualA,Lit(IntLit(0)))))))), 
-        SSABlock(TTail(TTail(TTail(TTail(TTail(THead(TBox)))))),List(
-            SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(THead(TBox))))))")))),EqualA,Lit(BooleanLit(false)))))))), 
-        SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TBox))))))),List(
-            SSAIf(BinOp(FieldAccess_(PrimaryFieldAccess(This,Ident("cap"))),LThan,Lit(IntLit(1))),
-                List(SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))),List(
-                    SSAAssignments(List(
-                        ExpStmt(Assign(NameLhs(Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox)))))))))")))),EqualA,Lit(BooleanLit(false))))))))
-                        ),
-                List(SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TBox))))))))),List(
-                    SSAIf(BinOp(FieldAccess_(PrimaryFieldAccess(This,Ident("size"))),LThan,FieldAccess_(PrimaryFieldAccess(This,Ident("cap")))),
-                        List( // then
-                            SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TThen(THead(TBox))))))))))),List(
-                                SSAAssignments(List(ExpStmt(Assign(ArrayLhs(ArrayIndex(FieldAccess_(PrimaryFieldAccess(This,Ident("vals"))),List(FieldAccess_(PrimaryFieldAccess(This,Ident("size")))))),EqualA,ExpName(Name(List(Ident("v")))))))))
-                                ), 
-                            SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TThen(TTail(TLast(TBox)))))))))))),List(
-                                SSAAssignments(List(ExpStmt(Assign(FieldLhs(PrimaryFieldAccess(This,Ident("size"))),EqualA,BinOp(FieldAccess_(PrimaryFieldAccess(This,Ident("size"))),Add,Lit(IntLit(1)))))))))
-                            ),
-                        List( // else
-                            SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(THead(TBox))))))))))),List(
-                                SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(THead(TBox)))))))))))")))),EqualA,ArrayCreate(PrimType_(IntT),List(FieldAccess_(PrimaryFieldAccess(This,Ident("cap")))),0))))))
-                                ), 
-                            SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(THead(TBox)))))))))))),List(
-                                SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(THead(TBox))))))))))))")))),EqualA,Lit(IntLit(0)))))))
-                                ), 
-                            SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TBox))))))))))))),List(
-                                SSAWhile(List(Phi(Name(List(Ident("i"))),Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))"))),
-                                    Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(THead(TBox)))))))))))) -> Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(THead(TBox))))))))))))"))), 
-                                        TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox)))))))))))))))) -> Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox))))))))))))))))")))))
-                                        ),
-                                    BinOp(BinOp(ExpName(Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")))),LThan,FieldAccess_(PrimaryFieldAccess(This,Ident("cap")))),Sub,Lit(IntLit(1))
-                                    ),
-                                    List( // while body
-                                        SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(THead(TBox))))))))))))))),List(
-                                            SSAAssignments(List(ExpStmt(Assign(ArrayLhs(ArrayIndex(ExpName(Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(THead(TBox)))))))))))")))),List(ExpName(Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))"))))))),EqualA,ArrayAccess(ArrayIndex(FieldAccess_(PrimaryFieldAccess(This,Ident("vals"))),List(BinOp(ExpName(Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")))),Add,Lit(IntLit(1)))))))))))
-                                            ), 
-                                        SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox)))))))))))))))),List(
-                                            SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox))))))))))))))))")))),EqualA,BinOp(ExpName(Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")))),Add,Lit(IntLit(1)))))))))
-                                            ),
-                                    List( // exit while phi
-                                        Phi(Name(List(Ident("i"))),Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePostPhi)))))))))))))"))),
-                                            Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1)))))))))))))) -> Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))"))))))))
-                                ), 
-                            SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(TTail(THead(TBox)))))))))))))),List(
-                                SSAAssignments(List(ExpStmt(Assign(ArrayLhs(ArrayIndex(ExpName(Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")))),List(BinOp(FieldAccess_(PrimaryFieldAccess(This,Ident("cap"))),Sub,Lit(IntLit(1)))))),EqualA,ExpName(Name(List(Ident("v_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")))))))))
-                                ), 
-                            SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(TTail(TTail(TLast(TBox))))))))))))))),List(
-                                SSAAssignments(List(ExpStmt(Assign(FieldLhs(PrimaryFieldAccess(This,Ident("vals"))),EqualA,ExpName(Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))"))))))))))
-                            ),
-                        List( // end if phi
-                            Phi(Name(List(Ident("i"))),Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))"))),
-                                Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TThen(TTail(TLast(TBox)))))))))))) -> Name(List(Ident("i_TTail(TTail(TTail(TTail(THead(TBox)))))"))), 
-                                    TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(TTail(TTail(TLast(TBox))))))))))))))) -> Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePostPhi)))))))))))))"))))
-                            ), 
-                            Phi(Name(List(Ident("nvals"))),Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi))))))))")))),
-                                Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TThen(TTail(TLast(TBox)))))))))))) -> Name(List(Ident("nvals_TTail(TTail(TTail(THead(TBox))))"))), 
-                                    TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(TTail(TTail(TLast(TBox))))))))))))))) -> Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))"))))
-                                ), 
-                            Phi(Name(List(Ident("res"))),Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))"))),
-                                Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TThen(TTail(TLast(TBox)))))))))))) -> Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(THead(TBox))))))"))), 
-                                    TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(TTail(TTail(TLast(TBox))))))))))))))) -> Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))"))))
-                                    ), 
-                            Phi(Name(List(Ident("v"))),Name(List(Ident("v_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))"))),
-                                Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TThen(TTail(TLast(TBox)))))))))))) -> Name(List(Ident("v"))), 
-                                    TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(TTail(TTail(TLast(TBox))))))))))))))) -> Name(List(Ident("v_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))"))))))))
-                        ), 
-                    SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox)))))))))),List(
-                        SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox))))))))))")))),EqualA,Lit(BooleanLit(true))))))))
-                ),
-                List(
-                    Phi(Name(List(Ident("res"))),Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))"))),
-                        Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))) -> Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox)))))))))"))), 
-                            TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox)))))))))) -> Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox))))))))))"))))), 
-                    Phi(Name(List(Ident("i"))),Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))"))),
-                        Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))) -> Name(List(Ident("i_TTail(TTail(TTail(TTail(THead(TBox)))))"))), 
-                            TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox)))))))))) -> Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))"))))
-                        ), 
-                    Phi(Name(List(Ident("nvals"))),Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))"))),
-                        Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))) -> Name(List(Ident("nvals_TTail(TTail(TTail(THead(TBox))))"))), 
-                            TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox)))))))))) -> Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))"))))
-                        ), 
-                    Phi(Name(List(Ident("v"))),Name(List(Ident("v_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))"))),
-                        Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))) -> Name(List(Ident("v"))), 
-                            TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox)))))))))) -> Name(List(Ident("v_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))"))))))))
-                ), 
-            SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(TTail(TLast(TBox)))))))),List(SSAReturn(Some(ExpName(Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))")))))))))))
+            SSABlock(THead(TBox),List(
+                SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(
+                    VarDecl(VarId(Ident("nvals_TTail(TTail(TTail(THead(TBox))))")),None))), 
+                SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(
+                    VarDecl(VarId(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(THead(TBox)))))))))))")),None))), 
+                SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(VarDecl(VarId(Ident(nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi))))))))))),None))), SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(VarDecl(VarId(Ident(nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi))))))))),None))), SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident(i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox)))))))))))))))))),None))), SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident(i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi))))))))),None))), SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident(i_TTail(TTail(TTail(TTail(THead(TBox))))))),None))), SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident(i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePostPhi))))))))))))))),None))), SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident(i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi))))))))))),None))), SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident(i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1)))))))))))))))),None))), SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident(res_TTail(TTail(TTail(TTail(TTail(THead(TBox)))))))),None))), SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident(res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox)))))))))))),None))), SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident(res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))))),None))), SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident(res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi))))))))),None))), SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(VarDecl(VarId(Ident(nvals_THead(TBox))),None))))), SSABlock(TTail(THead(TBox)),List(SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident(i_TTail(THead(TBox)))),None))))), SSABlock(TTail(TTail(THead(TBox))),List(SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident(res_TTail(TTail(THead(TBox))))),None))))), SSABlock(TTail(TTail(TTail(THead(TBox)))),List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident(nvals_TTail(TTail(TTail(THead(TBox)))))))),EqualA,Lit(NullLit))))))), SSABlock(TTail(TTail(TTail(TTail(THead(TBox))))),List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident(i_TTail(TTail(TTail(TTail(THead(TBox))))))))),EqualA,Lit(IntLit(0)))))))), SSABlock(TTail(TTail(TTail(TTail(TTail(THead(TBox)))))),List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident(res_TTail(TTail(TTail(TTail(TTail(THead(TBox)))))))))),EqualA,Lit(BooleanLit(false)))))))), SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TBox))))))),List(SSAIf(BinOp(FieldAccess_(PrimaryFieldAccess(This,Ident(cap))),LThan,Lit(IntLit(1))),List(SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))),List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident(res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))))))),EqualA,Lit(BooleanLit(false))))))))),List(SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TBox))))))))),List(SSAIf(BinOp(FieldAccess_(PrimaryFieldAccess(This,Ident(size))),LThan,FieldAccess_(PrimaryFieldAccess(This,Ident(cap)))),List(SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TThen(THead(TBox))))))))))),List(SSAAssignments(List(ExpStmt(Assign(ArrayLhs(ArrayIndex(FieldAccess_(PrimaryFieldAccess(This,Ident(vals))),List(FieldAccess_(PrimaryFieldAccess(This,Ident(size)))))),EqualA,ExpName(Name(List(Ident(v)))))))))), SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TThen(TTail(TLast(TBox)))))))))))),List(SSAAssignments(List(ExpStmt(Assign(FieldLhs(PrimaryFieldAccess(This,Ident(size))),EqualA,BinOp(FieldAccess_(PrimaryFieldAccess(This,Ident(size))),Add,Lit(IntLit(1)))))))))),List(SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(THead(TBox))))))))))),List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident(nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(THead(TBox))))))))))))))),EqualA,ArrayCreate(PrimType_(IntT),List(FieldAccess_(PrimaryFieldAccess(This,Ident(cap)))),0))))))), SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(THead(TBox)))))))))))),List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident(i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(THead(TBox)))))))))))))))),EqualA,Lit(IntLit(0)))))))), SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TBox))))))))))))),List(SSAWhile(List(Phi(Name(List(Ident(i))),Name(List(Ident(i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))))),Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(THead(TBox)))))))))))) -> Name(List(Ident(i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(THead(TBox))))))))))))))), TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox)))))))))))))))) -> Name(List(Ident(i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox)))))))))))))))))))))),BinOp(BinOp(ExpName(Name(List(Ident(i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1)))))))))))))))))),LThan,FieldAccess_(PrimaryFieldAccess(This,Ident(cap)))),Sub,Lit(IntLit(1))),List(SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(THead(TBox))))))))))))))),List(SSAAssignments(List(ExpStmt(Assign(ArrayLhs(ArrayIndex(ExpName(Name(List(Ident(nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(THead(TBox))))))))))))))),List(ExpName(Name(List(Ident(i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))))))))),EqualA,ArrayAccess(ArrayIndex(FieldAccess_(PrimaryFieldAccess(This,Ident(vals))),List(BinOp(ExpName(Name(List(Ident(i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1)))))))))))))))))),Add,Lit(IntLit(1)))))))))))), SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox)))))))))))))))),List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident(i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox)))))))))))))))))))),EqualA,BinOp(ExpName(Name(List(Ident(i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1)))))))))))))))))),Add,Lit(IntLit(1)))))))))),List(Phi(Name(List(Ident(i))),Name(List(Ident(i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePostPhi)))))))))))))))),Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1)))))))))))))) -> Name(List(Ident(i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))))))))))), SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(TTail(THead(TBox)))))))))))))),List(SSAAssignments(List(ExpStmt(Assign(ArrayLhs(ArrayIndex(ExpName(Name(List(Ident(nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(THead(TBox))))))))))))))),List(BinOp(FieldAccess_(PrimaryFieldAccess(This,Ident(cap))),Sub,Lit(IntLit(1)))))),EqualA,ExpName(Name(List(Ident(v)))))))))), SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(TTail(TTail(TLast(TBox))))))))))))))),List(SSAAssignments(List(ExpStmt(Assign(FieldLhs(PrimaryFieldAccess(This,Ident(vals))),EqualA,ExpName(Name(List(Ident(nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(THead(TBox)))))))))))))))))))))),List(Phi(Name(List(Ident(i))),Name(List(Ident(i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))))),Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TThen(TTail(TLast(TBox)))))))))))) -> Name(List(Ident(i_TTail(TTail(TTail(TTail(THead(TBox)))))))), TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(TTail(TTail(TLast(TBox))))))))))))))) -> Name(List(Ident(i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePostPhi)))))))))))))))))), Phi(Name(List(Ident(nvals))),Name(List(Ident(nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))))),Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TThen(TTail(TLast(TBox)))))))))))) -> Name(List(Ident(nvals_TTail(TTail(TTail(THead(TBox))))))), TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(TTail(TTail(TLast(TBox))))))))))))))) -> Name(List(Ident(nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(THead(TBox)))))))))))))))))))), SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox)))))))))),List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident(res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox)))))))))))))),EqualA,Lit(BooleanLit(true))))))))),List(Phi(Name(List(Ident(res))),Name(List(Ident(res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))))),Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))) -> Name(List(Ident(res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox)))))))))))), TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox)))))))))) -> Name(List(Ident(res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox))))))))))))))), Phi(Name(List(Ident(i))),Name(List(Ident(i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))))),Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))) -> Name(List(Ident(i_TTail(TTail(TTail(TTail(THead(TBox)))))))), TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox)))))))))) -> Name(List(Ident(i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))))))), Phi(Name(List(Ident(nvals))),Name(List(Ident(nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))))),Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))) -> Name(List(Ident(nvals_TTail(TTail(TTail(THead(TBox))))))), TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox)))))))))) -> Name(List(Ident(nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))))))))))), SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(TTail(TLast(TBox)))))))),List(SSAReturn(Some(ExpName(Name(List(Ident(res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi))))))))))))))))))
 
     test("TestMinSSA2") {
         methoddecl match {
@@ -248,7 +137,7 @@ public static boolean add(int v) {
         }
     }
 }
-*/
+
 
 
 
