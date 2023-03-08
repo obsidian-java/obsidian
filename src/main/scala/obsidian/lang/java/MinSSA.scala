@@ -343,35 +343,55 @@ object MinSSA {
     */
   sealed trait TCtx 
 
-  case object TBox extends TCtx
+  case object TBox extends TCtx               // 0
 
-  case class TLast(ctx:TCtx) extends TCtx
+  case class TLast(ctx:TCtx) extends TCtx     // 1
 
-  case class THead(ctx:TCtx) extends TCtx
+  case class THead(ctx:TCtx) extends TCtx     // 2
 
-  case class TTail(ctx:TCtx) extends TCtx
+  case class TTail(ctx:TCtx) extends TCtx     // 3
 
-  case class TThen(ctx:TCtx) extends TCtx
+  case class TThen(ctx:TCtx) extends TCtx     // 4
 
-  case class TElse(ctx:TCtx) extends TCtx
+  case class TElse(ctx:TCtx) extends TCtx     // 5
 
-  case object TIfPostPhi extends TCtx
+  case object TIfPostPhi extends TCtx         // 6
 
-  case class TWhilePrePhi(b:Int) extends TCtx
+  case class TWhilePrePhi(b:Int) extends TCtx  // 7
 
-  case class TWhile(ctx:TCtx) extends TCtx
+  case class TWhile(ctx:TCtx) extends TCtx     // 8
 
-  case object TWhilePostPhi extends TCtx
+  case object TWhilePostPhi extends TCtx       // 9
 
-  case class TTry(ctx:TCtx) extends TCtx
+  case class TTry(ctx:TCtx) extends TCtx       // a
 
-  case object TTryPeriPhi extends TCtx
+  case object TTryPeriPhi extends TCtx         // b
 
-  case class TCatch(ctx:TCtx) extends TCtx
+  case class TCatch(ctx:TCtx) extends TCtx     // c
 
-  case object TTryPostPhi extends TCtx 
+  case object TTryPostPhi extends TCtx         // d
 
   
+  val bitarray:List[Char] = "0123456789abcdef".toList
+
+  // bit coding for the Target Ctx // this mapping can be randomized 
+  def bitcode(ctx:TCtx, barr:List[Char]):List[Char] = ctx match {
+    case TBox => List(barr(0))
+    case TLast(ctx2) => List(barr(1)) ++ bitcode(ctx2, barr)
+    case THead(ctx2) => List(barr(2)) ++ bitcode(ctx2, barr)
+    case TTail(ctx2) => List(barr(3)) ++ bitcode(ctx2, barr)
+    case TThen(ctx2) => List(barr(4)) ++ bitcode(ctx2, barr)
+    case TElse(ctx2) => List(barr(5)) ++ bitcode(ctx2, barr)
+    case TIfPostPhi  => List(barr(6))
+    case TWhilePrePhi(_) => List(barr(7))
+    case TWhile(ctx2) => List(barr(8)) ++ bitcode(ctx2, barr)
+    case TWhilePostPhi => List(barr(9))
+    case TTry(ctx2) => List(barr(10)) ++ bitcode(ctx2, barr)
+    case TTryPeriPhi => List(barr(11))
+    case TCatch(ctx2) => List(barr(12)) ++ bitcode(ctx2, barr)
+    case TTryPostPhi => List(barr(13))
+  }
+
 
   def putTCtx(outter:TCtx, inner:TCtx): TCtx = outter match {
     case TBox => inner 
