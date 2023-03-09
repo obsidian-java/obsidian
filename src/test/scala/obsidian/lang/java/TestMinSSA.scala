@@ -58,7 +58,7 @@ public static void main(String [] args) {
                     case Flatten.FlatError(message) => fail(message)
                     case Flatten.FlatOk((st, f_methodDecl)) => {
                         val d_methodDecl = Desugar.dsgOps.desugar(f_methodDecl)
-                        MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.initState) match {
+                        MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.debugInitState) match {
                             case MinSSA.SSAError(message) => fail(message)
                             case MinSSA.SSAOk((st, ssa_methodDecl)) => { 
                                 // println(ssa_methodDecl)
@@ -201,7 +201,7 @@ public static boolean add(int v) {
                     case Flatten.FlatError(message) => fail(message)
                     case Flatten.FlatOk((st, f_methodDecl)) => {
                         val d_methodDecl = Desugar.dsgOps.desugar(f_methodDecl)
-                        MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.initState) match {
+                        MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.debugInitState) match {
                             case MinSSA.SSAError(message) => fail(message)
                             case MinSSA.SSAOk((st, ssa_methodDecl)) => { 
                                 // println(ssa_methodDecl)
@@ -259,7 +259,7 @@ public static void f(int v) {
                     case Flatten.FlatError(message) => fail(message)
                     case Flatten.FlatOk((st, f_methodDecl)) => {
                         val d_methodDecl = Desugar.dsgOps.desugar(f_methodDecl)
-                        MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.initState) match {
+                        MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.debugInitState) match {
                             case MinSSA.SSAError(message) => fail(message)
                             case MinSSA.SSAOk((st, ssa_methodDecl)) => { 
                                 // println(ssa_methodDecl)
@@ -344,6 +344,68 @@ public static void f(int v) {
 
  
     test("TestMinSSA4") {
+        methoddecl match {
+            case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
+                Flatten.flatMethodDecl(methodDecl).run(Flatten.initStateInfo) match {
+                    case Flatten.FlatError(message) => fail(message)
+                    case Flatten.FlatOk((st, f_methodDecl)) => {
+                        val d_methodDecl = Desugar.dsgOps.desugar(f_methodDecl)
+                        MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.debugInitState) match {
+                            case MinSSA.SSAError(message) => fail(message)
+                            case MinSSA.SSAOk((st, ssa_methodDecl)) => { 
+                                // println(ssa_methodDecl)
+                                assert(ssa == ssa_methodDecl)
+                            }
+                        }
+                  }
+              }
+            }
+            case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")           
+        }
+    }
+}
+
+
+class TestMinSSA5 extends FunSuite with Matchers { // same as TestMinSSA1 with default state config
+    val METHODSTR = """
+public static void main(String [] args) {
+	int x; 
+    int s;
+    x = 0;
+    s = 0;
+    while (x < 10) {
+        s = x + s;
+    }
+}
+    """
+    val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
+    
+    val ssa = SSAMethodDecl(List(Public, Static),List(),None,Ident("main"),List(FormalParam(List(),RefType_(ArrayType(RefType_(ClassRefType(ClassType(List((Ident("String"),List()))))))),false,VarId(Ident("args")))),List(),None,
+        SSAMethodBody(List(
+            SSABlock(THead(TBox),List(
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_3320")),None))), 
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_33332810")),None))), 
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_333327")),None))), 
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_333329")),None))), 
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_20")),None))))), 
+            SSABlock(TTail(THead(TBox)),List(
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_320")),None))))), 
+            SSABlock(TTail(TTail(THead(TBox))),List(
+                SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_3320")))),EqualA,Lit(IntLit(0)))))))), 
+            SSABlock(TTail(TTail(TTail(THead(TBox)))),List(
+                SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("s_33320")))),EqualA,Lit(IntLit(0)))))))), 
+            SSABlock(TTail(TTail(TTail(TTail(THead(TBox))))),List(
+                SSAWhile(
+                    List(Phi(Name(List(Ident("s"))),Name(List(Ident("s_333327"))), // while entry phi
+                    Map(TTail(TTail(TTail(THead(TBox)))) -> Name(List(Ident("s_33320"))), 
+                        TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox))))))) -> Name(List(Ident("s_33332810")))))),BinOp(ExpName(Name(List(Ident("x_3320")))),LThan,Lit(IntLit(10))),
+                    List(SSABlock(TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox))))))),List( // while body
+                        SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("s_33332810")))),EqualA,BinOp(ExpName(Name(List(Ident("x_3320")))),Add,ExpName(Name(List(Ident("s_333327")))))))))))),
+                    List(Phi(Name(List(Ident("s"))),Name(List(Ident("s_333329"))), // while exit phi
+                    Map(TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1)))))) -> Name(List(Ident("s_333327"))))))))), 
+            SSABlock(TTail(TTail(TTail(TTail(TTail(TLast(TBox)))))),List(SSAReturn(None))))))
+
+    test("TestMinSSA5") {
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
                 Flatten.flatMethodDecl(methodDecl).run(Flatten.initStateInfo) match {
