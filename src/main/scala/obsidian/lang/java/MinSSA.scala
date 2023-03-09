@@ -6,8 +6,9 @@ import cats._
 import cats.implicits._
 import cats.data.StateT
 import com.github.luzhuomi.scalangj.Syntax._
-import obsidian.lang.java.ASTPath._
 import scala.collection.immutable
+
+import obsidian.lang.java.ASTPath._
 import obsidian.lang.java.ASTUtils._
 
 
