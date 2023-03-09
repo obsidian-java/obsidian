@@ -144,7 +144,7 @@ object CPS {
         exceptTypes  <- m.pure(List())
         exp          <- m.pure(None)
         body         <- m.pure(MethodBody(Some(Block((xeAsmts ++ List(Return(Some(MethodInv(MethodCall(Name(List(kIdent)), List())))))).map(BlockStmt_(_))))))
-        decl         <- m.pure(MethodDecl(mods, typarams, Some(voidType), mkl, formalParams, exceptTypes, exp, body))
+        decl         <- m.pure(MethodDecl(mods, typarams, Some(voidType), mkl, formalParams, exceptTypes, exp, body)) // fixme  this should be a var decl with a lambda expression
     } yield (List(decl), ExpName(Name(List(mkl))))
 
 
