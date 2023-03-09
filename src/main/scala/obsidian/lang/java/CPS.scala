@@ -4,11 +4,12 @@ package obsidian.lang.java
 import cats._
 import cats.implicits._
 import cats.data.StateT
-
+import scala.annotation.tailrec
+import scala.collection.immutable
 
 // constructing CPS from SSA
 import com.github.luzhuomi.scalangj.Syntax._
-import obsidian.lang.java.MinSSA._
+import obsidian.lang.java.MinSSA.{SSABlock, SSAStmt, SSAIf, SSAWhile, SSATry, SSAAssert, SSAAssignments, SSABreak, SSAContinue, SSAEmpty, charcode, Label, TCtx, Phi}
 
 
 
@@ -23,6 +24,8 @@ object CPS {
     case class State(
         chararray: List[Char]
     )
+
+    type ErrorM = String
 
 
     def initState(carr:List[Char]):State = State(carr)
@@ -89,6 +92,8 @@ object CPS {
         }
     }
 
+    type SState[S,A] = StateT[CPSResult, S, A]
+    type CPSState[A] = SState[State, A]
 
     def get:SState[State, State] = StateT { state => CPSOk((state, state))} 
 
@@ -103,33 +108,60 @@ object CPS {
                 (declpp, exppp)   <- cpsblk(blkspp, phi, phiR)
                 exp               <- cpsexp(e)
                 (declppp, expppp) <- cpsk(phiK, lbl)
-            } yield ((declp ++ declpp ++ declppp, seq(ifelse( lambda(List(), exp), expp, exppp), expppp)))
+            } yield ((declp ++ declpp ++ declppp, seq(ifelse( thunk(exp), expp, exppp), expppp)))
         }
 
     }
 
     // Exception => Void
     // Function<Exception, Void>
-    def mkArrType(t1:Type, t2:Type):Type = {
-        RefType_(ClassRefType(ClassType(funcIdent, List(t1,t2))))
+    def mkArrType(t1:RefType, t2:RefType):Type = {
+        RefType_(ClassRefType(ClassType(List((funcIdent, List(ActualType(t1),ActualType(t2)))))))
     }
-    val funcIdent = List(Ident("java"), Ident("util"), Ident("function"), Ident("Function"))
+    // val funcIdents = List(Ident("java"), Ident("util"), Ident("function"), Ident("Function"))
+    val funcIdent = Ident("Function")
 
-    val exceptIdent = List(Ident("Exception"))
-    val voidIdent = List(Ident("Void"))
+    val exceptIdent = Ident("Exception")
+    val voidIdent = Ident("Void")
+    val raiseIdent = Ident("raise")
+    val kIdent = Ident("k")
 
-    val exceptType = RefType_(ClassRefType(ClassType(List(exceptIdent), List())))
-    val voidType   = RefType_(ClassRefType(ClassType(List(voidIdent), List())))
-    val exceptArrVoid = mkArryType(exceptType,voidType)
-    val voidArrVoid = mkArryType(voidType,voidType)
+    val exceptRefType = ClassRefType(ClassType(List((exceptIdent, List()))))
+    val voidRefType   = ClassRefType(ClassType(List((voidIdent, List()))))
+    val voidType      = RefType_(voidRefType)
+    val exceptType    = RefType_(exceptRefType)
+    val exceptArrVoid = mkArrType(exceptRefType,voidRefType)
+    val voidArrVoid = mkArrType(voidRefType,voidRefType)
     
 
     def cpsk(phi:List[Phi], lbl:Label)(implicit m:MonadError[CPSState, ErrorM]):SState[State, (List[VarDecl], Exp)] = for {
         xeAsmts      <- cpsphi(phi, lbl)
         mods         <- m.pure(List())
-        mklid        <- mkId("m", lbl)
-        typarmas     <- m.pure(List())
-        formalParams <- 
-        decl     <- m.pure(MethodDecl(mods, typarams, Some(voidType), formalParams)) // todo
-    }
+        mkl          <- mkId("m", lbl)
+        typarams     <- m.pure(List())
+        formalParams <- m.pure(List(FormalParam(List(), exceptArrVoid, false, VarId(raiseIdent)), 
+                                    FormalParam(List(), voidArrVoid, false,  VarId(kIdent))))
+        exceptTypes  <- m.pure(List())
+        exp          <- m.pure(None)
+        body         <- m.pure(MethodBody(Some(Block((xeAsmts ++ List(Return(Some(MethodInv(MethodCall(Name(List(kIdent)), List())))))).map(BlockStmt_(_))))))
+        decl         <- m.pure(MethodDecl(mods, typarams, Some(voidType), mkl, formalParams, exceptTypes, exp, body))
+    } yield (List(decl), ExpName(Name(List(mkl))))
+
+
+    def cpsphi(phi:List[Phi], ctxt:Label)(implicit m:MonadError[CPSState, ErrorM]):SState[State, List[Stmt]] = m.pure(List())
+
+    def cpsexp(e:Exp)(implicit m:MonadError[CPSState, ErrorM]):SState[State, Exp] = 
+        m.pure(ExpName(Name(List(kIdent)))) // TODO:fixme
+
+    def mkId(s:String, ctxt:Label)(implicit m:MonadError[CPSState, ErrorM]):SState[State, Ident] = for {
+        st <- get
+        id <- st match {
+            case State(chararr) => m.pure(Ident( s + "_" + charcode(ctxt, chararr).mkString))
+        }
+    } yield (id)
+
+    def seq(e1:Exp, e2:Exp):Exp = ExpName(Name(List(kIdent))) // TODO:fixme
+    def ifelse(e1:Exp, e2:Exp, e3:Exp):Exp = ExpName(Name(List(kIdent))) // TODO:fixme
+    def thunk(e:Exp):Exp = ExpName(Name(List(kIdent))) // TODO:fixme
 }
+
