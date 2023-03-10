@@ -105,13 +105,21 @@ object CPS {
         case List(SSABlock(lbl, stmts)) => stmts match {
             case List(SSAIf(e, blksp, blkspp, phi)) => for {
                 (declp, expp)     <- cpsblk(blksp, phi, phiR)
-                
                 (declpp, exppp)   <- cpsblk(blkspp, phi, phiR)
                 exp               <- cpsexp(e)
                 (declppp, expppp) <- cpsk(phiK, lbl)
             } yield ((declp ++ declpp ++ declppp, seq(ifelse( thunk(exp), expp, exppp), expppp)))
+            // todo: more cases here.
         }
-        // todo: more cases here.
+        case SSABlock(lbl, stmts)::blksppp => stmts match {
+            case List(SSAIf(e, blksp, blkspp, phi)) => for {
+                (declp, expp)     <- cpsblk(blksp, phi, phiR)
+                (declpp, exppp)   <- cpsblk(blkspp, phi, phiR)
+                exp               <- cpsexp(e)
+                (declppp, expppp) <- cpsblk(blksppp, phiK, phiR)
+            } yield ((declp ++ declpp ++ declppp, seq(ifelse( thunk(exp), expp, exppp), expppp)))
+            // todo: more cases here.
+        }
     }
 
     // partial function, t1 and t2 must be RefType. 
@@ -188,6 +196,14 @@ object CPS {
     def cpsexp(e:Exp)(implicit m:MonadError[CPSState, ErrorM]):SState[State, Exp] = m.pure(e)
 
 
+    /**
+      * create an Identifier by applying the chararray used in SSA phase
+      *
+      * @param s
+      * @param ctxt
+      * @param m
+      * @return
+      */
     def mkId(s:String, ctxt:Label)(implicit m:MonadError[CPSState, ErrorM]):SState[State, Ident] = for {
         st <- get
         id <- st match {
@@ -195,9 +211,13 @@ object CPS {
         }
     } yield (id)
 
-
-
-    // apply seq to both e1 and e2, note seq is a method?
+    /**
+      * apply seq to both e1 and e2, note seq is a method?
+      *
+      * @param e1
+      * @param e2
+      * @return
+      */
     def seq(e1:Exp, e2:Exp):Exp = 
     {
         val args = List(e1, e2)
