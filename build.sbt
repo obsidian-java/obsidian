@@ -24,3 +24,8 @@ libraryDependencies += "org.typelevel" %% "cats-core" % "2.0.0"
 libraryDependencies += "com.github.luzhuomi" %% "scalangj" % "0.1.5"  // apache license
 
 scalacOptions ++= Seq("-feature", "-deprecation", "-Yresolve-term-conflict:package", "-Ypartial-unification" )
+
+
+addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0") // to solve the withFilter is not a member of ... error in Scala 2.
+// reference https://github.com/oleg-py/better-monadic-for#destructuring-either--io--task--flatmapf
+// we don't need this plugin once we migrate to scala 3
