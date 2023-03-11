@@ -11,9 +11,6 @@ import scala.collection.immutable
 import com.github.luzhuomi.scalangj.Syntax._
 import obsidian.lang.java.Common._
 import obsidian.lang.java.MinSSA.{SSABlock, SSAStmt, SSAIf, SSAWhile, SSATry, SSAAssert, SSAAssignments, SSABreak, SSAContinue, SSAEmpty, charcode, Label, TCtx, Phi}
-import _root_.obsidian.lang.java.MinSSA
-
-
 
 
 object CPS {
@@ -137,12 +134,35 @@ object CPS {
                     case None    => m.pure(Nil)
                 }
                 mods         <- m.pure(List())
-                mkl          <- mkId("mr", lbl)
+                ml           <- mkId("m", lbl)
                 body         <- m.pure(Block((resAsmts ++ List(Return(Some(MethodInv(MethodCall(Name(List(kIdent)), List())))))).map(BlockStmt_(_))))
                 decl         <- m.pure(LocalVars(mods, exceptVoidArrVoidVoidArrVoid, 
-                                        List(VarDecl(VarId(mkl), Some(InitExp(Lambda(LambdaSingleParam(raiseIdent), 
+                                        List(VarDecl(VarId(ml), Some(InitExp(Lambda(LambdaSingleParam(raiseIdent), 
                                                     LambdaExpression_(Lambda(LambdaSingleParam(kIdent), LambdaBlock(body))))))))))
-            } yield (List(decl), ExpName(Name(List(mkl))))
+            } yield (List(decl), ExpName(Name(List(ml))))
+
+            case List(MinSSA.SSAAssignments(stmts)) => for {
+                stmtsp        <- cpsstmts(stmts) // this should be an identity function
+                mods          <- m.pure(List())
+                ml            <- mkId("m", lbl)
+                body          <- m.pure(Block((stmtsp ++ List(Return(Some(MethodInv(MethodCall(Name(List(kIdent)), List())))))).map(BlockStmt_(_))))
+                decl          <- m.pure(LocalVars(mods, exceptVoidArrVoidVoidArrVoid, 
+                                        List(VarDecl(VarId(ml), Some(InitExp(Lambda(LambdaSingleParam(raiseIdent), 
+                                                    LambdaExpression_(Lambda(LambdaSingleParam(kIdent), LambdaBlock(body))))))))))
+                (declp, expp) <- cpsk(phiK, lbl)
+            } yield (List(decl) ++ declp, seq(ExpName(Name(List(ml))), expp))
+            
+
+            case List(MinSSA.SSATry(blks, phiRp, catchparams, blksp, phiKp)) => for {
+                (decl, exp)       <- cpsblk(blks, phiKp, phiRp)
+                (declp, expp)     <- cpsblk(blksp, phiKp, phiR)
+                mods              <- m.pure(List())
+                params            <- m.pure(List(FormalParam(mods,exceptType,false,VarId(Ident("x")))))
+                stmtsp            <- m.pure(List(ExpStmt(Assign(NameLhs(Name(List(Ident("ex")))), EqualA, ExpName(Name(List(Ident("x"))))))))
+                body              <- m.pure(Block((stmtsp ++ List(Return(Some(expp)))).map(BlockStmt_(_))))
+                exppp             <- m.pure(Lambda(LambdaFormalParams(params), LambdaBlock(body))) 
+                (declppp, expppp) <- cpsk(phiK, lbl)
+            } yield (decl ++ declp ++ declppp, seq(trycatch(exp, exppp), expppp))
             // todo: more cases here.
         }
         case SSABlock(lbl, stmts)::blksppp => stmts match {
@@ -159,7 +179,31 @@ object CPS {
                 (declpp, exppp)   <- cpsblk(blks, phi_pre, phiR)
                 (declppp, expppp) <- cpsblk(blksppp, phiK, phiR)
             } yield (decl ++ declpp ++ declppp, seq(exp, loop( thunk(expp), exppp, expppp)))
-            // todo: more cases here.
+
+
+            case List(MinSSA.SSAAssignments(stmts)) => for {
+                stmtsp        <- cpsstmts(stmts) // this should be an identity function
+                mods          <- m.pure(List())
+                ml            <- mkId("m", lbl)
+                body          <- m.pure(Block((stmtsp ++ List(Return(Some(MethodInv(MethodCall(Name(List(kIdent)), List())))))).map(BlockStmt_(_))))
+                decl          <- m.pure(LocalVars(mods, exceptVoidArrVoidVoidArrVoid, 
+                                        List(VarDecl(VarId(ml), Some(InitExp(Lambda(LambdaSingleParam(raiseIdent), 
+                                                    LambdaExpression_(Lambda(LambdaSingleParam(kIdent), LambdaBlock(body))))))))))
+                (declp, expp) <- cpsblk(blksppp, phiK, phiR)
+            } yield (List(decl) ++ declp, seq(ExpName(Name(List(ml))), expp))
+
+
+            case List(MinSSA.SSATry(blks, phiRp, catchparams, blksp, phiKp)) => for {
+                (decl, exp)       <- cpsblk(blks, phiKp, phiRp)
+                (declp, expp)     <- cpsblk(blksp, phiKp, phiR)
+                mods              <- m.pure(List())
+                params            <- m.pure(List(FormalParam(mods,exceptType,false,VarId(Ident("x")))))
+                stmtsp            <- m.pure(List(ExpStmt(Assign(NameLhs(Name(List(Ident("ex")))), EqualA, ExpName(Name(List(Ident("x"))))))))
+                body              <- m.pure(Block((stmtsp ++ List(Return(Some(expp)))).map(BlockStmt_(_))))
+                exppp             <- m.pure(Lambda(LambdaFormalParams(params), LambdaBlock(body))) 
+                (declppp, expppp) <- cpsblk(blksppp, phiK, phiR)
+            } yield (decl ++ declp ++ declppp, seq(trycatch(exp, exppp), expppp))
+            // todo: more cases here. try?
         }
     }
 
@@ -239,6 +283,16 @@ object CPS {
 
 
     /**
+      * convert a list of assignment stmts from SSA to CPS, it should be an identity function
+      *
+      * @param stmts
+      * @param m
+      * @return
+      */
+    def cpsstmts(stmts:List[Stmt])(implicit m:MonadError[CPSState, ErrorM]):SState[State, List[Stmt]] = m.pure(stmts)
+
+
+    /**
       * create an Identifier by applying the chararray used in SSA phase
       *
       * @param s
@@ -264,6 +318,14 @@ object CPS {
     {
         val args = List(e1, e2)
         val seqname = Name(List(Ident("seq")))
+        MethodInv(MethodCall(seqname, args))
+    }
+
+
+    def trycatch(e1:Exp, e2:Exp):Exp = 
+    {
+        val args = List(e1, e2)
+        val seqname = Name(List(Ident("trycatch")))
         MethodInv(MethodCall(seqname, args))
     }
 
