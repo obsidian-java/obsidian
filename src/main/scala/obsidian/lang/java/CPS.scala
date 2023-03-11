@@ -9,7 +9,9 @@ import scala.collection.immutable
 
 // constructing CPS from SSA
 import com.github.luzhuomi.scalangj.Syntax._
+import obsidian.lang.java.Common._
 import obsidian.lang.java.MinSSA.{SSABlock, SSAStmt, SSAIf, SSAWhile, SSATry, SSAAssert, SSAAssignments, SSABreak, SSAContinue, SSAEmpty, charcode, Label, TCtx, Phi}
+import _root_.obsidian.lang.java.MinSSA
 
 
 
@@ -109,6 +111,38 @@ object CPS {
                 exp               <- cpsexp(e)
                 (declppp, expppp) <- cpsk(phiK, lbl)
             } yield ((declp ++ declpp ++ declppp, seq(ifelse( thunk(exp), expp, exppp), expppp)))
+            case List(SSAWhile(phi_pre, e, blks, phi_post)) => for {
+                lbl2              <- minlabel(phi_pre)
+                (decl, exp)       <- cpsk(phi_pre, lbl2)
+                expp              <- cpsexp(e)
+                (declpp, exppp)   <- cpsblk(blks, phi_pre, phiR)
+                (declppp, expppp) <- cpsk(phiK, lbl)
+
+            } yield (decl ++ declpp ++ declppp, seq(exp, loop( thunk(expp), exppp, expppp)))
+            case List(MinSSA.SSAThrow(e)) => for {
+                exp          <- cpsexp(e)
+                xeAsmts      <- cpsphi(phiR,lbl)
+                mods         <- m.pure(List())
+                mkl          <- mkId("mr", lbl)
+                body         <- m.pure(Block((xeAsmts ++ List(Return(Some(MethodInv(MethodCall(Name(List(raiseIdent)), List(exp))))))).map(BlockStmt_(_))))
+                decl         <- m.pure(LocalVars(mods, exceptVoidArrVoidVoidArrVoid, 
+                                        List(VarDecl(VarId(mkl), Some(InitExp(Lambda(LambdaSingleParam(raiseIdent), 
+                                                    LambdaExpression_(Lambda(LambdaSingleParam(kIdent), LambdaBlock(body))))))))))
+            } yield (List(decl), ExpName(Name(List(mkl))))
+            case List(MinSSA.SSAReturn(oe)) => for {
+                resAsmts     <- oe match {
+                    case Some(e) => for {
+                        exp  <- cpsexp(e)
+                    } yield List(ExpStmt(Assign(NameLhs(Name(List(Ident("res")))), EqualA, exp)))
+                    case None    => m.pure(Nil)
+                }
+                mods         <- m.pure(List())
+                mkl          <- mkId("mr", lbl)
+                body         <- m.pure(Block((resAsmts ++ List(Return(Some(MethodInv(MethodCall(Name(List(kIdent)), List())))))).map(BlockStmt_(_))))
+                decl         <- m.pure(LocalVars(mods, exceptVoidArrVoidVoidArrVoid, 
+                                        List(VarDecl(VarId(mkl), Some(InitExp(Lambda(LambdaSingleParam(raiseIdent), 
+                                                    LambdaExpression_(Lambda(LambdaSingleParam(kIdent), LambdaBlock(body))))))))))
+            } yield (List(decl), ExpName(Name(List(mkl))))
             // todo: more cases here.
         }
         case SSABlock(lbl, stmts)::blksppp => stmts match {
@@ -118,6 +152,13 @@ object CPS {
                 exp               <- cpsexp(e)
                 (declppp, expppp) <- cpsblk(blksppp, phiK, phiR)
             } yield ((declp ++ declpp ++ declppp, seq(ifelse( thunk(exp), expp, exppp), expppp)))
+            case List(SSAWhile(phi_pre, e, blks, phi_post)) => for {
+                lbl2              <- minlabel(phi_pre)
+                (decl, exp)       <- cpsk(phi_pre, lbl2)
+                expp              <- cpsexp(e)
+                (declpp, exppp)   <- cpsblk(blks, phi_pre, phiR)
+                (declppp, expppp) <- cpsblk(blksppp, phiK, phiR)
+            } yield (decl ++ declpp ++ declppp, seq(exp, loop( thunk(expp), exppp, expppp)))
             // todo: more cases here.
         }
     }
@@ -151,6 +192,7 @@ object CPS {
     val exceptVoidArrVoidVoidArrVoid = mkArrType(exceptArrVoid, mkArrType(voidArrVoid, voidType)match {case Some(t) => t}) match {case Some(t) => t}
 
     
+
     /**
       * convert the end of a block into the continuation expression.
       *
@@ -162,7 +204,7 @@ object CPS {
     def cpsk(phi:List[Phi], lbl:Label)(implicit m:MonadError[CPSState, ErrorM]):SState[State, (List[VarDecl], Exp)] = for {
         xeAsmts      <- cpsphi(phi, lbl)
         mods         <- m.pure(List())
-        mkl          <- mkId("m", lbl)
+        mkl          <- mkId("mk", lbl)
         body         <- m.pure(Block((xeAsmts ++ List(Return(Some(MethodInv(MethodCall(Name(List(kIdent)), List())))))).map(BlockStmt_(_))))
         decl         <- m.pure(LocalVars(mods, exceptVoidArrVoidVoidArrVoid, 
                                 List(VarDecl(VarId(mkl), Some(InitExp(Lambda(LambdaSingleParam(raiseIdent), 
@@ -179,7 +221,7 @@ object CPS {
       */
     def cpsphi(phis:List[Phi], ctxt:Label)(implicit m:MonadError[CPSState, ErrorM]):SState[State, List[Stmt]] = phis.traverse(
         (phi:Phi) => phi match {
-            case Phi(srcVar, renVar, rhs) => rhs.get(ctxt) match {
+            case Phi(srcVar, renVar, rhs) => lookup(rhs,ctxt) match {
                 case None => m.raiseError("cpsphi failed: the rhs of the phi assignment does not contain the input ctxt.")
                 case Some(n) => m.pure(ExpStmt(Assign(NameLhs(renVar), EqualA, ExpName(n))))
             }
@@ -233,11 +275,44 @@ object CPS {
         MethodInv(MethodCall(ifelsename, args))   
     }
 
+
+    def loop(e1:Exp, e2:Exp, e3:Exp):Exp = 
+    {
+        val thunkede1 = thunk(e1) 
+        val args = List(thunkede1, e2, e3) 
+        val ifelsename = Name(List(Ident("loop")))
+        MethodInv(MethodCall(ifelsename, args))   
+    }
+
     // this will return a delayed expression () -> e
     def thunk(e:Exp):Exp = 
     {
         Lambda(LambdaSingleParam(unitIdent), LambdaExpression_(e))
     }
         
+
+    /**
+      * find the min label from the rhs of the phi assignments.
+      *  assumption, the set of phi assignments should be non empty
+      *              the min labels for all phi assignments are the same.
+      *              the min labels are the left most item
+      * @param phis
+      * @param m
+      */
+    def minlabel(phis:List[Phi])(implicit m:MonadError[CPSState, ErrorM]):SState[State, Label] = {
+        val rhss:List[List[(Label,Name)]] = phis.map(phi => phi match {
+            case Phi(srcVar, renVar, rhs) => rhs
+        })
+        val oplabels:List[Option[Label]] = rhss.map(rhs => rhs match { case Nil => None; case p::ps => Some(p._1)})
+        oplabels match {
+            case Nil => m.raiseError("minlabel failed: the phi list is empty.")
+            case (oplabel::rest) if oplabels.forall( oplabel => !(oplabel.isEmpty)) && allSame(oplabels) => {
+                oplabel match {
+                    case Some(label) => m.pure(label)
+                    case None => m.raiseError("minlabel failed: the phi list's first item is empty, but this should not happen.")
+                }
+            }
+        }
+    }
 }
 

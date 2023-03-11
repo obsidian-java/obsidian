@@ -43,12 +43,12 @@ public static void main(String [] args) {
             SSABlock(TTail(TTail(TTail(TTail(THead(TBox))))),List(
                 SSAWhile(
                     List(Phi(Name(List(Ident("s"))),Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1))))))"))), // while entry phi
-                    Map(TTail(TTail(TTail(THead(TBox)))) -> Name(List(Ident("s_TTail(TTail(TTail(THead(TBox))))"))), 
+                    List(TTail(TTail(TTail(THead(TBox)))) -> Name(List(Ident("s_TTail(TTail(TTail(THead(TBox))))"))), 
                         TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox))))))) -> Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox)))))))")))))),BinOp(ExpName(Name(List(Ident("x_TTail(TTail(THead(TBox)))")))),LThan,Lit(IntLit(10))),
                     List(SSABlock(TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox))))))),List( // while body
                         SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox)))))))")))),EqualA,BinOp(ExpName(Name(List(Ident("x_TTail(TTail(THead(TBox)))")))),Add,ExpName(Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1))))))")))))))))))),
                     List(Phi(Name(List(Ident("s"))),Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePostPhi)))))"))), // while exit phi
-                    Map(TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1)))))) -> Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1))))))"))))))))), 
+                    List(TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1)))))) -> Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1))))))"))))))))), 
             SSABlock(TTail(TTail(TTail(TTail(TTail(TLast(TBox)))))),List(SSAReturn(None))))))
 
     test("TestMinSSA1") {
@@ -158,7 +158,7 @@ public static boolean add(int v) {
                                     SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TBox))))))))))))),List(
                                         SSAWhile(
                                             List(Phi(Name(List(Ident("i"))),Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))"))), // while entry phi
-                                                Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(THead(TBox)))))))))))) -> Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(THead(TBox))))))))))))"))), 
+                                                List(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(THead(TBox)))))))))))) -> Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(THead(TBox))))))))))))"))), 
                                                     TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox)))))))))))))))) -> Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox))))))))))))))))")))))),
                                             BinOp(BinOp(ExpName(Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")))),LThan,FieldAccess_(PrimaryFieldAccess(This,Ident("cap")))),Sub,Lit(IntLit(1))),
                                             List( // while body
@@ -167,29 +167,29 @@ public static boolean add(int v) {
                                                 SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox)))))))))))))))),List(
                                                     SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox))))))))))))))))")))),EqualA,BinOp(ExpName(Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")))),Add,Lit(IntLit(1)))))))))),
                                             List(Phi(Name(List(Ident("i"))),Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePostPhi)))))))))))))"))), // while exit phi
-                                                Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1)))))))))))))) -> Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))"))))))))), 
+                                                List(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1)))))))))))))) -> Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))"))))))))), 
                                     SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(TTail(THead(TBox)))))))))))))),List(
                                         SSAAssignments(List(ExpStmt(Assign(ArrayLhs(ArrayIndex(ExpName(Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(THead(TBox)))))))))))")))),List(BinOp(FieldAccess_(PrimaryFieldAccess(This,Ident("cap"))),Sub,Lit(IntLit(1)))))),EqualA,ExpName(Name(List(Ident("v")))))))))), 
                                     SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(TTail(TTail(TLast(TBox))))))))))))))),List(
                                         SSAAssignments(List(ExpStmt(Assign(FieldLhs(PrimaryFieldAccess(This,Ident("vals"))),EqualA,ExpName(Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(THead(TBox)))))))))))"))))))))))),
                                 List( // end if phi
                                     Phi(Name(List(Ident("i"))),Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))"))),
-                                        Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TThen(TTail(TLast(TBox)))))))))))) -> Name(List(Ident("i_TTail(TTail(TTail(TTail(THead(TBox)))))"))), 
+                                        List(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TThen(TTail(TLast(TBox)))))))))))) -> Name(List(Ident("i_TTail(TTail(TTail(TTail(THead(TBox)))))"))), 
                                             TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(TTail(TTail(TLast(TBox))))))))))))))) -> Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePostPhi)))))))))))))"))))), 
                                     Phi(Name(List(Ident("nvals"))),Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))"))),
-                                        Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TThen(TTail(TLast(TBox)))))))))))) -> Name(List(Ident("nvals_TTail(TTail(TTail(THead(TBox))))"))), 
+                                        List(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TThen(TTail(TLast(TBox)))))))))))) -> Name(List(Ident("nvals_TTail(TTail(TTail(THead(TBox))))"))), 
                                             TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(TTail(TTail(TLast(TBox))))))))))))))) -> Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(THead(TBox)))))))))))"))))))))), 
                             SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox)))))))))),List(
                                 SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox))))))))))")))),EqualA,Lit(BooleanLit(true))))))))),
                         List( // end if phi
                             Phi(Name(List(Ident("res"))),Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))"))),
-                                Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))) -> Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox)))))))))"))), 
+                                List(TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))) -> Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox)))))))))"))), 
                                     TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox)))))))))) -> Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox))))))))))"))))), 
                             Phi(Name(List(Ident("i"))),Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))"))),
-                                Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))) -> Name(List(Ident("i_TTail(TTail(TTail(TTail(THead(TBox)))))"))), 
+                                List(TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))) -> Name(List(Ident("i_TTail(TTail(TTail(TTail(THead(TBox)))))"))), 
                                     TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox)))))))))) -> Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))"))))), 
                             Phi(Name(List(Ident("nvals"))),Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))"))),
-                                Map(TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))) -> Name(List(Ident("nvals_TTail(TTail(TTail(THead(TBox))))"))), 
+                                List(TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))) -> Name(List(Ident("nvals_TTail(TTail(TTail(THead(TBox))))"))), 
                                     TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox)))))))))) -> Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))"))))))))), 
                     SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(TTail(TLast(TBox)))))))),List( // return
                         SSAReturn(Some(ExpName(Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))")))))))))))
@@ -243,13 +243,13 @@ public static void f(int v) {
         SSABlock(TTail(THead(TBox)),List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_TTail(THead(TBox))")))),EqualA,Lit(IntLit(0)))))))), 
         SSABlock(TTail(TTail(THead(TBox))),List(
             SSAWhile(List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_TTail(TTail(THead(TWhilePrePhi(1))))"))),
-                Map(TTail(THead(TBox)) -> Name(List(Ident("x_TTail(THead(TBox))"))), 
+                List(TTail(THead(TBox)) -> Name(List(Ident("x_TTail(THead(TBox))"))), 
                     TTail(TTail(THead(TWhile(TLast(TBox))))) -> Name(List(Ident("x_TTail(TTail(THead(TWhile(TLast(TBox)))))")))))),
                 BinOp(ExpName(Name(List(Ident("x_TTail(TTail(THead(TWhilePrePhi(1))))")))),GThan,ExpName(Name(List(Ident("v"))))),
                 List(SSABlock(TTail(TTail(THead(TWhile(TLast(TBox))))),List(
                     SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_TTail(TTail(THead(TWhile(TLast(TBox)))))")))),EqualA,BinOp(ExpName(Name(List(Ident("x_TTail(TTail(THead(TWhilePrePhi(1))))")))),Sub,ExpName(Name(List(Ident("v")))))))))))),
                 List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_TTail(TTail(THead(TWhilePostPhi)))"))),
-                Map(TTail(TTail(THead(TWhilePrePhi(1)))) -> Name(List(Ident("x_TTail(TTail(THead(TWhilePrePhi(1))))"))))))))), 
+                List(TTail(TTail(THead(TWhilePrePhi(1)))) -> Name(List(Ident("x_TTail(TTail(THead(TWhilePrePhi(1))))"))))))))), 
         SSABlock(TTail(TTail(TTail(TLast(TBox)))),List(SSAReturn(None))))))
 
     test("TestMinSSA3") {
@@ -327,18 +327,18 @@ public static void f(int v) {
                         SSABlock(TTail(TTail(THead(TElse(TLast(TBox))))),List(
                             SSAWhile(
                                 List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePrePhi(1))))))"))), // while entry phi
-                                    Map(TTail(THead(TBox)) -> Name(List(Ident("x_TTail(THead(TBox))"))), 
+                                    List(TTail(THead(TBox)) -> Name(List(Ident("x_TTail(THead(TBox))"))), 
                                         TTail(TTail(THead(TElse(TLast(TWhile(TLast(TBox))))))) -> Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhile(TLast(TBox)))))))")))))),
                                 BinOp(ExpName(Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePrePhi(1))))))")))),GThan,ExpName(Name(List(Ident("v"))))), // cond
                                 List(SSABlock(TTail(TTail(THead(TElse(TLast(TWhile(TLast(TBox))))))),List( // while body
                                     SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhile(TLast(TBox)))))))")))),EqualA,BinOp(ExpName(Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePrePhi(1))))))")))),Sub,ExpName(Name(List(Ident("v")))))))))))
                                     ),
                                 List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePostPhi)))))"))),
-                                    Map(TTail(TTail(THead(TElse(TLast(TWhilePrePhi(1)))))) -> Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePrePhi(1))))))")))))))))
+                                    List(TTail(TTail(THead(TElse(TLast(TWhilePrePhi(1)))))) -> Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePrePhi(1))))))")))))))))
                         ),
                     List( // if phi
                         Phi(Name(List(Ident("x"))),Name(List(Ident("x_TTail(TTail(THead(TIfPostPhi)))"))),
-                            Map(TTail(TTail(THead(TThen(TLast(TBox))))) -> Name(List(Ident("x_TTail(TTail(THead(TThen(TLast(TBox)))))"))), 
+                            List(TTail(TTail(THead(TThen(TLast(TBox))))) -> Name(List(Ident("x_TTail(TTail(THead(TThen(TLast(TBox)))))"))), 
                                 TTail(TTail(THead(TElse(TLast(TWhilePostPhi))))) -> Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePostPhi)))))"))))))))), 
             SSABlock(TTail(TTail(TTail(TLast(TBox)))),List(SSAReturn(None))))))
 
@@ -397,12 +397,12 @@ public static void main(String [] args) {
             SSABlock(TTail(TTail(TTail(TTail(THead(TBox))))),List(
                 SSAWhile(
                     List(Phi(Name(List(Ident("s"))),Name(List(Ident("s_333327"))), // while entry phi
-                    Map(TTail(TTail(TTail(THead(TBox)))) -> Name(List(Ident("s_33320"))), 
+                    List(TTail(TTail(TTail(THead(TBox)))) -> Name(List(Ident("s_33320"))), 
                         TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox))))))) -> Name(List(Ident("s_33332810")))))),BinOp(ExpName(Name(List(Ident("x_3320")))),LThan,Lit(IntLit(10))),
                     List(SSABlock(TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox))))))),List( // while body
                         SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("s_33332810")))),EqualA,BinOp(ExpName(Name(List(Ident("x_3320")))),Add,ExpName(Name(List(Ident("s_333327")))))))))))),
                     List(Phi(Name(List(Ident("s"))),Name(List(Ident("s_333329"))), // while exit phi
-                    Map(TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1)))))) -> Name(List(Ident("s_333327"))))))))), 
+                    List(TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1)))))) -> Name(List(Ident("s_333327"))))))))), 
             SSABlock(TTail(TTail(TTail(TTail(TTail(TLast(TBox)))))),List(SSAReturn(None))))))
 
     test("TestMinSSA5") {

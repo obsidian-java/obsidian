@@ -8,6 +8,7 @@ import cats.data.StateT
 import com.github.luzhuomi.scalangj.Syntax._
 import scala.collection.immutable
 
+import obsidian.lang.java.Common._
 import obsidian.lang.java.ASTPath._
 import obsidian.lang.java.ASTUtils._
 
@@ -122,10 +123,9 @@ object MinSSA {
   case class Phi(
     srcVar:Name,
     renVar:Name, 
-    rhs:Map[Label, Name]
+    // rhs:Map[Label, Name] // changed back to List[(Label, Name)], so that we can find the entry will min label w/o re-sorting
+    rhs:List[(Label, Name)]
   )
-
-
 
 
   trait SubstName[A] {
@@ -146,6 +146,12 @@ object MinSSA {
   implicit def appSusbtMap[K,A](implicit sna:SubstName[A]) = new SubstName[Map[K,A]] {
     override def appSubst(subst:Map[Name, Name], m:Map[K, A]):Map[K, A] = m.map( { case (k,v) => (k, sna.appSubst(subst,v)) })
   }
+
+
+  implicit def appSusbtList[K,A](implicit sna:SubstName[A]) = new SubstName[List[(K,A)]] {
+    override def appSubst(subst:Map[Name, Name], m:List[(K, A)]):List[(K, A)] = m.map( { case (k,v) => (k, sna.appSubst(subst,v)) })
+  }
+
 
   implicit def appSubstSSABlock:SubstName[SSABlock] = new SubstName[SSABlock] { 
     override def appSubst(subst:Map[Name,Name], b:SSABlock): SSABlock = b match {
@@ -1928,13 +1934,13 @@ object MinSSA {
           if ((eenv0++dom(benv0++cenv0)).contains(eCtx0)) => // is this still possible? it means the while statement is dead code
             vm0.keySet.toList.traverse( v => for {
               v_lbl <- mkName(v, lbl1)
-            } yield Phi(v, v_lbl, Map()))
+            } yield Phi(v, v_lbl, List()))
           case State(vm0, eCtx0, aenv0, eenv0, benv0, cenv0, nestedDecls0, methInvs0, srcLblEnv0, conf0) => 
             vm0.keySet.toList.traverse( v => for {
               v_lbl <- mkName(v, lbl1)
               rhs <- Rleq(aenv0, eenv0, benv0, cenv0, eCtx0, vm0, v) match {
                 case Nil => m.raiseError("SSA construction failed, Rleq failed to find a lub during the while stmt conversion. None found.")
-                case (c,n)::Nil => m.pure(Map(lbl0 -> n))
+                case (c,n)::Nil => m.pure(List((lbl0 -> n)))
                 case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub during the while stmt conversion. More than one candidates found.")
               }
             } yield Phi(v, v_lbl, rhs))
@@ -1983,7 +1989,7 @@ object MinSSA {
                   case (c,n)::Nil => m.pure(n)
                   case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub during the while stmt conversion. More than one candidates found.")            
                 }
-              } yield Phi(v, v_lbl, Map(lbl0 -> name0, lbl2 -> name2)))
+              } yield Phi(v, v_lbl, List(lbl0 -> name0, lbl2 -> name2)))
               phis2 <- phis.traverse( phi => updatePhiFromCEnv(phi, stBodyOut, tctx))
             } yield phis2
           }
@@ -2027,7 +2033,7 @@ object MinSSA {
                     phis <- vs.toList.traverse( v => for {
                       v_lbl3 <- mkName(v, lbl3)
                       v_lbl1 <- mkName(v, lbl1)
-                    } yield Phi(v, v_lbl3, Map(lbl1 -> v_lbl1)))
+                    } yield Phi(v, v_lbl3, List(lbl1 -> v_lbl1)))
                   } yield phis
                 }
               }
@@ -2112,7 +2118,7 @@ object MinSSA {
           case (c,n)::Nil => m.pure(n)
           case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). More than one candidates found.")            
         }
-      } yield Phi(v, vlbl, Map(lbl1 -> name1, lbl2 -> name2)))
+      } yield Phi(v, vlbl, List(lbl1 -> name1, lbl2 -> name2)))
     } yield phis  
   }
 
@@ -2249,7 +2255,7 @@ object MinSSA {
         val cenv2_filtered_dom = cenv2.filter( (x:(TCtx,Option[TCtx])) => x._2 == Some(parentctx)).map(p=>p._1)
         for { 
           rhs_tb_added <- cenv2_filtered_dom.traverse(go)
-          rhs_map_updated <- m.pure(rhs_tb_added.foldLeft(rhs_map)((m,p)=>m + (p._1 -> p._2)))
+          rhs_map_updated <- m.pure(rhs_tb_added.foldLeft(rhs_map)((m,p)=>upsert(m,p)))
         } yield Phi(v, v_vlbl, rhs_map_updated)
       }
     }
@@ -2270,7 +2276,7 @@ object MinSSA {
         val benv2_filtered_dom = benv2.filter( (x:(TCtx,Option[TCtx])) => x._2 == Some(parentctx)).map(p=>p._1)
         for { 
           rhs_tb_added <- benv2_filtered_dom.traverse(go)
-          rhs_map_updated <- m.pure(rhs_tb_added.foldLeft(rhs_map)((m,p)=>m + (p._1 -> p._2)))
+          rhs_map_updated <- m.pure(rhs_tb_added.foldLeft(rhs_map)((m,p)=>upsert(m,p)))
         } yield Phi(v, v_vlbl, rhs_map_updated)
       }
     }
