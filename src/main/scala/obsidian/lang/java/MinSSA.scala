@@ -469,6 +469,16 @@ object MinSSA {
     config: SSAEnvConfig
   )
 
+  /** 
+   * extract the charcodes from the environment
+   * */
+  def getCharCodes(st:State):List[Char] = st match {
+    case State(varMap, exitCtx, aenv, eenv, benv, cenv, nestedDecls, methodInvs, srcLabelEnv, config) => 
+      config match {
+        case SSAEnvConfig(ctxtAsID, charcodes) => charcodes
+      }
+  }
+
 
   /**
   * A configurartion for the conversion function state

@@ -9,6 +9,7 @@ import scala.collection.immutable
 
 // constructing CPS from SSA
 import com.github.luzhuomi.scalangj.Syntax._
+import obsidian.lang.java.ASTUtils._
 import obsidian.lang.java.Common._
 import obsidian.lang.java.MinSSA.{SSABlock, SSAStmt, SSAIf, SSAWhile, SSATry, SSAAssert, SSAAssignments, SSABreak, SSAContinue, SSAEmpty, charcode, Label, TCtx, Phi}
 
@@ -100,6 +101,64 @@ object CPS {
 
     type VarDecl = BlockStmt // actually must be LocalVars(mods, ty, var_decls)
 
+
+    def cpsmethoddecl(methd:MinSSA.SSAMethodDecl)(implicit m:MonadError[CPSState,ErrorM]):SState[State, MethodDecl] = methd match {
+        case MinSSA.SSAMethodDecl(
+            modifiers, // List[Modifier],
+            type_params,  // List[TypeParam],
+            oty, // : Option[Type], 
+            id, // : Ident, 
+            formal_params, // : List[FormalParam], 
+            ex_types,  // : List[ExceptionType], 
+            exp, // : Option[Exp],
+            body // : SSAMethodBody
+        ) => for {
+            // no need to rename input parameter?
+            idcps <- m.pure(appIdStr(id, "cps"))
+            mods  <- m.pure(List())
+            (in_typs,in_args) <- m.pure(extractFormParams(formal_params))
+            ret_typ   <- oty match { // ret_type
+                case None => m.pure(voidType)
+                case Some(ty) => m.pure(ty)
+            }
+            // (Exception => Void) => (re_typ => Void) => Void
+            exceptVoidArrTpVoidArrVoid <- m.pure(exceptVoidArrTVoidArrVoid(ret_typ))
+            // ity1 -> ... ityn -> (Exception => Void) => (re_typ => Void) => Void
+            itysArrExceptVoidArrTpVoidArrVoid  <- m.pure(curryType(in_typs, exceptVoidArrTpVoidArrVoid))
+            // raise -> k -> {E(raise)(()->k(res))}
+            (decls, lamb) <- body match {
+                case MinSSA.SSAMethodBody(blks) => for {
+                        (decls, exp) <- cpsblk(blks, Nil, Nil)
+                     } yield (decls, 
+                        Lambda(LambdaSingleParam(raiseIdent), LambdaExpression_(
+                            Lambda(LambdaSingleParam(kIdent), LambdaExpression_(
+                                eapply(eapply(exp,ExpName(Name(List(raiseIdent)))), thunk(eapply(ExpName(Name(List(kIdent))), ExpName(Name(List(resIdent)))))
+                            )))
+                        ))
+                     )
+                }
+            // x1 -> ... xn -> raise -> k -> {E(raise)(()->k(res))}
+            bodyp <- m.pure(curryLamb(in_args, lamb))
+            // m_cps's decl
+            decl  <- m.pure(LocalVars(mods, itysArrExceptVoidArrTpVoidArrVoid, 
+                        List(VarDecl(VarId(idcps), Some(InitExp(bodyp))))))
+            // t' res ; Exception ex
+            declspp <- m.pure(List(
+                LocalVars(mods, ret_typ, List(VarDecl(VarId(resIdent), None))),
+                LocalVars(mods, exceptType, List(VarDecl(VarId(exIdent), None))))
+            )
+            bodypp <- m.pure(MethodBody(Some(Block(decl::decls))))
+
+        } yield MethodDecl(modifiers, type_params, oty, id, formal_params, ex_types, exp, bodypp)
+    }
+
+    def cpsbody(body:MinSSA.SSAMethodBody)(implicit m:MonadError[CPSState,ErrorM]):SState[State, MethodBody] = body match {
+        case MinSSA.SSAMethodBody(blks) => for {
+            (decls, exp) <- cpsblk(blks, Nil, Nil)
+            blkStmts     <- m.pure(decls ++ List(BlockStmt_(ExpStmt(exp))))
+        } yield MethodBody(Some(Block(blkStmts)))
+    } 
+
     def cpsblk(blks:List[SSABlock], phiK:List[Phi], phiR:List[Phi])(implicit m:MonadError[CPSState, ErrorM]):SState[State, (List[VarDecl], Exp)] = blks match {
         case List(SSABlock(lbl, stmts)) => stmts match {
             case List(SSAIf(e, blksp, blkspp, phi)) => for {
@@ -130,7 +189,7 @@ object CPS {
                 resAsmts     <- oe match {
                     case Some(e) => for {
                         exp  <- cpsexp(e)
-                    } yield List(ExpStmt(Assign(NameLhs(Name(List(Ident("res")))), EqualA, exp)))
+                    } yield List(ExpStmt(Assign(NameLhs(Name(List(resIdent))), EqualA, exp)))
                     case None    => m.pure(Nil)
                 }
                 mods         <- m.pure(List())
@@ -198,7 +257,7 @@ object CPS {
                 (declp, expp)     <- cpsblk(blksp, phiKp, phiR)
                 mods              <- m.pure(List())
                 params            <- m.pure(List(FormalParam(mods,exceptType,false,VarId(Ident("x")))))
-                stmtsp            <- m.pure(List(ExpStmt(Assign(NameLhs(Name(List(Ident("ex")))), EqualA, ExpName(Name(List(Ident("x"))))))))
+                stmtsp            <- m.pure(List(ExpStmt(Assign(NameLhs(Name(List(exIdent))), EqualA, ExpName(Name(List(Ident("x"))))))))
                 body              <- m.pure(Block((stmtsp ++ List(Return(Some(expp)))).map(BlockStmt_(_))))
                 exppp             <- m.pure(Lambda(LambdaFormalParams(params), LambdaBlock(body))) 
                 (declppp, expppp) <- cpsblk(blksppp, phiK, phiR)
@@ -206,36 +265,6 @@ object CPS {
             // todo: more cases here. try?
         }
     }
-
-    // partial function, t1 and t2 must be RefType. 
-    def mkArrType(t1:Type, t2:Type):Option[Type] = (t1, t2) match {
-        case (RefType_(s1), RefType_(s2)) => Some(RefType_(ClassRefType(ClassType(List((funcIdent, List(ActualType(s1),ActualType(s2))))))))
-        case _ => None
-    }
-    // val funcIdents = List(Ident("java"), Ident("util"), Ident("function"), Ident("Function"))
-    val funcIdent = Ident("Function")
-
-    val exceptIdent = Ident("Exception")
-    val voidIdent = Ident("Void")
-    val raiseIdent = Ident("raise")
-    val kIdent = Ident("k")
-    val unitIdent = Ident("unit")
-
-    val exceptRefType = ClassRefType(ClassType(List((exceptIdent, List()))))
-    val voidRefType   = ClassRefType(ClassType(List((voidIdent, List()))))
-    val voidType      = RefType_(voidRefType)
-    val exceptType    = RefType_(exceptRefType)
-    // Exception => Void
-    // Function<Exception, Void>
-    val exceptArrVoid = mkArrType(exceptType,voidType) match { case Some(t) => t }
-    // Void => Void
-    // Function<Void, Void>
-    val voidArrVoid   = mkArrType(voidType,voidType) match {case Some(t) => t }
-    // (Exception => Void) => ((Void => Void) => Void)
-    // Function<Function<Exception, Void>,  Function<Function<Void, Void>, Void>>
-    val exceptVoidArrVoidVoidArrVoid = mkArrType(exceptArrVoid, mkArrType(voidArrVoid, voidType)match {case Some(t) => t}) match {case Some(t) => t}
-
-    
 
     /**
       * convert the end of a block into the continuation expression.
@@ -376,5 +405,103 @@ object CPS {
             }
         }
     }
+
+
+    // some helper functions to construct types
+    // partial function, t1 and t2 must be RefType, otherwise, a corresponding boxed type will be 
+    // created to replace t1 (like wise, t2)
+    def mkArrType(t1:Type, t2:Type):Type = (t1, t2) match {
+        case (RefType_(s1), RefType_(s2)) => 
+            RefType_(ClassRefType(ClassType(List((funcIdent, List(ActualType(s1),ActualType(s2)))))))
+        case (PrimType_(p1), PrimType_(p2)) => {
+            val s1 = ClassRefType(prim2Class(p1))
+            val s2 = ClassRefType(prim2Class(p2))
+            RefType_(ClassRefType(ClassType(List((funcIdent, List(ActualType(s1),ActualType(s2)))))))
+        }
+        case (RefType_(s1), PrimType_(p2)) => {
+            val s2 = ClassRefType(prim2Class(p2))
+            RefType_(ClassRefType(ClassType(List((funcIdent, List(ActualType(s1),ActualType(s2)))))))
+        }
+        case (PrimType_(p1), RefType_(s2)) => {
+            val s1 = ClassRefType(prim2Class(p1))
+            RefType_(ClassRefType(ClassType(List((funcIdent, List(ActualType(s1),ActualType(s2)))))))
+        }
+    }
+    // val funcIdents = List(Ident("java"), Ident("util"), Ident("function"), Ident("Function"))
+    val funcIdent = Ident("Function")
+
+    val exceptIdent = Ident("Exception")
+    val voidIdent = Ident("Void")
+    val raiseIdent = Ident("raise")
+    val kIdent = Ident("k")
+    val unitIdent = Ident("unit")
+    val resIdent = Ident("res")
+    val exIdent = Ident("ex")
+
+    val exceptRefType = ClassRefType(ClassType(List((exceptIdent, List()))))
+    val voidRefType   = ClassRefType(ClassType(List((voidIdent, List()))))
+    val voidType      = RefType_(voidRefType)
+    val exceptType    = RefType_(exceptRefType)
+    // Exception => Void
+    // Function<Exception, Void>
+    val exceptArrVoid = mkArrType(exceptType,voidType)
+    // Void => Void
+    // Function<Void, Void>
+    val voidArrVoid   = mkArrType(voidType,voidType) 
+    // (Exception => Void) => ((Void => Void) => Void)
+    // Function<Function<Exception, Void>,  Function<Function<Void, Void>, Void>>
+    val exceptVoidArrVoidVoidArrVoid = mkArrType(exceptArrVoid, mkArrType(voidArrVoid, voidType))
+
+
+    def prim2Class(pt:PrimType):ClassType = pt match {
+        case BooleanT => ClassType(List((Ident("Boolean"),Nil)))
+        case ByteT    => ClassType(List((Ident("Byte"),Nil)))
+        case CharT    => ClassType(List((Ident("Char"),Nil)))
+        case DoubleT  => ClassType(List((Ident("Double"),Nil)))
+        case FloatT   => ClassType(List((Ident("Float"), Nil)))
+        case IntT     => ClassType(List((Ident("Integer"), Nil)))
+        case LongT    => ClassType(List((Ident("Long"), Nil)))
+        case ShortT   => ClassType(List((Ident("Short"), Nil)))    
+    }
+
+    
+    def exceptVoidArrTVoidArrVoid(t:Type):Type = { 
+        val s = t match {
+            case RefType_(r_ty) =>  t
+            case PrimType_(p_ty) => RefType_(ClassRefType(prim2Class(p_ty)))
+        }
+        val sArrVoid   = mkArrType(s,voidType) 
+        mkArrType(exceptArrVoid, mkArrType(sArrVoid, voidType))
+    }
+
+
+    // e1.apply(e2) assuming e1 is a lambda expressin
+    def eapply(e1:Exp, e2:Exp):Exp = {
+        val typ_args = List()
+        MethodInv(PrimaryMethodCall(e1,typ_args, Ident("apply"), List(e2)))
+    }
+
+    // extract the types and the idents from the formal parameters 
+    def extractFormParams(formal_params:List[FormalParam]):(List[Type], List[Ident]) = { 
+        formal_params.map( _ match 
+            {
+                case FormalParam(modifiers, ty, has_arity, var_decl_id) => (ty,idFromVarDeclId(var_decl_id))
+            }
+        ).unzip
+    }
+    // create curry type
+    
+    def curryType(tys: List[Type], inner_type:Type):Type = tys match {
+        case Nil => inner_type
+        case (ty::tysp) => mkArrType(ty, curryType(tysp, inner_type))
+    }
+    
+    // create curry lambda exp
+    def curryLamb(idents: List[Ident], inner_exp:Exp):Exp = idents match {
+        case Nil => inner_exp
+        case (ident::identsp) => Lambda(LambdaSingleParam(ident), LambdaExpression_(curryLamb(identsp, inner_exp)))
+    }
+
+    // eapply a curry lambda exp
 }
 
