@@ -12,6 +12,7 @@ import com.github.luzhuomi.scalangj.Syntax._
 import obsidian.lang.java.ASTUtils._
 import obsidian.lang.java.Common._
 import obsidian.lang.java.MinSSA.{SSABlock, SSAStmt, SSAIf, SSAWhile, SSATry, SSAAssert, SSAAssignments, SSABreak, SSAContinue, SSAEmpty, charcode, Label, TCtx, Phi}
+import obsidian.lang.java.MinSSA.SSAVarDecls
 
 
 object CPS {
@@ -102,7 +103,7 @@ object CPS {
     type VarDecl = BlockStmt // actually must be LocalVars(mods, ty, var_decls)
 
 
-    def cpsmethoddecl(methd:MinSSA.SSAMethodDecl)(implicit m:MonadError[CPSState,ErrorM]):SState[State, MethodDecl] = methd match {
+    def cpsmethoddecl(methd:MinSSA.SSAMethodDecl)(implicit m:MonadError[CPSState,ErrorM]):SState[State, MemberDecl] = methd match {
         case MinSSA.SSAMethodDecl(
             modifiers, // List[Modifier],
             type_params,  // List[TypeParam],
@@ -128,8 +129,24 @@ object CPS {
             // raise -> k -> {E(raise)(()->k(res))}
             (decls, lamb) <- body match {
                 case MinSSA.SSAMethodBody(blks) => for {
-                        (decls, exp) <- cpsblk(blks, Nil, Nil)
-                     } yield (decls, 
+                        vardecls <- m.pure(blks.flatMap(ssablk => ssablk match {
+                            case SSABlock(label, stmts) => stmts.map( stmt => stmt match {
+                                case SSAVarDecls(mods, ty, varDecls) => varDecls
+                                case _ => Nil
+                            })
+                        }))
+                        notVarDecls <- m.pure(blks.flatMap(ssablk => ssablk match {
+                            case SSABlock(label, stmts) => {
+                                val stmtsp = stmts.filter(s => s match {
+                                    case SSAVarDecls(mods, ty, varDecls) => false
+                                    case _ => true
+                                })
+                                if (stmtsp.isEmpty) { Nil }
+                                else {List(SSABlock(label, stmtsp))} 
+                            }
+                        }))
+                        (decs, exp) <- cpsblk(notVarDecls, Nil, Nil)
+                     } yield (vardecls ++ decs, 
                         Lambda(LambdaSingleParam(raiseIdent), LambdaExpression_(
                             Lambda(LambdaSingleParam(kIdent), LambdaExpression_(
                                 eapply(eapply(exp,ExpName(Name(List(raiseIdent)))), thunk(eapply(ExpName(Name(List(kIdent))), ExpName(Name(List(resIdent)))))
@@ -147,7 +164,22 @@ object CPS {
                 LocalVars(mods, ret_typ, List(VarDecl(VarId(resIdent), None))),
                 LocalVars(mods, exceptType, List(VarDecl(VarId(exIdent), None))))
             )
-            bodypp <- m.pure(MethodBody(Some(Block(decl::decls))))
+            appStmt <- {
+                // M_cps.apply(arg1).apply(arg2)...
+                val mcps_app_in_args = curryApply(ExpName(Name(List(idcps))), in_args.map(a=>ExpName(Name(List(a)))))
+                val e = eapply(mcps_app_in_args, ExpName(Name(List(idraiseIdent))))
+                // r -> { res = r; return;}
+                val f = Lambda(LambdaSingleParam(Ident("r")), LambdaBlock(Block(List(
+                    BlockStmt_(ExpStmt(Assign(NameLhs(Name(List(resIdent))), EqualA, ExpName(Name(List(Ident("r"))))))),
+                    BlockStmt_(Return(None))
+                ))))
+                val d = eapply(e, f)
+                m.pure(BlockStmt_(ExpStmt(d)))
+            }
+            bodypp <- m.pure(MethodBody(Some(Block(decl::declspp ++ List(
+                appStmt, 
+                BlockStmt_(Return(Some(ExpName(Name(List(resIdent)))))) // return res
+            ))))) // TODO: fixme
 
         } yield MethodDecl(modifiers, type_params, oty, id, formal_params, ex_types, exp, bodypp)
     }
@@ -223,6 +255,8 @@ object CPS {
                 (declppp, expppp) <- cpsk(phiK, lbl)
             } yield (decl ++ declp ++ declppp, seq(trycatch(exp, exppp), expppp))
             // todo: more cases here.
+
+            
         }
         case SSABlock(lbl, stmts)::blksppp => stmts match {
             case List(SSAIf(e, blksp, blkspp, phi)) => for {
@@ -262,7 +296,9 @@ object CPS {
                 exppp             <- m.pure(Lambda(LambdaFormalParams(params), LambdaBlock(body))) 
                 (declppp, expppp) <- cpsblk(blksppp, phiK, phiR)
             } yield (decl ++ declp ++ declppp, seq(trycatch(exp, exppp), expppp))
+
             // todo: more cases here. try?
+
         }
     }
 
@@ -380,6 +416,7 @@ object CPS {
     {
         Lambda(LambdaSingleParam(unitIdent), LambdaExpression_(e))
     }
+
         
 
     /**
@@ -437,6 +474,7 @@ object CPS {
     val unitIdent = Ident("unit")
     val resIdent = Ident("res")
     val exIdent = Ident("ex")
+    val idraiseIdent = Ident("id_raise")
 
     val exceptRefType = ClassRefType(ClassType(List((exceptIdent, List()))))
     val voidRefType   = ClassRefType(ClassType(List((voidIdent, List()))))
@@ -502,6 +540,10 @@ object CPS {
         case (ident::identsp) => Lambda(LambdaSingleParam(ident), LambdaExpression_(curryLamb(identsp, inner_exp)))
     }
 
-    // eapply a curry lambda exp
+    // nested eapply a curry lambda exp to a list of args
+    def curryApply(exp:Exp, args:List[Exp]):Exp = args match {
+        case Nil => exp
+        case (arg::argsp) => curryApply(eapply(exp,arg), argsp)
+    }
 }
 

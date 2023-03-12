@@ -43,7 +43,7 @@ public static void main(String [] args) {
                                 CPS.cpsmethoddecl(ssa_methodDecl).run(CPS.initState(charcodes)) match {
                                     case CPS.CPSError(message) => fail(message)
                                     case CPS.CPSOk((st, cps_methodDecl)) => 
-                                        println(cps_methodDecl)
+                                        println(prettyPrint(cps_methodDecl))
                                 }
                             }
                         }
