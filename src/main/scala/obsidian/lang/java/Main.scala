@@ -28,20 +28,20 @@ public class Fib
 
     public static int fib(int n)
     {
-	int f1;
-	int f2;
-	int i;
-    int t;
-    f1 =1;
-    f2 =1;
-    i = 0;
-	while(i<n) {
-	    t = f1 + f2;
-	    f1 = f2;
-	    f2 = t;
-	    i = i +1;
-	}
-	return f2;
+        int f1;
+        int f2;
+        int i;
+        int t;
+        f1 =1;
+        f2 =1;
+        i = 0;
+        while(i<n) {
+            t = f1 + f2;
+            f1 = f2;
+            f2 = t;
+            i = i +1;
+        }
+        return f2;
     }
 
     public static void  main(String argv[]) {
