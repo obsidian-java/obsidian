@@ -12,6 +12,10 @@ import obsidian.lang.java.Common._
 import obsidian.lang.java.ASTPath._
 import obsidian.lang.java.ASTUtils._
 
+/**
+ * all variables must be declared and initialized in the source program
+ * otherwise Rleq fails to find an LUB.
+ * */
 
 object MinSSA {
   case class SSAMethodDecl(
@@ -1949,12 +1953,13 @@ object MinSSA {
             vm0.keySet.toList.traverse( v => for {
               v_lbl <- mkName(v, lbl1)
               rhs <- Rleq(aenv0, eenv0, benv0, cenv0, eCtx0, vm0, v) match {
-                case Nil => m.raiseError("SSA construction failed, Rleq failed to find a lub during the while stmt conversion. None found.")
+                case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub for the operand of ${v} in the phi-asssignment in the while stmt conversion. None found.")
                 case (c,n)::Nil => m.pure(List((lbl0 -> n)))
-                case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub during the while stmt conversion. More than one candidates found.")
+                case _::_ => m.raiseError(s"SSA construction failed, Rleq failed to find a lub for the operand of ${v} in the phi-asssignment during the while stmt conversion. More than one candidates found.")
               }
             } yield Phi(v, v_lbl, rhs))
         }
+
         stBodyIn <- st match { // creating vm1
           case State(vm0, eCtx0, aenv0, eenv0, benv0, cenv0, nestedDecls0, methInvs0, srcLblEnv0, conf0) => for {
             entries <- vm0.keySet.toList.traverse( v => for {
@@ -1990,14 +1995,14 @@ object MinSSA {
                 lbl0  <- m.pure(eCtx0)
                 lbl2  <- m.pure(eCtx2)
                 name0 <- Rleq(aenv0, eenv0, benv0, cenv0, eCtx0, vm0, v) match {
-                  case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub during the while stmt conversion.")
+                  case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub for the first operand of ${v} in the updated phi-asssignment during the while stmt conversion.")
                   case (c,n)::Nil => m.pure(n)
-                  case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub during the while stmt conversion. More than one candidates found.")          
+                  case _::_ => m.raiseError(s"SSA construction failed, Rleq failed to find a lub for the first operand of ${v} in the updated phi-asssignment during the while stmt conversion. More than one candidates found.")          
                 }
                 name2 <- Rleq(aenv2, eenv2, benv2, cenv2, eCtx2, vm2, v) match {
-                  case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub during the while stmt conversion.")
+                  case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub for the second operand of ${v} in the updated  phi-asssignment during the while stmt conversion.")
                   case (c,n)::Nil => m.pure(n)
-                  case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub during the while stmt conversion. More than one candidates found.")            
+                  case _::_ => m.raiseError(s"SSA construction failed, Rleq failed to find a lub for the second operand of ${v} in the updated phi-asssignment during the while stmt conversion. More than one candidates found.")            
                 }
               } yield Phi(v, v_lbl, List(lbl0 -> name0, lbl2 -> name2)))
               phis2 <- phis.traverse( phi => updatePhiFromCEnv(phi, stBodyOut, tctx))

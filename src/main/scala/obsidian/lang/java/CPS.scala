@@ -126,12 +126,12 @@ object CPS {
             exceptVoidArrTpVoidArrVoid <- m.pure(exceptVoidArrTVoidArrVoid(ret_typ))
             // ity1 -> ... ityn -> (Exception => Void) => (re_typ => Void) => Void
             itysArrExceptVoidArrTpVoidArrVoid  <- m.pure(curryType(in_typs, exceptVoidArrTpVoidArrVoid))
-            // raise -> k -> {E(raise)(()->k(res))}
-            (decls, lamb) <- body match {
+            // (some inner cps decl,  raise -> k -> {E(raise)(()->k(res))} )
+            (inner_cps_decls, lamb) <- body match {
                 case MinSSA.SSAMethodBody(blks) => for {
                         vardecls <- m.pure(blks.flatMap(ssablk => ssablk match {
                             case SSABlock(label, stmts) => stmts.map( stmt => stmt match {
-                                case SSAVarDecls(mods, ty, varDecls) => varDecls
+                                case SSAVarDecls(mods, ty, varDecls) => List(LocalVars(mods, ty, varDecls))
                                 case _ => Nil
                             })
                         }))
@@ -146,7 +146,7 @@ object CPS {
                             }
                         }))
                         (decs, exp) <- cpsblk(notVarDecls, Nil, Nil)
-                     } yield (vardecls ++ decs, 
+                     } yield (vardecls.flatten ++ decs, 
                         Lambda(LambdaSingleParam(raiseIdent), LambdaExpression_(
                             Lambda(LambdaSingleParam(kIdent), LambdaExpression_(
                                 eapply(eapply(exp,ExpName(Name(List(raiseIdent)))), thunk(eapply(ExpName(Name(List(kIdent))), ExpName(Name(List(resIdent)))))
@@ -176,7 +176,7 @@ object CPS {
                 val d = eapply(e, f)
                 m.pure(BlockStmt_(ExpStmt(d)))
             }
-            bodypp <- m.pure(MethodBody(Some(Block(decl::declspp ++ List(
+            bodypp <- m.pure(MethodBody(Some(Block(declspp ++ inner_cps_decls ++ List(decl) ++  List(
                 appStmt, 
                 BlockStmt_(Return(Some(ExpName(Name(List(resIdent)))))) // return res
             ))))) // TODO: fixme

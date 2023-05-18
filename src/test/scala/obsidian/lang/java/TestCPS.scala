@@ -68,6 +68,7 @@ class TestCPS2 extends FunSuite with Matchers {
         f1 =1;
         f2 =1;
         i = 0;
+        t = 0;
         while(i<n) {
             t = f1 + f2;
             f1 = f2;
