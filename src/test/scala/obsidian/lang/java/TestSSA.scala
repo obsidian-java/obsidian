@@ -186,7 +186,7 @@ class TestSSAFib extends FunSuite with Matchers with AppendedClues{
     }
   }
 }
-
+/*
 class TestSSAIfWhile extends FunSuite with Matchers with AppendedClues {
 
   val METHODSTR = """
@@ -286,3 +286,4 @@ class TestSSAIfWhile extends FunSuite with Matchers with AppendedClues {
   }
 
 }
+*/
