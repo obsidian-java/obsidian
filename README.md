@@ -5,8 +5,8 @@ It is work in progress
 
 # Documentation
 
-* [Technical Report](https://github.com/obsidian-java/obsidian/raw/master/pepm21-fixed.pdf)
-
+* [Code Obfuscation using CPS](https://github.com/obsidian-java/obsidian/raw/master/pepm21-fixed.pdf)
+* [Structured SSA construction]((https://github.com/obsidian-java/obsidian/raw/master/structured_ssa.pdf)
 # Example 
 
 Some examples in Java
