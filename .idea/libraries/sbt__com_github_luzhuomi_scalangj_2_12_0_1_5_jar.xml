@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="sbt: com.github.luzhuomi:scalangj_2.12:0.1.5:jar">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/Library/Caches/Coursier/v1/https/raw.githubusercontent.com/luzhuomi/mavenrepo/master/com/github/luzhuomi/scalangj_2.12/0.1.5/scalangj_2.12-0.1.5.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/Library/Caches/Coursier/v1/https/raw.githubusercontent.com/luzhuomi/mavenrepo/master/com/github/luzhuomi/scalangj_2.12/0.1.5/scalangj_2.12-0.1.5-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

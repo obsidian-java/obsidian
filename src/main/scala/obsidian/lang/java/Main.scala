@@ -1,5 +1,6 @@
 package obsidian.lang.java
 
+import scala.io._
 import com.github.luzhuomi.scalangj.Parser._
 import com.github.luzhuomi.scalangj.Pretty._
 import com.github.luzhuomi.scalangj.Syntax._
@@ -8,6 +9,8 @@ import obsidian.lang.java._
 
 import obsidian.lang.java.MinSSA._
 import obsidian.lang.java.CPS._
+import os.Path
+
 
 
 object Main extends App {
@@ -35,6 +38,7 @@ public class Fib
         f1 =1;
         f2 =1;
         i = 0;
+        t = 0; // all variables must be initialized
         while(i<n) {
             t = f1 + f2;
             f1 = f2;
@@ -100,6 +104,7 @@ public class Fib
                                     }
                                 }))
                             }
+                            println(id)
                             ClassDecl_(modifiers, id, type_params, ref_type, ref_types, obs_body)
                         }
                     }
@@ -113,6 +118,12 @@ public class Fib
     val eCU = parseCompilationUnit(STRING)
     eCU match {
         case Left(error_msg) => println(error_msg)
-        case Right(cu) => println(prettyPrint(run(cu))) 
+        case Right(cu) => {
+            val path:os.Path = os.pwd / "output" / "output.java"
+            val obs_cu = run(cu)
+            
+            println( prettyPrint(cu))
+            os.write(path, prettyPrint(obs_cu)) 
+        }
     }
 }

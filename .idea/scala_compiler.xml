@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ScalaCompilerConfiguration">
+    <profile name="sbt 1" modules="obsidian_2823" />
+    <profile name="sbt 2" modules="obsidian">
+      <option name="deprecationWarnings" value="true" />
+      <option name="featureWarnings" value="true" />
+      <parameters>
+        <parameter value="-Yresolve-term-conflict:package" />
+        <parameter value="-Ypartial-unification" />
+      </parameters>
+    </profile>
+  </component>
+</project>
