@@ -6,7 +6,7 @@ It is work in progress
 # Documentation
 
 * [Code Obfuscation using CPS](https://github.com/obsidian-java/obsidian/raw/master/pepm21-fixed.pdf)
-* [Structured SSA construction](https://github.com/obsidian-java/obsidian/raw/master/structured_ssa.pdf)
+* [Structured SSA construction](https://github.com/obsidian-java/obsidian/raw/master/ftfjp23-fixed.pdf)
 # Example 
 
 Some examples in Java
