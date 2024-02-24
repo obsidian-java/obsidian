@@ -1,16 +1,18 @@
 package obsidian.lang.java
 
-import obsidian.lang.java.CFG.{CFGError, CFGOk, cfgOps, initStateInfo}
+import obsidian.lang.java.CFG.{CFGResult, cfgOps, initStateInfo}
 import com.github.luzhuomi.scalangj.Lexer
-import com.github.luzhuomi.scalangj.Parser._
-import com.github.luzhuomi.scalangj.Syntax._
-import com.github.luzhuomi.scalangj.Pretty._
-import obsidian.lang.java.SSACFG._
-import obsidian.lang.java._
-import obsidian.lang.java.Desugar._
-import org.scalatest.{AppendedClues, FunSuite, Matchers}
+import com.github.luzhuomi.scalangj.Parser.*
+import com.github.luzhuomi.scalangj.Syntax.*
+import com.github.luzhuomi.scalangj.Pretty.*
+import obsidian.lang.java.SSACFG.*
+import obsidian.lang.java.*
+import obsidian.lang.java.Desugar.*
+import obsidian.lang.java.Label.*
+import obsidian.lang.java.Flatten.*
+import org.scalatest.{funsuite, matchers}
 
-class TestSSACFGFib extends FunSuite with Matchers with AppendedClues{
+class TestSSACFGFib extends funsuite.AnyFunSuite with matchers.should.Matchers {
   val METHODSTR =
     """
       |    public static int fib(int n)
@@ -42,6 +44,9 @@ class TestSSACFGFib extends FunSuite with Matchers with AppendedClues{
     classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
 
 
+  import LabelResult.*
+  import FlatResult.*
+  import CFGResult.*
 
   test("Test SSACFG on fib"){
     methoddecl match {
@@ -49,11 +54,11 @@ class TestSSACFGFib extends FunSuite with Matchers with AppendedClues{
         Label.labelOps
           .label(methodDecl, None, None)
           .run(Label.initStateInfo) match {
-          case Label.LabelError(message) => fail(message)
-          case Label.LabelOk((st, methDecl)) => {
+          case LabelError(message) => fail(message)
+          case LabelOk((st, methDecl)) => {
             Flatten.flatMethodDecl(methDecl).run(Flatten.initStateInfo) match {
-              case Flatten.FlatError(message) => fail(message)
-              case Flatten.FlatOk((st, f_methdDecl)) => {
+              case FlatError(message) => fail(message)
+              case FlatOk((st, f_methdDecl)) => {
                 val d_methodDecl = Desugar.dsgOps.desugar(f_methdDecl)
                 val cfg = cfgOps.buildCFG(d_methodDecl, List()).run(initStateInfo) match {
                   case CFGError(message) => fail(message)
@@ -77,7 +82,7 @@ class TestSSACFGFib extends FunSuite with Matchers with AppendedClues{
   }
 }
 
-class TestSSACFGIfWhile extends FunSuite with Matchers with AppendedClues{
+class TestSSACFGIfWhile extends funsuite.AnyFunSuite with matchers.should.Matchers {
 
   val METHODSTR = """
                     |    public static int fun(int n)
@@ -106,19 +111,23 @@ class TestSSACFGIfWhile extends FunSuite with Matchers with AppendedClues{
 
 
 
+  import LabelResult.*
+  import FlatResult.*
+  import CFGResult.*
+
   test("Test ssacfg on if followed by while"){
     methoddecl match {
       case MemberDecl_(methodDecl @ MethodDecl(_, _, _, _, _, _, _, _)) => {
         Label.labelOps
           .label(methodDecl, None, None)
           .run(Label.initStateInfo) match {
-          case Label.LabelError(message) => fail(message)
-          case Label.LabelOk((st, methDecl)) => {
+          case LabelError(message) => fail(message)
+          case LabelOk((st, methDecl)) => {
             Flatten.flatMethodDecl(methDecl).run(Flatten.initStateInfo) match {
-              case Flatten.FlatError(message) => fail(message)
-              case Flatten.FlatOk((st, f_methdDecl)) => {
+              case FlatError(message) => fail(message)
+              case FlatOk((st, f_methdDecl)) => {
                 val d_methodDecl = Desugar.dsgOps.desugar(f_methdDecl)
-                val cfg = cfgOps.buildCFG(d_methodDecl, List()).run(initStateInfo) match {
+                val cfg = cfgOps.buildCFG(d_methodDecl, List()).run(CFG.initStateInfo) match {
                   case CFGError(message) => fail(message)
                   case CFGOk((st, unit)) => {
                     // println(st.cfg)
@@ -141,7 +150,7 @@ class TestSSACFGIfWhile extends FunSuite with Matchers with AppendedClues{
   }
 }
 
-class TestSSACFGIfElifElse extends FunSuite with Matchers with AppendedClues{
+class TestSSACFGIfElifElse extends funsuite.AnyFunSuite with matchers.should.Matchers {
 
   val METHODSTR = """
                     |    public static int fun(int n)
@@ -161,6 +170,10 @@ class TestSSACFGIfElifElse extends FunSuite with Matchers with AppendedClues{
     classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
 
 
+  import LabelResult.*
+  import FlatResult.*
+  import CFGResult.*
+
 
   test("Test ssacfg on if elif else"){
     methoddecl match {
@@ -168,13 +181,13 @@ class TestSSACFGIfElifElse extends FunSuite with Matchers with AppendedClues{
         Label.labelOps
           .label(methodDecl, None, None)
           .run(Label.initStateInfo) match {
-          case Label.LabelError(message) => fail(message)
-          case Label.LabelOk((st, methDecl)) => {
+          case LabelError(message) => fail(message)
+          case LabelOk((st, methDecl)) => {
             Flatten.flatMethodDecl(methDecl).run(Flatten.initStateInfo) match {
-              case Flatten.FlatError(message) => fail(message)
-              case Flatten.FlatOk((st, f_methdDecl)) => {
+              case FlatError(message) => fail(message)
+              case FlatOk((st, f_methdDecl)) => {
                 val d_methodDecl = Desugar.dsgOps.desugar(f_methdDecl)
-                val cfg = cfgOps.buildCFG(d_methodDecl, List()).run(initStateInfo) match {
+                val cfg = cfgOps.buildCFG(d_methodDecl, List()).run(CFG.initStateInfo) match {
                   case CFGError(message) => fail(message)
                   case CFGOk((st, unit)) => {
                     // println(st.cfg)
@@ -197,7 +210,7 @@ class TestSSACFGIfElifElse extends FunSuite with Matchers with AppendedClues{
   }
 }
 
-class TestSSACFGTryCatch extends FunSuite with Matchers with AppendedClues{
+class TestSSACFGTryCatch extends funsuite.AnyFunSuite with matchers.should.Matchers {
 
   val METHODSTR = """
                     |    public static int fun(int n)
@@ -213,6 +226,10 @@ class TestSSACFGTryCatch extends FunSuite with Matchers with AppendedClues{
                     |    }""".stripMargin
 
 
+  import LabelResult.*
+  import FlatResult.*
+  import CFGResult.*
+
   val expectedSsaCfg = Map()
 
   val methoddecl: Decl =
@@ -226,14 +243,14 @@ class TestSSACFGTryCatch extends FunSuite with Matchers with AppendedClues{
         Label.labelOps
           .label(methodDecl, None, None)
           .run(Label.initStateInfo) match {
-          case Label.LabelError(message) => fail(message)
-          case Label.LabelOk((st, methDecl)) => {
+          case LabelError(message) => fail(message)
+          case LabelOk((st, methDecl)) => {
             Flatten.flatMethodDecl(methDecl).run(Flatten.initStateInfo) match {
-              case Flatten.FlatError(message) => fail(message)
-              case Flatten.FlatOk((st, f_methdDecl)) => {
+              case FlatError(message) => fail(message)
+              case FlatOk((st, f_methdDecl)) => {
                 val d_methodDecl = Desugar.dsgOps.desugar(f_methdDecl)
                 println(prettyPrint(MemberDecl_(d_methodDecl): Decl))
-                val cfg = cfgOps.buildCFG(d_methodDecl, List()).run(initStateInfo) match {
+                val cfg = cfgOps.buildCFG(d_methodDecl, List()).run(CFG.initStateInfo) match {
                   case CFGError(message) => fail(message)
                   case CFGOk((st, unit)) => {
                     // println(st.cfg)
@@ -257,7 +274,7 @@ class TestSSACFGTryCatch extends FunSuite with Matchers with AppendedClues{
   }
 }
 
-class TestSSACFGCatchJoin extends FunSuite with Matchers with AppendedClues{
+class TestSSACFGCatchJoin extends funsuite.AnyFunSuite with matchers.should.Matchers {
 
   val METHODSTR = """
                     |    public static int fun(int n)
@@ -283,6 +300,10 @@ class TestSSACFGCatchJoin extends FunSuite with Matchers with AppendedClues{
     classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
 
 
+  import LabelResult.*
+  import FlatResult.*
+  import CFGResult.*
+
 
   test("Test ssacfg on try-catch with catch join"){
     methoddecl match {
@@ -290,14 +311,14 @@ class TestSSACFGCatchJoin extends FunSuite with Matchers with AppendedClues{
         Label.labelOps
           .label(methodDecl, None, None)
           .run(Label.initStateInfo) match {
-          case Label.LabelError(message) => fail(message)
-          case Label.LabelOk((st, methDecl)) => {
+          case LabelError(message) => fail(message)
+          case LabelOk((st, methDecl)) => {
             Flatten.flatMethodDecl(methDecl).run(Flatten.initStateInfo) match {
-              case Flatten.FlatError(message) => fail(message)
-              case Flatten.FlatOk((st, f_methdDecl)) => {
+              case FlatError(message) => fail(message)
+              case FlatOk((st, f_methdDecl)) => {
                 val d_methodDecl = Desugar.dsgOps.desugar(f_methdDecl)
                 println(prettyPrint(MemberDecl_(d_methodDecl): Decl))
-                val cfg = cfgOps.buildCFG(d_methodDecl, List()).run(initStateInfo) match {
+                val cfg = cfgOps.buildCFG(d_methodDecl, List()).run(CFG.initStateInfo) match {
                   case CFGError(message) => fail(message)
                   case CFGOk((st, unit)) => {
                     // println(st.cfg)
@@ -322,7 +343,7 @@ class TestSSACFGCatchJoin extends FunSuite with Matchers with AppendedClues{
 }
 
 
-class TestSSACFGWhileBreak extends FunSuite with Matchers with AppendedClues{
+class TestSSACFGWhileBreak extends funsuite.AnyFunSuite with matchers.should.Matchers {
 
   val METHODSTR = """
                     |    public static int fun(int n)
@@ -347,6 +368,10 @@ class TestSSACFGWhileBreak extends FunSuite with Matchers with AppendedClues{
     classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
 
 
+  import LabelResult.*
+  import FlatResult.*
+  import CFGResult.*
+
 
   test("Test ssacfg on while-break"){
     methoddecl match {
@@ -354,13 +379,13 @@ class TestSSACFGWhileBreak extends FunSuite with Matchers with AppendedClues{
         Label.labelOps
           .label(methodDecl, None, None)
           .run(Label.initStateInfo) match {
-          case Label.LabelError(message) => fail(message)
-          case Label.LabelOk((st, methDecl)) => {
+          case LabelError(message) => fail(message)
+          case LabelOk((st, methDecl)) => {
             Flatten.flatMethodDecl(methDecl).run(Flatten.initStateInfo) match {
-              case Flatten.FlatError(message) => fail(message)
-              case Flatten.FlatOk((st, f_methdDecl)) => {
+              case FlatError(message) => fail(message)
+              case FlatOk((st, f_methdDecl)) => {
                 val d_methodDecl = Desugar.dsgOps.desugar(f_methdDecl)
-                val cfg = cfgOps.buildCFG(d_methodDecl, List()).run(initStateInfo) match {
+                val cfg = cfgOps.buildCFG(d_methodDecl, List()).run(CFG.initStateInfo) match {
                   case CFGError(message) => fail(message)
                   case CFGOk((st, unit)) => {
                     // println(st.cfg)

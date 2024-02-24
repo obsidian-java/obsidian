@@ -1,14 +1,14 @@
 package obsidian.lang.java
 
 import com.github.luzhuomi.scalangj.Lexer
-import com.github.luzhuomi.scalangj.Parser._
-import com.github.luzhuomi.scalangj.Syntax._
-import obsidian.lang.java._ 
-import obsidian.lang.java.ASTPath._
+import com.github.luzhuomi.scalangj.Parser.*
+import com.github.luzhuomi.scalangj.Syntax.*
+import obsidian.lang.java.*
+import obsidian.lang.java.ASTPath.*
 
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.{funsuite, matchers}
 
-class TestASTPath1 extends FunSuite with Matchers {
+class TestASTPath1 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     /**
       * public static void main() {
           System.out.println("Hello World!");
@@ -25,7 +25,7 @@ class TestASTPath1 extends FunSuite with Matchers {
 }
 
 
-class TestASTPath2 extends FunSuite with Matchers {
+class TestASTPath2 extends funsuite.AnyFunSuite with matchers.should.Matchers {
   val METHODSTRING = """
 int get (int x) {
   int i = lpos;  // 0
@@ -72,7 +72,7 @@ int get (int x) {
 }
 
 
-class TestASTPath3 extends FunSuite with Matchers {
+class TestASTPath3 extends funsuite.AnyFunSuite with matchers.should.Matchers {
   val METHODSTRING = """
 int get (int x) {
   int i = lpos;  // 0
@@ -119,7 +119,7 @@ int get (int x) {
 }
 
 
-class TestASTPath4 extends FunSuite with Matchers {
+class TestASTPath4 extends funsuite.AnyFunSuite with matchers.should.Matchers {
   val METHODSTRING = """
 int get (int x) {
   int i = lpos;  // 0
@@ -166,7 +166,7 @@ int get (int x) {
 }
 
 
-class TestASTPath5 extends FunSuite with Matchers {
+class TestASTPath5 extends funsuite.AnyFunSuite with matchers.should.Matchers {
   val METHODSTRING = """
 int get (int x) {
   int i = lpos;  // 0
@@ -214,7 +214,7 @@ int get (int x) {
 
 
 
-class TestASTPath6 extends FunSuite with Matchers {
+class TestASTPath6 extends funsuite.AnyFunSuite with matchers.should.Matchers {
   val METHODSTRING =  """
 public static void main (String[] args)
 {

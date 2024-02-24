@@ -1,16 +1,15 @@
 package obsidian.lang.java
 
-
-import cats._
-import cats.implicits._
+import cats.*
+import cats.implicits.*
 import cats.data.StateT
 import scala.annotation.tailrec
 import scala.collection.immutable
 
 // constructing CPS from SSA
-import com.github.luzhuomi.scalangj.Syntax._
-import obsidian.lang.java.ASTUtils._
-import obsidian.lang.java.Common._
+import com.github.luzhuomi.scalangj.Syntax.*
+import obsidian.lang.java.ASTUtils.*
+import obsidian.lang.java.Common.*
 import obsidian.lang.java.MinSSA.{SSABlock, SSAStmt, SSAIf, SSAWhile, SSATry, SSAAssert, SSAAssignments, SSABreak, SSAContinue, SSAEmpty, charcode, Label, TCtx, Phi}
 import obsidian.lang.java.MinSSA.SSAVarDecls
 
@@ -31,22 +30,24 @@ object CPS {
 
     def initState(carr:List[Char]):State = State(carr)
 
-    sealed trait CPSResult[+A]
-    
-    case class CPSError(msg:ErrorM) extends CPSResult[Nothing]
-  
-    case class CPSOk[A](result:A) extends CPSResult[A]
 
-    implicit def cpsResultFunctor: Functor[CPSResult] =
-        new Functor[CPSResult] {
-        override def map[A, B](fa: CPSResult[A])(f: A => B): CPSResult[B] =
-            fa match {
+    enum CPSResult[+A] {
+        case CPSError(msg:ErrorM) extends CPSResult[Nothing]
+        case CPSOk[A](result:A) extends CPSResult[A]
+    }
+    
+    import CPSResult.*
+
+    given cpsResultFunctor:Functor[CPSResult] = new Functor[CPSResult] {
+        def map[A, B](fa: CPSResult[A])(f: A => B): CPSResult[B] =
+        fa match {
             case CPSError(s) => CPSError(s)
             case CPSOk(a) => CPSOk(f(a))
-            }
         }
+    }
+    
 
-    implicit def cpsResultApplicative: ApplicativeError[CPSResult, ErrorM] = 
+    given cpsResultApplicative: ApplicativeError[CPSResult, ErrorM] = 
         new ApplicativeError[CPSResult, ErrorM] {
         override def ap[A, B](ff: CPSResult[A => B])(fa: CPSResult[A]): CPSResult[B] =
             ff match {
@@ -69,7 +70,7 @@ object CPS {
             }
         }
 
-    implicit def cpsResultMonadError(implicit app:ApplicativeError[CPSResult, ErrorM]):MonadError[CPSResult, ErrorM] = {
+    given cpsResultMonadError(using app:ApplicativeError[CPSResult, ErrorM]):MonadError[CPSResult, ErrorM] = {
         new MonadError[CPSResult, ErrorM] {
         override def raiseError[A](e: ErrorM): CPSResult[A] = app.raiseError(e)
 
@@ -103,7 +104,7 @@ object CPS {
     type VarDecl = BlockStmt // actually must be LocalVars(mods, ty, var_decls)
 
 
-    def cpsmethoddecl(methd:MinSSA.SSAMethodDecl)(implicit m:MonadError[CPSState,ErrorM]):SState[State, MemberDecl] = methd match {
+    def cpsmethoddecl(methd:MinSSA.SSAMethodDecl)(using m:MonadError[CPSState,ErrorM]):SState[State, MemberDecl] = methd match {
         case MinSSA.SSAMethodDecl(
             modifiers, // List[Modifier],
             type_params,  // List[TypeParam],
@@ -113,85 +114,88 @@ object CPS {
             ex_types,  // : List[ExceptionType], 
             exp, // : Option[Exp],
             body // : SSAMethodBody
-        ) => for {
+        ) => {
             // no need to rename input parameter?
-            idcps <- m.pure(appIdStr(id, "cps"))
-            mods  <- m.pure(List())
-            (in_typs,in_args) <- m.pure(extractFormParams(formal_params))
-            ret_typ   <- oty match { // ret_type
-                case None => m.pure(voidType)
-                case Some(ty) => m.pure(ty)
+            val idcps = appIdStr(id, "cps")
+            val mods  = List()
+            val (in_typs,in_args) = extractFormParams(formal_params)
+            val ret_typ  = oty match { // ret_type
+                case None => voidType
+                case Some(ty) => ty
             }
             // (Exception => Void) => (re_typ => Void) => Void
-            exceptVoidArrTpVoidArrVoid <- m.pure(exceptVoidArrTVoidArrVoid(ret_typ))
+            val exceptVoidArrTpVoidArrVoid = exceptVoidArrTVoidArrVoid(ret_typ)
             // ity1 -> ... ityn -> (Exception => Void) => (re_typ => Void) => Void
-            itysArrExceptVoidArrTpVoidArrVoid  <- m.pure(curryType(in_typs, exceptVoidArrTpVoidArrVoid))
+            val itysArrExceptVoidArrTpVoidArrVoid = curryType(in_typs, exceptVoidArrTpVoidArrVoid)
             // (some inner cps decl,  raise -> k -> {E(raise)(()->k(res))} )
-            (inner_cps_decls, lamb) <- body match {
-                case MinSSA.SSAMethodBody(blks) => for {
-                        vardecls <- m.pure(blks.flatMap(ssablk => ssablk match {
-                            case SSABlock(label, stmts) => stmts.map( stmt => stmt match {
-                                case SSAVarDecls(mods, ty, varDecls) => List(LocalVars(mods, ty, varDecls))
-                                case _ => Nil
-                            })
-                        }))
-                        notVarDecls <- m.pure(blks.flatMap(ssablk => ssablk match {
-                            case SSABlock(label, stmts) => {
-                                val stmtsp = stmts.filter(s => s match {
-                                    case SSAVarDecls(mods, ty, varDecls) => false
-                                    case _ => true
+            for {
+                (inner_cps_decls, lamb) <- body match {
+                    case MinSSA.SSAMethodBody(blks) => {
+                            val vardecls = blks.flatMap(ssablk => ssablk match {
+                                case SSABlock(label, stmts) => stmts.map( stmt => stmt match {
+                                    case SSAVarDecls(mods, ty, varDecls) => List(LocalVars(mods, ty, varDecls))
+                                    case _ => Nil
                                 })
-                                if (stmtsp.isEmpty) { Nil }
-                                else {List(SSABlock(label, stmtsp))} 
-                            }
-                        }))
-                        (decs, exp) <- cpsblk(notVarDecls, Nil, Nil)
-                     } yield (vardecls.flatten ++ decs, 
-                        Lambda(LambdaSingleParam(raiseIdent), LambdaExpression_(
-                            Lambda(LambdaSingleParam(kIdent), LambdaExpression_(
-                                eapply(eapply(exp,ExpName(Name(List(raiseIdent)))), thunk(eapply(ExpName(Name(List(kIdent))), ExpName(Name(List(resIdent)))))
-                            )))
-                        ))
-                     )
+                            })
+                            val notVarDecls = blks.flatMap(ssablk => ssablk match {
+                                case SSABlock(label, stmts) => {
+                                    val stmtsp = stmts.filter(s => s match {
+                                        case SSAVarDecls(mods, ty, varDecls) => false
+                                        case _ => true
+                                    })
+                                    if (stmtsp.isEmpty) { Nil }
+                                    else {List(SSABlock(label, stmtsp))} 
+                                }
+                            })
+                            for {
+                                (decs, exp) <- cpsblk(notVarDecls, Nil, Nil)
+                            } yield (vardecls.flatten ++ decs, 
+                                Lambda(LambdaSingleParam(raiseIdent), LambdaExpression_(
+                                    Lambda(LambdaSingleParam(kIdent), LambdaExpression_(
+                                        eapply(eapply(exp,ExpName(Name(List(raiseIdent)))), thunk(eapply(ExpName(Name(List(kIdent))), ExpName(Name(List(resIdent)))))
+                                    )))
+                                ))
+                            )
+                    }
                 }
-            // x1 -> ... xn -> raise -> k -> {E(raise)(()->k(res))}
-            bodyp <- m.pure(curryLamb(in_args, lamb))
-            // m_cps's decl
-            decl  <- m.pure(LocalVars(mods, itysArrExceptVoidArrTpVoidArrVoid, 
-                        List(VarDecl(VarId(idcps), Some(InitExp(bodyp))))))
-            // t' res ; Exception ex
-            declspp <- m.pure(List(
-                LocalVars(mods, ret_typ, List(VarDecl(VarId(resIdent), None))),
-                LocalVars(mods, exceptType, List(VarDecl(VarId(exIdent), None))))
-            )
-            appStmt <- {
-                // M_cps.apply(arg1).apply(arg2)...
-                val mcps_app_in_args = curryApply(ExpName(Name(List(idcps))), in_args.map(a=>ExpName(Name(List(a)))))
-                val e = eapply(mcps_app_in_args, ExpName(Name(List(idraiseIdent))))
-                // r -> { res = r; return;}
-                val f = Lambda(LambdaSingleParam(Ident("r")), LambdaBlock(Block(List(
-                    BlockStmt_(ExpStmt(Assign(NameLhs(Name(List(resIdent))), EqualA, ExpName(Name(List(Ident("r"))))))),
-                    BlockStmt_(Return(None))
-                ))))
-                val d = eapply(e, f)
-                m.pure(BlockStmt_(ExpStmt(d)))
-            }
-            bodypp <- m.pure(MethodBody(Some(Block(declspp ++ inner_cps_decls ++ List(decl) ++  List(
-                appStmt, 
-                BlockStmt_(Return(Some(ExpName(Name(List(resIdent)))))) // return res
-            ))))) // TODO: fixme
-
-        } yield MethodDecl(modifiers, type_params, oty, id, formal_params, ex_types, exp, bodypp)
+                // x1 -> ... xn -> raise -> k -> {E(raise)(()->k(res))}
+                bodyp = curryLamb(in_args, lamb)
+                // m_cps's decl
+                decl  = LocalVars(mods, itysArrExceptVoidArrTpVoidArrVoid, 
+                            List(VarDecl(VarId(idcps), Some(InitExp(bodyp)))))
+                // t' res ; Exception ex
+                declspp = List(
+                    LocalVars(mods, ret_typ, List(VarDecl(VarId(resIdent), None))),
+                    LocalVars(mods, exceptType, List(VarDecl(VarId(exIdent), None))))
+                appStmt = {
+                    // M_cps.apply(arg1).apply(arg2)...
+                    val mcps_app_in_args = curryApply(ExpName(Name(List(idcps))), in_args.map(a=>ExpName(Name(List(a)))))
+                    val e = eapply(mcps_app_in_args, ExpName(Name(List(idraiseIdent))))
+                    // r -> { res = r; return;}
+                    val f = Lambda(LambdaSingleParam(Ident("r")), LambdaBlock(Block(List(
+                        BlockStmt_(ExpStmt(Assign(NameLhs(Name(List(resIdent))), EqualA, ExpName(Name(List(Ident("r"))))))),
+                        BlockStmt_(Return(None))
+                    ))))
+                    val d = eapply(e, f)
+                    BlockStmt_(ExpStmt(d))
+                }
+                bodypp = MethodBody(Some(Block(declspp ++ inner_cps_decls ++ List(decl) ++  List(
+                    appStmt, 
+                    BlockStmt_(Return(Some(ExpName(Name(List(resIdent)))))) // return res
+                )))) // TODO: fixme
+            
+            } yield MethodDecl(modifiers, type_params, oty, id, formal_params, ex_types, exp, bodypp)
+        }
     }
 
-    def cpsbody(body:MinSSA.SSAMethodBody)(implicit m:MonadError[CPSState,ErrorM]):SState[State, MethodBody] = body match {
+    def cpsbody(body:MinSSA.SSAMethodBody)(using m:MonadError[CPSState,ErrorM]):SState[State, MethodBody] = body match {
         case MinSSA.SSAMethodBody(blks) => for {
             (decls, exp) <- cpsblk(blks, Nil, Nil)
             blkStmts     <- m.pure(decls ++ List(BlockStmt_(ExpStmt(exp))))
         } yield MethodBody(Some(Block(blkStmts)))
-    } 
+    }
 
-    def cpsblk(blks:List[SSABlock], phiK:List[Phi], phiR:List[Phi])(implicit m:MonadError[CPSState, ErrorM]):SState[State, (List[VarDecl], Exp)] = blks match {
+    def cpsblk(blks:List[SSABlock], phiK:List[Phi], phiR:List[Phi])(using m:MonadError[CPSState, ErrorM]):SState[State, (List[VarDecl], Exp)] = blks match {
         case List(SSABlock(lbl, stmts)) => stmts match {
             case List(SSAIf(e, blksp, blkspp, phi)) => for {
                 (declp, expp)     <- cpsblk(blksp, phi, phiR)
@@ -310,7 +314,7 @@ object CPS {
       * @param m
       * @return
       */
-    def cpsk(phi:List[Phi], lbl:Label)(implicit m:MonadError[CPSState, ErrorM]):SState[State, (List[VarDecl], Exp)] = for {
+    def cpsk(phi:List[Phi], lbl:Label)(using m:MonadError[CPSState, ErrorM]):SState[State, (List[VarDecl], Exp)] = for {
         xeAsmts      <- cpsphi(phi, lbl)
         mods         <- m.pure(List())
         mkl          <- mkId("mk", lbl)
@@ -319,7 +323,7 @@ object CPS {
                                 List(VarDecl(VarId(mkl), Some(InitExp(Lambda(LambdaSingleParam(raiseIdent), 
                                             LambdaExpression_(Lambda(LambdaSingleParam(kIdent), LambdaBlock(body))))))))))
     } yield (List(decl), ExpName(Name(List(mkl))))
-
+    
     /**
       * convert phi assignment into a sequence of statements based on the input ctxt.
       *
@@ -328,7 +332,7 @@ object CPS {
       * @param m
       * @return
       */
-    def cpsphi(phis:List[Phi], ctxt:Label)(implicit m:MonadError[CPSState, ErrorM]):SState[State, List[Stmt]] = phis.traverse(
+    def cpsphi(phis:List[Phi], ctxt:Label)(using m:MonadError[CPSState, ErrorM]):SState[State, List[Stmt]] = phis.traverse(
         (phi:Phi) => phi match {
             case Phi(srcVar, renVar, rhs) => lookup(rhs,ctxt) match {
                 case None => m.raiseError("cpsphi failed: the rhs of the phi assignment does not contain the input ctxt.")
@@ -344,7 +348,7 @@ object CPS {
       * @param m
       * @return
       */
-    def cpsexp(e:Exp)(implicit m:MonadError[CPSState, ErrorM]):SState[State, Exp] = m.pure(e)
+    def cpsexp(e:Exp)(using m:MonadError[CPSState, ErrorM]):SState[State, Exp] = m.pure(e)
 
 
     /**
@@ -354,7 +358,7 @@ object CPS {
       * @param m
       * @return
       */
-    def cpsstmts(stmts:List[Stmt])(implicit m:MonadError[CPSState, ErrorM]):SState[State, List[Stmt]] = m.pure(stmts)
+    def cpsstmts(stmts:List[Stmt])(using m:MonadError[CPSState, ErrorM]):SState[State, List[Stmt]] = m.pure(stmts)
 
 
     /**
@@ -365,7 +369,7 @@ object CPS {
       * @param m
       * @return
       */
-    def mkId(s:String, ctxt:Label)(implicit m:MonadError[CPSState, ErrorM]):SState[State, Ident] = for {
+    def mkId(s:String, ctxt:Label)(using m:MonadError[CPSState, ErrorM]):SState[State, Ident] = for {
         st <- get
         id <- st match {
             case State(chararr) => m.pure(Ident( s + "_" + charcode(ctxt, chararr).mkString))
@@ -427,7 +431,7 @@ object CPS {
       * @param phis
       * @param m
       */
-    def minlabel(phis:List[Phi])(implicit m:MonadError[CPSState, ErrorM]):SState[State, Label] = {
+    def minlabel(phis:List[Phi])(using m:MonadError[CPSState, ErrorM]):SState[State, Label] = {
         val rhss:List[List[(Label,Name)]] = phis.map(phi => phi match {
             case Phi(srcVar, renVar, rhs) => rhs
         })
@@ -521,11 +525,9 @@ object CPS {
 
     // extract the types and the idents from the formal parameters 
     def extractFormParams(formal_params:List[FormalParam]):(List[Type], List[Ident]) = { 
-        formal_params.map( _ match 
-            {
+        formal_params.map( x => x match {
                 case FormalParam(modifiers, ty, has_arity, var_decl_id) => (ty,idFromVarDeclId(var_decl_id))
-            }
-        ).unzip
+        }).unzip
     }
     // create curry type
     

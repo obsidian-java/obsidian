@@ -1,16 +1,16 @@
 package obsidian.lang.java
 
 import com.github.luzhuomi.scalangj.Lexer
-import com.github.luzhuomi.scalangj.Parser._
-import com.github.luzhuomi.scalangj.Syntax._
-import com.github.luzhuomi.scalangj.Pretty._
-import obsidian.lang.java._ 
-import obsidian.lang.java.Label._
+import com.github.luzhuomi.scalangj.Parser.*
+import com.github.luzhuomi.scalangj.Syntax.*
+import com.github.luzhuomi.scalangj.Pretty.*
+import obsidian.lang.java.*
+import obsidian.lang.java.Label.*
 
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.{funsuite, matchers}
 
 
-class TestLabel1 extends FunSuite with Matchers {
+class TestLabel1 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
 public static void main(String [] args) {
 	int x = 0;
@@ -26,6 +26,7 @@ public static void main(String [] args) {
     """
     val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get 
     val l_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(L_METHODSTR)).get.get 
+    import LabelResult.*
     test("TestLabel1") {
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
@@ -45,7 +46,7 @@ public static void main(String [] args) {
 
 
 
-class TestLabel2 extends FunSuite with Matchers {
+class TestLabel2 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
 public static void main(String [] args) {
 	int x = 0;
@@ -68,6 +69,7 @@ public static void main (String[] args)
   { System.out.println(x); if (x < 10) { x++; continue obsLbl_0; } else { break obsLbl_0; } }
 }
     """
+    import LabelResult.*
     val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get 
     val l_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(L_METHODSTR)).get.get 
     test("TestLabel2") {
@@ -88,7 +90,7 @@ public static void main (String[] args)
 }
 
 
-class TestLabel3 extends FunSuite with Matchers {
+class TestLabel3 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
 public static void main(String [] args) {
 	int x = 0;
@@ -118,6 +120,7 @@ public static void main (String[] args)
 }
     """" 
     //println(classBodyStatement.apply(new Lexer.Scanner(METHODSTR)))
+    import LabelResult.*
     val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get 
     val l_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(L_METHODSTR)).get.get 
     test("TestLabel3") {
@@ -139,7 +142,7 @@ public static void main (String[] args)
 
 
 
-class TestLabel4 extends FunSuite with Matchers {
+class TestLabel4 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
 public static void main(String [] args) {
 	int x = 0;
@@ -174,6 +177,7 @@ public static void main (String[] args)
 }
     """" 
     //println(classBodyStatement.apply(new Lexer.Scanner(METHODSTR)))
+    import LabelResult.*
     val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get 
     val l_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(L_METHODSTR)).get.get 
     test("TestLabel4") {
@@ -194,7 +198,7 @@ public static void main (String[] args)
 }
 
 
-class TestLabel5 extends FunSuite with Matchers {
+class TestLabel5 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
  public static void main (String[] args)
 { int x = 0; l_0: while (x > 10) { System.out.println(x); x++; } }   
@@ -203,6 +207,8 @@ class TestLabel5 extends FunSuite with Matchers {
  public static void main (String[] args)
 { int x = 0; l_0: while (x > 10) { System.out.println(x); x++; } }   
     """
+    import LabelResult.*
+
     val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get 
     val l_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(L_METHODSTR)).get.get 
     test("TestLabel5") {
@@ -223,7 +229,7 @@ class TestLabel5 extends FunSuite with Matchers {
 }
 
 
-class TestLabel6 extends FunSuite with Matchers {
+class TestLabel6 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
 public static void main (String[] args)
 {
@@ -241,6 +247,8 @@ public static void main (String[] args)
   { System.out.println(x); if (x < 10) { x++; continue l_0; } else { break l_0; } }
 }
     """
+    import LabelResult.*
+
     val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get 
     val l_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(L_METHODSTR)).get.get 
     test("TestLabel6") {
@@ -261,7 +269,7 @@ public static void main (String[] args)
 }
 
 
-class TestLabel7 extends FunSuite with Matchers {
+class TestLabel7 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
 public static void main (String[] args)
 {
@@ -291,6 +299,8 @@ public static void main (String[] args)
 }
     """
     //println(classBodyStatement.apply(new Lexer.Scanner(METHODSTR)))
+    import LabelResult.*
+
     val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get 
     val l_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(L_METHODSTR)).get.get 
     test("TestLabel7") {
@@ -310,7 +320,7 @@ public static void main (String[] args)
     }
 }
 
-class TestLabel8 extends FunSuite with Matchers {
+class TestLabel8 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
 public static void main (String[] args)
 {
@@ -350,6 +360,8 @@ public static void main (String[] args)
     //println(classBodyStatement.apply(new Lexer.Scanner(METHODSTR)))
     val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get 
     val l_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(L_METHODSTR)).get.get 
+    import LabelResult.*
+
     test("TestLabel8") {
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
@@ -369,7 +381,7 @@ public static void main (String[] args)
 
 
 
-class TestLabel9 extends FunSuite with Matchers {
+class TestLabel9 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
 public static void main (String[] args)
 {
@@ -386,6 +398,8 @@ public static void main (String[] args)
     //println(classBodyStatement.apply(new Lexer.Scanner(METHODSTR)))
     val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get 
     val l_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(L_METHODSTR)).get.get 
+    import LabelResult.*
+
     test("TestLabel9") {
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {

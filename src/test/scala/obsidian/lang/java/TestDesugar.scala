@@ -1,17 +1,17 @@
 package obsidian.lang.java
 
 import com.github.luzhuomi.scalangj.Lexer
-import com.github.luzhuomi.scalangj.Parser._
-import com.github.luzhuomi.scalangj.Syntax._
-import com.github.luzhuomi.scalangj.Pretty._
-import obsidian.lang.java._ 
-import obsidian.lang.java.Desugar._
+import com.github.luzhuomi.scalangj.Parser.*
+import com.github.luzhuomi.scalangj.Syntax.*
+import com.github.luzhuomi.scalangj.Pretty.*
+import obsidian.lang.java.*
+import obsidian.lang.java.Desugar.*
 
 
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.{funsuite, matchers}
 
 
-class TestDesugar1 extends FunSuite with Matchers {
+class TestDesugar1 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
  public static void main(String [] args) {
 	int x = 0;
@@ -39,7 +39,7 @@ public static void main (String[] args)
 
 
 
-class TestDesugar2 extends FunSuite with Matchers {
+class TestDesugar2 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
  public static void main(String [] args) {
 	int x = 0;
@@ -66,7 +66,7 @@ public static void main (String[] args)
 }
 
 
-class TestDesugar3 extends FunSuite with Matchers {
+class TestDesugar3 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
  public static void main(String [] args) {
 	int x = 0;
@@ -94,7 +94,7 @@ public static void main (String[] args)
 
 
 
-class TestDesugar4 extends FunSuite with Matchers {
+class TestDesugar4 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
  public static void main(String [] args) {
 	int [] a = {0, 1, 2, 3, 4};
@@ -131,7 +131,7 @@ public static void main (String[] args)
 
 
 
-class TestDesugar5 extends FunSuite with Matchers {
+class TestDesugar5 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
 public static void main(String [] args) {
 	ArrayList<Integer> a = new ArrayList<Integer>();
@@ -168,7 +168,7 @@ public static void main (String[] args)
 }
 
 
-class TestDesugar6 extends FunSuite with Matchers {
+class TestDesugar6 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
 public static void main(String [] args) {
     int x = 0;
@@ -200,7 +200,7 @@ public static void main (String[] args)
 
 
 
-class TestDesugar7 extends FunSuite with Matchers {
+class TestDesugar7 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
 public static void main(String [] args) {
     int x = 0;
@@ -231,7 +231,7 @@ public static void main (String[] args)
 
 
 
-class TestDesugar8 extends FunSuite with Matchers {
+class TestDesugar8 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
 public static void main(String [] args) {
     int x = 0;
@@ -262,7 +262,7 @@ public static void main (String[] args)
 
 
 
-class TestDesugar9 extends FunSuite with Matchers {
+class TestDesugar9 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
 public static void main(String [] args) {
     int x = 0;
@@ -311,7 +311,7 @@ public static void main (String[] args)
 
 
 
-class TestDesugar10 extends FunSuite with Matchers {
+class TestDesugar10 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
  public static void main(String [] args) {
 	int x = 0;
@@ -339,7 +339,7 @@ public static void main (String[] args)
 
 
 
-class TestDesugar11 extends FunSuite with Matchers {
+class TestDesugar11 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
 public static void main(String [] args) {
 	int x = 0;

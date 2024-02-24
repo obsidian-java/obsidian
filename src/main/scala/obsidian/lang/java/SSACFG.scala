@@ -1,7 +1,7 @@
 package obsidian.lang.java
 
-import cats._
-import cats.implicits._
+import cats.*
+import cats.implicits.*
 
 import cats.data.StateT
 import cats.{ApplicativeError, Functor, MonadError}
@@ -278,7 +278,7 @@ object SSACFG {
   }
 
   def cfgToSsacfg(cfg: CFG.CFG): SSACFG = {
-    cfg.mapValues(nodeToSsaNode)
+    cfg.map((path, node) => (path, nodeToSsaNode(node)))
   }
 
 
@@ -288,7 +288,7 @@ object SSACFG {
 
   case class SsacfgOk[A](result: A) extends SsacfgResult[A]
 
-  implicit def cfgResultFunctor: Functor[SsacfgResult] =
+  given cfgResultFunctor: Functor[SsacfgResult] =
     new Functor[SsacfgResult] {
       override def map[A, B](fa: SsacfgResult[A])(f: A => B): SsacfgResult[B] =
         fa match {
@@ -298,7 +298,7 @@ object SSACFG {
     }
 
 
-  implicit def ssaCfgResultApplicative: ApplicativeError[SsacfgResult, String] =
+  given ssaCfgResultApplicative: ApplicativeError[SsacfgResult, String] =
     new ApplicativeError[SsacfgResult, String] {
       override def ap[A, B](
                              ff: SsacfgResult[A => B]
@@ -325,7 +325,7 @@ object SSACFG {
         }
     }
 
-  implicit def ssaCfgResultMonadError(implicit
+  given ssaCfgResultMonadError(using
                                       app: ApplicativeError[SsacfgResult, String]
                                      ): MonadError[SsacfgResult, String] =
     new MonadError[SsacfgResult, String] {
@@ -391,8 +391,8 @@ object SSACFG {
     val lVarReplacements = info.lhsVarReplacements
     node match {
       case a: AssignmentsNode =>
-        SsacfgOk(a.copy(rhsVarReplacements = rVarReplacements.filterKeys(path => a.stmts contains path),
-          lhsVarReplacements = lVarReplacements.filterKeys(path => a.stmts contains path)))
+        SsacfgOk(a.copy(rhsVarReplacements = rVarReplacements.filter( (path, v) => a.stmts contains path),
+          lhsVarReplacements = lVarReplacements.filter((path,v) => a.stmts contains path)))
       case n: IfThenElseNode =>
         if (lVarReplacements contains nodeId) SsacfgError(f"Tried to assign LHS variable to node $nodeId")
         else SsacfgOk(n.copy(rhsVarReplacements = rVarReplacements.getOrElse(nodeId, Map())))
@@ -456,7 +456,7 @@ object SSACFG {
     } yield newNode
   }
 
-  private def mergeNonTryCatchPostJoin(nodeId: NodeId, ident: Ident, join: (Int, Phi), dom: NodeId) = {
+  private def mergeNonTryCatchPostJoin(nodeId: NodeId, ident: Ident, join: (Int, Phi), dom: NodeId): SSACFGState[NodeId]  = {
     for {
       s <- StateT.get[SsacfgResult, SsaCfgInfo]
       nodeId <- s.ssacfg(dom) match {
@@ -476,8 +476,8 @@ object SSACFG {
   private def mergeSwitchNode(nodeId: NodeId, ident: Ident, n: SwitchNode, join: (Int, Phi), dom: NodeId) = {
     for {
       s <- StateT.get[SsacfgResult, SsaCfgInfo]
-      breakRhs = join._2.filterKeys(key => s.ssacfg(key).isInstanceOf[BreakNode])
-      nonBreakRhs = join._2.filterKeys(key => !s.ssacfg(key).isInstanceOf[BreakNode])
+      breakRhs = join._2.filter((key,value) => s.ssacfg(key).isInstanceOf[BreakNode])
+      nonBreakRhs = join._2.filter((key,value) => !s.ssacfg(key).isInstanceOf[BreakNode])
       nonBreakLhs <- if (nonBreakRhs.isEmpty) {
         StateT.pure[SsacfgResult, SsaCfgInfo, Option[(NodeId, Int)]](None)
       } else {
@@ -494,8 +494,8 @@ object SSACFG {
   private def mergeWhileNode(nodeId: NodeId, ident: Ident, n: WhileNode, join: (Int, Phi), dom: NodeId) = {
     for {
       s <- StateT.get[SsacfgResult, SsaCfgInfo]
-      breakRhs = join._2.filterKeys(key => s.ssacfg(key).isInstanceOf[BreakNode])
-      nonBreakRhs = join._2.filterKeys(key => !s.ssacfg(key).isInstanceOf[BreakNode])
+      breakRhs = join._2.filter((key,v) => s.ssacfg(key).isInstanceOf[BreakNode])
+      nonBreakRhs = join._2.filter((key,v) => !s.ssacfg(key).isInstanceOf[BreakNode])
       nonBreakLhs <- if (nonBreakRhs.isEmpty) {
         StateT.pure[SsacfgResult, SsaCfgInfo, Option[(NodeId, Int)]](None)
       } else {
@@ -546,9 +546,9 @@ object SSACFG {
       } else {
         // merge both catch and try, then merge
         for {
-          catchLhs <- mergeNonTryCatchPostJoinIfMoreThanOne(nodeId, ident, join._2.filterKeys(catchPreds),
+          catchLhs <- mergeNonTryCatchPostJoinIfMoreThanOne(nodeId, ident, join._2.filter((key,v) => catchPreds contains key),
             newCommonDominator(catchPreds, dom, s.sdom, s.domTree))
-          tryLhs <- mergeNonTryCatchPostJoinIfMoreThanOne(nodeId, ident, join._2.filterKeys(tryPreds),
+          tryLhs <- mergeNonTryCatchPostJoinIfMoreThanOne(nodeId, ident, join._2.filter((key,v) => tryPreds contains key),
             newCommonDominator(tryPreds, dom, s.sdom, s.domTree))
           _ <- StateT.modifyF[SsacfgResult, SsaCfgInfo] { s =>
             s.ssacfg.get(tryNodeId) match {
@@ -567,20 +567,20 @@ object SSACFG {
     } yield mergeNodeId
   }
 
-  private def mergeIfThenElseJoin(nodeId: NodeId, ident: Ident, n: IfThenElseNode, dom: NodeId, join: (Int, Phi)) = {
+  private def mergeIfThenElseJoin(nodeId: NodeId, ident: Ident, n: IfThenElseNode, dom: NodeId, join: (Int, Phi)):SSACFGState[NodeId]  = {
     for {
       s <- StateT.get[SsacfgResult, SsaCfgInfo]
       thenNodeId = n.thenNode ++ List(0)
       elseNodeId = n.elseNode ++ List(0)
-      thenRhs = join._2.filterKeys(s.sdom.getOrElse(thenNodeId, Set()) + thenNodeId)
-      elseRhs = join._2.filterKeys(s.sdom.getOrElse(elseNodeId, Set()) + elseNodeId)
+      thenRhs = join._2.filter((key, v)=> s.sdom.getOrElse(thenNodeId, Set()) + thenNodeId contains key)
+      elseRhs = join._2.filter((key, v)=> s.sdom.getOrElse(elseNodeId, Set()) + elseNodeId contains key)
       thenLhs <- mergeNonTryCatchPostJoinIfMoreThanOne(
         nodeId, ident,
-        join._2.filterKeys(thenRhs.keySet),
+        join._2.filter((key, v) => thenRhs.keySet contains key),
         newCommonDominator(thenRhs.keySet, dom, s.sdom, s.domTree))
       elseLhs <- mergeNonTryCatchPostJoinIfMoreThanOne(
         nodeId, ident,
-        join._2.filterKeys(elseRhs.keySet),
+        join._2.filter((key, v) => elseRhs.keySet contains key),
         newCommonDominator(elseRhs.keySet, dom, s.sdom, s.domTree))
       _ <- StateT.modify[SsacfgResult, SsaCfgInfo] { s =>
         val newDom = n.copy(joins = n.joins.updated(ident, (join._1, Map(thenLhs, elseLhs))))
@@ -607,7 +607,7 @@ object SSACFG {
           (s.info, lhs)
         }
         StateT.modify[SsacfgResult, SsaCfgInfo](s => s.copy(info = newStateInfo)) >>
-          mergePostJoin(nodeId, ident, (i, rhs.filterKeys(postJoinPreds)), s.idom(nodeId))
+          mergePostJoin(nodeId, ident, (i, rhs.filter((key, v) => postJoinPreds contains key)), s.idom(nodeId))
             .map(nodeId => Some((nodeId, i)))
       } else {
         StateT.pure[SsacfgResult, SsaCfgInfo, Option[(NodeId, Int)]](rhs.filterKeys(postJoinPreds).headOption)
@@ -623,14 +623,14 @@ object SSACFG {
                 otherPreds = backPreds -- continuePreds
                 otherJoinLhsOption <- if (otherPreds.nonEmpty) {
                   mergeNonTryCatchPostJoinIfMoreThanOne(nodeId, ident,
-                    rhs.filterKeys(otherPreds),
+                    rhs.filter((key, v) => otherPreds contains key),
                     newCommonDominator(otherPreds, nodeId, s.sdom, s.domTree)).map(Some(_))
                 } else {
                   StateT.pure[SsacfgResult, SsaCfgInfo, Option[(NodeId, Int)]](None)
                 }
                 _ <- StateT.modify[SsacfgResult, SsaCfgInfo] { s =>
                   s.copy(ssacfg = s.ssacfg.updated(nodeId,
-                    n.copy(preJoins = n.preJoins.updated(ident, (lhs, rhs.filterKeys(continuePreds) ++ otherJoinLhsOption ++ postJoinOption)))))
+                    n.copy(preJoins = n.preJoins.updated(ident, (lhs, rhs.filter((key, v) => continuePreds contains key) ++ otherJoinLhsOption ++ postJoinOption)))))
                 }
               } yield ()
             case n =>

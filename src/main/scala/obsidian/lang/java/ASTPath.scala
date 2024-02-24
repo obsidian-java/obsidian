@@ -1,7 +1,7 @@
 package obsidian.lang.java
 
-import scala.collection.Map._
-import com.github.luzhuomi.scalangj.Syntax._
+import scala.collection.Map.*
+import com.github.luzhuomi.scalangj.Syntax.*
 
 /**
   * an AST Path is a sequence of integers that represent the hierachical position of a statement
@@ -61,12 +61,12 @@ object ASTPath {
     }
 
     object queryOps {
-        def query[A](a:A, p:ASTPath)(implicit qu:Queryable[A]):Option[BlockStmt] = {
+        def query[A](a:A, p:ASTPath)(using qu:Queryable[A]):Option[BlockStmt] = {
             qu.query(a,p)
         }
     }
 
-    implicit def memberQueryableInstance:Queryable[MemberDecl] = {
+    given memberQueryableInstance:Queryable[MemberDecl] = {
         new Queryable[MemberDecl] {
             override def query(
                 a : MemberDecl, p : ASTPath 
@@ -86,7 +86,7 @@ object ASTPath {
     }
 
 
-    implicit def methodDeclQueryableInstance:Queryable[MethodDecl] = {
+    given methodDeclQueryableInstance:Queryable[MethodDecl] = {
         new Queryable[MethodDecl] {
             override def query(
                 a : MethodDecl, p : ASTPath 
@@ -104,7 +104,7 @@ object ASTPath {
         }
     }
     
-    implicit def bodyQueryableInstance:Queryable[MethodBody] = {
+    given bodyQueryableInstance:Queryable[MethodBody] = {
         new Queryable[MethodBody] {
             override def query(a: MethodBody, p:ASTPath):Option[BlockStmt] = a match {
                 case MethodBody(None) => None
@@ -113,7 +113,7 @@ object ASTPath {
         }
     }
     
-    implicit def blockQueryableInstance:Queryable[Block] = {
+    given blockQueryableInstance:Queryable[Block] = {
         new Queryable[Block] {
             override def query(a: Block, p:ASTPath): Option[BlockStmt] = p match {
                 case Nil => Some(BlockStmt_(StmtBlock(a)))
@@ -127,7 +127,7 @@ object ASTPath {
             }
         }
     }
-    implicit def BlockStmtQueryableInstance:Queryable[BlockStmt] = {
+    given BlockStmtQueryableInstance:Queryable[BlockStmt] = {
         new Queryable[BlockStmt] {
             override def query(a: BlockStmt, p:ASTPath): Option[BlockStmt] = p match {
                 case Nil => Some(a)
@@ -141,7 +141,7 @@ object ASTPath {
             }
         }
     }
-    implicit def StmtQueryableInstance:Queryable[Stmt] = {
+    given StmtQueryableInstance:Queryable[Stmt] = {
         new Queryable[Stmt] {
             override def query(a:Stmt, p:ASTPath): Option[BlockStmt] = p match {
                 case Nil => Some(BlockStmt_(a))
@@ -179,7 +179,7 @@ object ASTPath {
             }
         }
     }
-    implicit def switchBlockQueryableInstance:Queryable[SwitchBlock] = {
+    given switchBlockQueryableInstance:Queryable[SwitchBlock] = {
         new Queryable[SwitchBlock] {
             override def query(a: SwitchBlock, p: ASTPath): Option[BlockStmt] = a match {
                 case SwitchBlock(label, blk_stmts) => p match {
@@ -191,7 +191,7 @@ object ASTPath {
         }
     }
 
-    implicit def catchQueryableInstrance:Queryable[Catch] = {
+    given catchQueryableInstrance:Queryable[Catch] = {
         new Queryable[Catch] {
             override def query(a: Catch, p: ASTPath): Option[BlockStmt] = a match {
                 case Catch(params, blk) => queryOps.query(blk,p) 

@@ -1,18 +1,18 @@
 package obsidian.lang.java
 
 
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.{funsuite, matchers}
 
 import com.github.luzhuomi.scalangj.Lexer
-import com.github.luzhuomi.scalangj.Parser._
-import com.github.luzhuomi.scalangj.Syntax._
-import com.github.luzhuomi.scalangj.Pretty._
-import obsidian.lang.java._ 
+import com.github.luzhuomi.scalangj.Parser.*
+import com.github.luzhuomi.scalangj.Syntax.*
+import com.github.luzhuomi.scalangj.Pretty.*
+import obsidian.lang.java.*
+import obsidian.lang.java.Flatten.*
+import obsidian.lang.java.MinSSA.*
 
-import obsidian.lang.java.MinSSA._
 
-
-class TestMinSSA1 extends FunSuite with Matchers {
+class TestMinSSA1 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
 public static void main(String [] args) {
 	int x; 
@@ -50,17 +50,18 @@ public static void main(String [] args) {
                     List(Phi(Name(List(Ident("s"))),Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePostPhi)))))"))), // while exit phi
                     List(TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1)))))) -> Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1))))))"))))))))), 
             SSABlock(TTail(TTail(TTail(TTail(TTail(TLast(TBox)))))),List(SSAReturn(None))))))
-
+    import FlatResult.*
+    import SSAResult.*
     test("TestMinSSA1") {
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
                 Flatten.flatMethodDecl(methodDecl).run(Flatten.initStateInfo) match {
-                    case Flatten.FlatError(message) => fail(message)
-                    case Flatten.FlatOk((st, f_methodDecl)) => {
+                    case FlatError(message) => fail(message)
+                    case FlatOk((st, f_methodDecl)) => {
                         val d_methodDecl = Desugar.dsgOps.desugar(f_methodDecl)
                         MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.debugInitState) match {
-                            case MinSSA.SSAError(message) => fail(message)
-                            case MinSSA.SSAOk((st, ssa_methodDecl)) => { 
+                            case SSAError(message) => fail(message)
+                            case SSAOk((st, ssa_methodDecl)) => { 
                                 // println(ssa_methodDecl)
                                 assert(ssa == ssa_methodDecl)
                             }
@@ -77,7 +78,7 @@ public static void main(String [] args) {
 /* v should not be in the phi list */
 
 
-class TestMinSSA2 extends FunSuite with Matchers { // todo, declaration with init does not work yet!
+class TestMinSSA2 extends funsuite.AnyFunSuite with matchers.should.Matchers { // todo, declaration with init does not work yet!
     val METHODSTR = """
 public static boolean add(int v) {
     int [] nvals; 
@@ -193,17 +194,19 @@ public static boolean add(int v) {
                                     TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox)))))))))) -> Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))"))))))))), 
                     SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(TTail(TLast(TBox)))))))),List( // return
                         SSAReturn(Some(ExpName(Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))")))))))))))
+    import FlatResult.*
+    import SSAResult.*
 
     test("TestMinSSA2") {
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
                 Flatten.flatMethodDecl(methodDecl).run(Flatten.initStateInfo) match {
-                    case Flatten.FlatError(message) => fail(message)
-                    case Flatten.FlatOk((st, f_methodDecl)) => {
+                    case FlatError(message) => fail(message)
+                    case FlatOk((st, f_methodDecl)) => {
                         val d_methodDecl = Desugar.dsgOps.desugar(f_methodDecl)
                         MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.debugInitState) match {
-                            case MinSSA.SSAError(message) => fail(message)
-                            case MinSSA.SSAOk((st, ssa_methodDecl)) => { 
+                            case SSAError(message) => fail(message)
+                            case SSAOk((st, ssa_methodDecl)) => { 
                                 // println(ssa_methodDecl)
                                 assert(ssa == ssa_methodDecl)
                             }
@@ -219,7 +222,7 @@ public static boolean add(int v) {
 
 
 
-class TestMinSSA3 extends FunSuite with Matchers {
+class TestMinSSA3 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
 public static void f(int v) {
 	int x; 
@@ -251,17 +254,19 @@ public static void f(int v) {
                 List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_TTail(TTail(THead(TWhilePostPhi)))"))),
                 List(TTail(TTail(THead(TWhilePrePhi(1)))) -> Name(List(Ident("x_TTail(TTail(THead(TWhilePrePhi(1))))"))))))))), 
         SSABlock(TTail(TTail(TTail(TLast(TBox)))),List(SSAReturn(None))))))
+    import FlatResult.*
+    import SSAResult.*
 
     test("TestMinSSA3") {
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
                 Flatten.flatMethodDecl(methodDecl).run(Flatten.initStateInfo) match {
-                    case Flatten.FlatError(message) => fail(message)
-                    case Flatten.FlatOk((st, f_methodDecl)) => {
+                    case FlatError(message) => fail(message)
+                    case FlatOk((st, f_methodDecl)) => {
                         val d_methodDecl = Desugar.dsgOps.desugar(f_methodDecl)
                         MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.debugInitState) match {
-                            case MinSSA.SSAError(message) => fail(message)
-                            case MinSSA.SSAOk((st, ssa_methodDecl)) => { 
+                            case SSAError(message) => fail(message)
+                            case SSAOk((st, ssa_methodDecl)) => { 
                                 // println(ssa_methodDecl)
                                 assert(ssa == ssa_methodDecl)
                             }
@@ -290,7 +295,7 @@ public static void f(int v) {
 */
 
 
-class TestMinSSA4 extends FunSuite with Matchers {
+class TestMinSSA4 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
 public static void f(int v) {
 	int x; 
@@ -342,17 +347,19 @@ public static void f(int v) {
                                 TTail(TTail(THead(TElse(TLast(TWhilePostPhi))))) -> Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePostPhi)))))"))))))))), 
             SSABlock(TTail(TTail(TTail(TLast(TBox)))),List(SSAReturn(None))))))
 
- 
+    import FlatResult.*
+    import SSAResult.*
+
     test("TestMinSSA4") {
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
                 Flatten.flatMethodDecl(methodDecl).run(Flatten.initStateInfo) match {
-                    case Flatten.FlatError(message) => fail(message)
-                    case Flatten.FlatOk((st, f_methodDecl)) => {
+                    case FlatError(message) => fail(message)
+                    case FlatOk((st, f_methodDecl)) => {
                         val d_methodDecl = Desugar.dsgOps.desugar(f_methodDecl)
                         MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.debugInitState) match {
-                            case MinSSA.SSAError(message) => fail(message)
-                            case MinSSA.SSAOk((st, ssa_methodDecl)) => { 
+                            case SSAError(message) => fail(message)
+                            case SSAOk((st, ssa_methodDecl)) => { 
                                 // println(ssa_methodDecl)
                                 assert(ssa == ssa_methodDecl)
                             }
@@ -366,7 +373,7 @@ public static void f(int v) {
 }
 
 
-class TestMinSSA5 extends FunSuite with Matchers { // same as TestMinSSA1 with default state config
+class TestMinSSA5 extends funsuite.AnyFunSuite with matchers.should.Matchers { // same as TestMinSSA1 with default state config
     val METHODSTR = """
 public static void main(String [] args) {
 	int x; 
@@ -404,17 +411,19 @@ public static void main(String [] args) {
                     List(Phi(Name(List(Ident("s"))),Name(List(Ident("s_333329"))), // while exit phi
                     List(TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1)))))) -> Name(List(Ident("s_333327"))))))))), 
             SSABlock(TTail(TTail(TTail(TTail(TTail(TLast(TBox)))))),List(SSAReturn(None))))))
+    import FlatResult.*
+    import SSAResult.*
 
     test("TestMinSSA5") {
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
                 Flatten.flatMethodDecl(methodDecl).run(Flatten.initStateInfo) match {
-                    case Flatten.FlatError(message) => fail(message)
-                    case Flatten.FlatOk((st, f_methodDecl)) => {
+                    case FlatError(message) => fail(message)
+                    case FlatOk((st, f_methodDecl)) => {
                         val d_methodDecl = Desugar.dsgOps.desugar(f_methodDecl)
                         MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.initState) match {
-                            case MinSSA.SSAError(message) => fail(message)
-                            case MinSSA.SSAOk((st, ssa_methodDecl)) => { 
+                            case SSAError(message) => fail(message)
+                            case SSAOk((st, ssa_methodDecl)) => { 
                                 // println(ssa_methodDecl)
                                 assert(ssa == ssa_methodDecl)
                             }

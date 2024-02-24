@@ -1,9 +1,9 @@
 package obsidian.lang.java
 
-import scala.collection.Map._
-import com.github.luzhuomi.scalangj.Syntax._
+import scala.collection.Map.*
+import com.github.luzhuomi.scalangj.Syntax.*
 import com.github.luzhuomi.scalangj.Syntax
-import obsidian.lang.java.ASTUtils._
+import obsidian.lang.java.ASTUtils.*
 
 
 /**
@@ -63,12 +63,12 @@ object Desugar {
   }
 
   object dsgOps {
-    def desugar[A](a: A)(implicit d: DSG[A]): A = {
+    def desugar[A](a: A)(using d: DSG[A]): A = {
       d.desugar(a)
     }
   }
 
-  implicit def methodDSGInstance: DSG[MethodDecl] = {
+  given methodDSGInstance: DSG[MethodDecl] = {
     new DSG[MethodDecl] {
       override def desugar(a: MethodDecl): MethodDecl =
         a match {
@@ -96,7 +96,7 @@ object Desugar {
     }
   }
 
-  implicit def bodyDSGInstance: DSG[MethodBody] = {
+  given bodyDSGInstance: DSG[MethodBody] = {
     new DSG[MethodBody] {
       override def desugar(a: Syntax.MethodBody): Syntax.MethodBody =
         a match {
@@ -109,7 +109,7 @@ object Desugar {
     }
   }
 
-  implicit def blockDSGInstance: DSG[Block] = {
+  given blockDSGInstance: DSG[Block] = {
     new DSG[Block] {
       override def desugar(a: Syntax.Block): Syntax.Block =
         a match {
@@ -124,7 +124,7 @@ object Desugar {
         }
     }
   }
-  implicit def blockStmtDSGInstance: DSG[BlockStmt] = {
+  given blockStmtDSGInstance: DSG[BlockStmt] = {
     new DSG[BlockStmt] {
       override def desugar(a: Syntax.BlockStmt): Syntax.BlockStmt =
         a match {
@@ -136,7 +136,7 @@ object Desugar {
   }
 
 
-  implicit def stmtDSGInstance: DSG[Stmt] = {
+  given stmtDSGInstance: DSG[Stmt] = {
     new DSG[Stmt] {
       override def desugar(a: Syntax.Stmt): Syntax.Stmt =
         a match {
@@ -458,7 +458,7 @@ object Desugar {
     Catch(params_top, Block(List(BlockStmt_(ifelse))))
   }
 
-  implicit def expDSGInstance: DSG[Exp] = {
+  given expDSGInstance: DSG[Exp] = {
     new DSG[Exp] {
       override def desugar(a: Exp): Exp = a match {
         case ArrayAccess(idx) => ArrayAccess(idx)
@@ -511,7 +511,7 @@ object Desugar {
     }
   }
 
-  implicit def methodInvDSGInstance:DSG[MethodInvocation] = {
+  given methodInvDSGInstance:DSG[MethodInvocation] = {
     new DSG[MethodInvocation] {
       override def desugar(a: Syntax.MethodInvocation): Syntax.MethodInvocation = a match {
           case ClassMethodCall(name, ref_types, id, args) => ClassMethodCall(name, ref_types, id, args.map(dsgOps.desugar(_)))
@@ -524,7 +524,7 @@ object Desugar {
   }
   
 
-  implicit def arrayInitDSGInstance:DSG[ArrayInit] = {
+  given arrayInitDSGInstance:DSG[ArrayInit] = {
     new DSG[ArrayInit] {
       override def desugar(a: Syntax.ArrayInit): Syntax.ArrayInit = a match {
           case ArrayInit(var_inits) => ArrayInit(var_inits.map(dsgOps.desugar(_)))
@@ -532,7 +532,7 @@ object Desugar {
     }
   }
 
-  implicit def varInitDSGInstance:DSG[VarInit] = {
+  given varInitDSGInstance:DSG[VarInit] = {
       new DSG[VarInit] {
           override def desugar(a: Syntax.VarInit): Syntax.VarInit = a match {
               case InitArray(array_init) => InitArray(dsgOps.desugar(array_init))
@@ -541,7 +541,7 @@ object Desugar {
       }
   }
 
-  implicit def fieldAccessDSGInstance:DSG[FieldAccess] = {
+  given fieldAccessDSGInstance:DSG[FieldAccess] = {
     new DSG[FieldAccess] {
       override def desugar(a: Syntax.FieldAccess): Syntax.FieldAccess = a match {
           case ClassFieldAccess(name, id) => ClassFieldAccess(name, id) 
@@ -551,7 +551,7 @@ object Desugar {
     }
   }
   
-  implicit def catchDSGInstance: DSG[Catch] = {
+  given catchDSGInstance: DSG[Catch] = {
     new DSG[Catch] {
       override def desugar(a: Syntax.Catch): Syntax.Catch = a match {
         case Catch(params, blk) => Catch(params, dsgOps.desugar(blk))
@@ -559,7 +559,7 @@ object Desugar {
     }
   }
   
-  implicit def switchBlockDSGInstance: DSG[SwitchBlock] = new DSG[SwitchBlock] {
+  given switchBlockDSGInstance: DSG[SwitchBlock] = new DSG[SwitchBlock] {
     override def desugar(a: Syntax.SwitchBlock): Syntax.SwitchBlock = a match {
       case SwitchBlock(Default, blk_stmts) => SwitchBlock(Default, blk_stmts.map(dsgOps.desugar(_)))
       case SwitchBlock(SwitchCase(e), blk_stmts) => SwitchBlock(SwitchCase(dsgOps.desugar(e)), blk_stmts.map(dsgOps.desugar(_)))

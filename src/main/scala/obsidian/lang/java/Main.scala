@@ -1,14 +1,15 @@
 package obsidian.lang.java
 
-import scala.io._
-import com.github.luzhuomi.scalangj.Parser._
-import com.github.luzhuomi.scalangj.Pretty._
-import com.github.luzhuomi.scalangj.Syntax._
+import scala.io.*
+import com.github.luzhuomi.scalangj.Parser.*
+import com.github.luzhuomi.scalangj.Pretty.*
+import com.github.luzhuomi.scalangj.Syntax.*
 import com.github.luzhuomi.scalangj.Lexer
-import obsidian.lang.java._ 
+import obsidian.lang.java.*
 
-import obsidian.lang.java.MinSSA._
-import obsidian.lang.java.CPS._
+import obsidian.lang.java.Flatten.* 
+import obsidian.lang.java.MinSSA.*
+import obsidian.lang.java.CPS.*
 import os.Path
 
 
@@ -73,25 +74,25 @@ public class Fib
                                             case MethodDecl(modifiers, type_params, ty, id, formal_params, ex_types, exp, body) if id == Ident("main") => member
                                             case MethodDecl(modifiers, type_params, ty, id, formal_params, ex_types, exp, body) => {
                                                 Flatten.flatMethodDecl(MethodDecl(modifiers, type_params, ty, id, formal_params, ex_types, exp, body)).run(Flatten.initStateInfo) match {
-                                                    case Flatten.FlatError(message) => {
+                                                    case FlatResult.FlatError(message) => {
                                                         println(message);
                                                         member // failed
                                                     } 
-                                                    case Flatten.FlatOk((st, f_methodDecl)) => {
+                                                    case FlatResult.FlatOk((st, f_methodDecl)) => {
                                                         val d_methodDecl = Desugar.dsgOps.desugar(f_methodDecl)
                                                         MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.initState) match {
-                                                            case MinSSA.SSAError(message) => {
+                                                            case MinSSA.SSAResult.SSAError(message) => {
                                                                 println(message)
                                                                 member // failed
                                                             }
-                                                            case MinSSA.SSAOk((st, ssa_methodDecl)) => { 
+                                                            case MinSSA.SSAResult.SSAOk((st, ssa_methodDecl)) => { 
                                                                 val charcodes = getCharCodes(st)
                                                                 CPS.cpsmethoddecl(ssa_methodDecl).run(CPS.initState(charcodes)) match {
-                                                                    case CPS.CPSError(message) => {
+                                                                    case CPSResult.CPSError(message) => {
                                                                         println(message)
                                                                         member // failed
                                                                     }
-                                                                    case CPS.CPSOk((st, cps_methodDecl)) => 
+                                                                    case CPSResult.CPSOk((st, cps_methodDecl)) => 
                                                                        cps_methodDecl
                                                                 }
                                                             }

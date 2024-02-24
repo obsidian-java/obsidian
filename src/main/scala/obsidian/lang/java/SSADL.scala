@@ -2,13 +2,13 @@ package obsidian.lang.java
 
 
 import cats.kernel.Semilattice
-import cats._
-import cats.implicits._
+import cats.*
+import cats.implicits.*
 import cats.data.StateT
-import com.github.luzhuomi.scalangj.Syntax._
-import obsidian.lang.java.ASTPath._
+import com.github.luzhuomi.scalangj.Syntax.*
+import obsidian.lang.java.ASTPath.*
 import scala.collection.immutable
-import obsidian.lang.java.ASTUtils._
+import obsidian.lang.java.ASTUtils.*
 
 /**
  * TODO
@@ -22,6 +22,7 @@ import obsidian.lang.java.ASTUtils._
   *   source program is desguared, flattened and label.
   */
 
+/*
 object SSADL {
   case class SSAMethodDecl(
     modifiers: List[Modifier],
@@ -317,7 +318,7 @@ object SSADL {
   
   case class SSAOk[A](result:A) extends SSAResult[A]
 
-  implicit def ssaResultFunctor: Functor[SSAResult] =
+  given ssaResultFunctor: Functor[SSAResult] =
     new Functor[SSAResult] {
       override def map[A, B](fa: SSAResult[A])(f: A => B): SSAResult[B] =
         fa match {
@@ -326,7 +327,7 @@ object SSADL {
         }
     }
 
-  implicit def ssaResultApplicative: ApplicativeError[SSAResult, ErrorM] = 
+  given ssaResultApplicative: ApplicativeError[SSAResult, ErrorM] = 
     new ApplicativeError[SSAResult, ErrorM] {
       override def ap[A, B](ff: SSAResult[A => B])(fa: SSAResult[A]): SSAResult[B] =
         ff match {
@@ -349,7 +350,7 @@ object SSADL {
         }
     }
 
-  implicit def ssaResultMonadError(implicit app:ApplicativeError[SSAResult, ErrorM]):MonadError[SSAResult, ErrorM] = {
+  given ssaResultMonadError(using app:ApplicativeError[SSAResult, ErrorM]):MonadError[SSAResult, ErrorM] = {
     new MonadError[SSAResult, ErrorM] {
       override def raiseError[A](e: ErrorM): SSAResult[A] = app.raiseError(e)
 
@@ -388,7 +389,7 @@ object SSADL {
     * @param m
     * @return
     */
-  def setECtx(tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
+  def setECtx(tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get
     st1 <- m.pure(st match {
       case State(vm, eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs, srcLabelEnv) => State(vm, tctx, aenv, eenv, benv, cenv, nestedDecls, methInvs, srcLabelEnv)
@@ -404,7 +405,7 @@ object SSADL {
     * @param m
     * @return
     */
-  def setVM(vm:VarMap)(implicit m:MonadError[SSAState, ErrorM]): SState[State, Unit] = for {
+  def setVM(vm:VarMap)(using m:MonadError[SSAState, ErrorM]): SState[State, Unit] = for {
     st <- get
     st1 <- m.pure(st match {
       case State(_,eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs, srcLabelEnv) => State(vm, eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs,srcLabelEnv)
@@ -412,7 +413,7 @@ object SSADL {
     _   <- put(st1)
   } yield ()
   
-  def removeVarFromVM(v:Name)(implicit m:MonadError[SSAState, ErrorM]): SState[State, Unit] = for {
+  def removeVarFromVM(v:Name)(using m:MonadError[SSAState, ErrorM]): SState[State, Unit] = for {
     st <- get
     st1 <- m.pure(st match {
       case State(vm ,eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs, srcLabelEnv) => State(vm - v, eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs,srcLabelEnv)
@@ -430,7 +431,7 @@ object SSADL {
     * @param m
     * @return
     */
-  def addNestedVarDecls(tctx:TCtx, id:Ident, ty:Type, mods:List[Modifier])(implicit m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
+  def addNestedVarDecls(tctx:TCtx, id:Ident, ty:Type, mods:List[Modifier])(using m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
     st <- get
     st1  <- m.pure(st match {
       case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs, srcLblEnv) => {
@@ -449,7 +450,7 @@ object SSADL {
     * @param m
     * @return
     */
-  def addMethodInv(tctx:TCtx, methinv:MethodInvocation)(implicit m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
+  def addMethodInv(tctx:TCtx, methinv:MethodInvocation)(using m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
     st <- get 
     st1  <- m.pure(st match {
       case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs, srcLblEnv) => {
@@ -460,7 +461,7 @@ object SSADL {
     _  <- put(st1)
   } yield ()
 
-  def addSrcLabel(label:Ident, ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
+  def addSrcLabel(label:Ident, ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get
     st1 <- m.pure(st match {
       case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs, srcLblEnv) => {
@@ -478,7 +479,7 @@ object SSADL {
     * @param m
     * @return
     */
-  def addAEnv(tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
+  def addAEnv(tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get 
     st1  <- m.pure(st match {
       case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs, srcLblEnv) => {
@@ -499,7 +500,7 @@ object SSADL {
   */
   
 
-  def addEEnv(tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
+  def addEEnv(tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get 
     st1  <- m.pure(st match {
       case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs, srcLblEnv) => {
@@ -519,7 +520,7 @@ object SSADL {
     * @return
     */
 
-  def addBEnv(bctx:TCtx, tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
+  def addBEnv(bctx:TCtx, tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get 
     st1  <- m.pure(st match {
       case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs, srcLblEnv) => {
@@ -540,7 +541,7 @@ object SSADL {
     */
 
 
-  def addCEnv(bctx:TCtx, tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
+  def addCEnv(bctx:TCtx, tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get 
     st1  <- m.pure(st match {
       case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs, srcLblEnv) => {
@@ -571,7 +572,7 @@ object SSADL {
 
   
 
-  def extendAllVarsWithContextAndLabel(sctx:SCtx, tctx:TCtx, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
+  def extendAllVarsWithContextAndLabel(sctx:SCtx, tctx:TCtx, lbl:Label)(using m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
     st <- get
     st1 <- st match {
       case State(vm0, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs, srcLblEnv) => for {
@@ -594,9 +595,9 @@ object SSADL {
     * @param ctx
     * @return
     */
-  def toLbl(ctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Label] = toLbl2(List(0), ctx)(m)
+  def toLbl(ctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Label] = toLbl2(List(0), ctx)(m)
 
-  def toLbl2(p:ASTPath, ctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Label] = ctx match {
+  def toLbl2(p:ASTPath, ctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Label] = ctx match {
     case TBox => m.pure(Label(p, None))
     case TLast(ctx2) => toLbl2(p, ctx2)
     case THead(ctx2) => toLbl2(p, ctx2) 
@@ -622,7 +623,7 @@ object SSADL {
   } 
 
 
-  implicit val eqTCtx:Eq[TCtx] = new Eq[TCtx]{
+  using val eqTCtx:Eq[TCtx] = new Eq[TCtx]{
     override def eqv(x: TCtx, y: TCtx): Boolean = (x,y) match {
       case (TBox, TBox) => true
       case (TLast(ctx1), TLast(ctx2)) => eqv(ctx1, ctx2)
@@ -852,7 +853,7 @@ object SSADL {
   // besides the eenv, cenv, and benv, we need to pass the list of all TCtxts in the given code excluding the phi locations.
   // the reason that the < relation is non syntax-directed, we need to know what is the next sibling context to apply the transitivity rule!
   
-  implicit def partialOrderTCtx(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv):PartialOrder[TCtx] = new PartialOrder[TCtx]{
+  given partialOrderTCtx(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv):PartialOrder[TCtx] = new PartialOrder[TCtx]{
     override def partialCompare(x: TCtx, y: TCtx): Double = 
     { 
       (x,y) match {
@@ -1066,7 +1067,7 @@ object SSADL {
 
   /*
 
-  implicit def semilatticeTCtx(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv):Semilattice[TCtx] = new Semilattice[TCtx] {
+  given semilatticeTCtx(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv):Semilattice[TCtx] = new Semilattice[TCtx] {
     override def combine(x: TCtx, y: TCtx): TCtx = (x,y) match {
       case (_, _) if (eqTCtx.eqv(x,y)) => x 
       // CtxOrdHole
@@ -1571,7 +1572,7 @@ object SSADL {
     * @param m
     * @return
     */
-  def kmethodDecl(md:MethodDecl)(implicit m:MonadError[SSAState, ErrorM]):SState[State, SSAMethodDecl] = md match {
+  def kmethodDecl(md:MethodDecl)(using m:MonadError[SSAState, ErrorM]):SState[State, SSAMethodDecl] = md match {
     case MethodDecl(modifiers, type_params, return_ty, fname, formal_params, ex_types, exp, body) => body match {
       case MethodBody(None) => m.pure(SSAMethodDecl(modifiers, type_params, return_ty, fname, formal_params, ex_types, exp, SSAMethodBody(Nil)))
       case MethodBody(Some(block)) => {
@@ -1601,7 +1602,7 @@ object SSADL {
   }
 
   
-  def genVarDecls(implicit m:MonadError[SSAState, ErrorM]):SState[State, List[SSAStmt]] = for {
+  def genVarDecls(using m:MonadError[SSAState, ErrorM]):SState[State, List[SSAStmt]] = for {
     st <- get
     stmts <- st match {
       case State(vm, eCtx, aenv, eenv, benv, cenv, nestedDecls, methodInvs, srcLblEnv) => for {
@@ -1640,7 +1641,7 @@ object SSADL {
     * @return
     */
 
-  def kexp(e:Exp, ctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Exp] = e match {
+  def kexp(e:Exp, ctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Exp] = e match {
     case ArrayAccess(ArrayIndex(e, es)) => for {
       e1 <- kexp(e, ctx)
       es1 <- es.traverse(kexp(_, ctx))
@@ -1758,7 +1759,7 @@ object SSADL {
     */
   
 
-  def kstmt(stmt:Stmt, ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, SSABlock] = {
+  def kstmt(stmt:Stmt, ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, SSABlock] = {
     val tctx = kctx(ctx)
     stmt match {
       case Assert(exp, msg) => for {
@@ -2121,7 +2122,7 @@ object SSADL {
     * @return
     */
 
-  def mkPhi(st1:State, st2:State, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State, List[Phi]] = (st1, st2) match {
+  def mkPhi(st1:State, st2:State, lbl:Label)(using m:MonadError[SSAState, ErrorM]):SState[State, List[Phi]] = (st1, st2) match {
     case (State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1,  _, _, _), State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, _, _,_)) if ((eenv1 ++ dom(benv1 ++ cenv1)).contains(eCtx1)) && ((eenv2 ++ dom(benv2 ++ cenv2)).contains(eCtx2)) => for {
       // do we still need this case? it means dead code
       vs <- m.pure(vm1.keySet ++ vm2.keySet)
@@ -2182,7 +2183,7 @@ object SSADL {
     * @param m
     * @return
     */
-  def mkPhisFromThrows(st:State, parenteenv:EEnv, parentbenv:BEnv, parentcenv:CEnv, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State, List[Phi]] = st match {
+  def mkPhisFromThrows(st:State, parenteenv:EEnv, parentbenv:BEnv, parentcenv:CEnv, lbl:Label)(using m:MonadError[SSAState, ErrorM]):SState[State, List[Phi]] = st match {
     case State(vm, eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs, srcLblEnv) => { 
       def go(ctx:TCtx, v:Name):SState[State,(Label,Name)] = for {
         lbl1 <- toLbl(ctx)
@@ -2204,7 +2205,7 @@ object SSADL {
     }
   }
 
-  def updatePhiFromCEnv(phi:Phi, st:State, parentctx:TCtx,lctx:TCtx)(implicit m:MonadError[SSAState,ErrorM]):SState[State,Phi] = (st,phi) match {
+  def updatePhiFromCEnv(phi:Phi, st:State, parentctx:TCtx,lctx:TCtx)(using m:MonadError[SSAState,ErrorM]):SState[State,Phi] = (st,phi) match {
       case (State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, nestedDecls2, methInvs2, srcLblEnv2), Phi(v,v_vlbl,rhs_map)) => { 
       {
         def go(ctxk:TCtx):SState[State, (Label, Name)] = for {
@@ -2225,7 +2226,7 @@ object SSADL {
   }
 
 
-  def updatePhiFromBEnv(phi:Phi, st:State, parentctx:TCtx)(implicit m:MonadError[SSAState,ErrorM]):SState[State,Phi] = (st,phi) match {
+  def updatePhiFromBEnv(phi:Phi, st:State, parentctx:TCtx)(using m:MonadError[SSAState,ErrorM]):SState[State,Phi] = (st,phi) match {
       case (State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, nestedDecls2, methInvs2, srcLblEnv2), Phi(v,v_vlbl,rhs_map)) => { 
       {
         def go(ctxb:TCtx):SState[State, (Label, Name)] = for {
@@ -2285,7 +2286,7 @@ object SSADL {
     * @return
     */
   
-  def kstmtBlock(stmt:Stmt, ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,List[SSABlock]] = stmt match {
+  def kstmtBlock(stmt:Stmt, ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,List[SSABlock]] = stmt match {
     // case StmtBlock(Block(blkStmts)) => kblkStmts(blkStmts,ctx)
     case StmtBlock(blk) => kBlock(blk,ctx)
     case _ => for {
@@ -2301,7 +2302,7 @@ object SSADL {
     * @param m
     * @return
     */
-  def kBlock(blk:Block, ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,List[SSABlock]] = blk match {
+  def kBlock(blk:Block, ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,List[SSABlock]] = blk match {
     case Block(blkStmts) => kblkStmts(blkStmts,ctx)
   }
 
@@ -2314,7 +2315,7 @@ object SSADL {
     * @return
     */
 
-  def kblkStmts(blkStmts:List[BlockStmt], ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, List[SSABlock]] = blkStmts match {
+  def kblkStmts(blkStmts:List[BlockStmt], ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, List[SSABlock]] = blkStmts match {
     case Nil => m.pure(Nil)
     case (bstmt::Nil) => for {
       _ <- addAEnv(kctx(ctx))
@@ -2335,7 +2336,7 @@ object SSADL {
     * @param m
     * @return
     */
-  def kblkStmt(blkStmt:BlockStmt, ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,SSABlock] = blkStmt match {
+  def kblkStmt(blkStmt:BlockStmt, ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,SSABlock] = blkStmt match {
     case BlockStmt_(stmt) => kstmt(stmt, ctx) 
     case LocalClass(_) => m.raiseError("SSA construction failed, local class is not supported.")
     case LocalVars(mods, ty, varDecls) => kVarDecls(mods, ty, varDecls, ctx)
@@ -2351,7 +2352,7 @@ object SSADL {
     * @param m
     * @return
     */
-  def kVarDecls(mods:List[Modifier], ty:Type, varDecls:List[VarDecl], ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, SSABlock] = for {
+  def kVarDecls(mods:List[Modifier], ty:Type, varDecls:List[VarDecl], ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, SSABlock] = for {
     tctx <- m.pure(kctx(ctx))
     // a new case, combining KVD and KSTMT assignment
     // we first record all the variable name and type
@@ -2362,7 +2363,7 @@ object SSADL {
     varDecls1 <- kVarDecls(varDecls, tctx)
   } yield SSABlock(lbl, List(SSAVarDecls(mods, ty, varDecls1)))
   
-  def recordVarDecls(mods:List[Modifier], ty:Type, varDecls:List[VarDecl], tCtx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,Unit] = varDecls match {
+  def recordVarDecls(mods:List[Modifier], ty:Type, varDecls:List[VarDecl], tCtx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,Unit] = varDecls match {
     case Nil => m.pure(())
     case (varDecl::rest) => varDecl match {
       case VarDecl(VarId(id), v_init) => for {
@@ -2374,7 +2375,7 @@ object SSADL {
     }
   }
 
-  def kVarDecls(varDecls:List[VarDecl], tCtx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,List[VarDecl]] = varDecls match {
+  def kVarDecls(varDecls:List[VarDecl], tCtx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,List[VarDecl]] = varDecls match {
     case Nil => m.pure(Nil)
     case (varDecl::rest) => varDecl match {
       case VarDecl(VarId(id), ov_init) => for {
@@ -2401,7 +2402,7 @@ object SSADL {
     }
   }
 
-  def kVarInit(vInit:VarInit, tCtx:TCtx)(implicit m:MonadError[SSAState, ErrorM]): SState[State, VarInit] = vInit match {
+  def kVarInit(vInit:VarInit, tCtx:TCtx)(using m:MonadError[SSAState, ErrorM]): SState[State, VarInit] = vInit match {
     case InitExp(exp) => for {
       exp1 <- kexp(exp, tCtx) 
     } yield InitExp(exp1)
@@ -2418,7 +2419,7 @@ object SSADL {
     * @param m
     * @return
     */
-  def mkName(n:Name, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Name] = n match 
+  def mkName(n:Name, lbl:Label)(using m:MonadError[SSAState, ErrorM]):SState[State, Name] = n match 
     {
       case Name(Nil) => m.raiseError("SSA construction failed, mkName is applied to an empty name.")
       case Name(ids) => {
@@ -2438,7 +2439,7 @@ object SSADL {
     * @param m
     * @return
     */
-  def mkId(id:Ident, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Ident] = {
+  def mkId(id:Ident, lbl:Label)(using m:MonadError[SSAState, ErrorM]):SState[State, Ident] = {
     val s = lblToStr(lbl)
     val y = appIdStr(id,s)
     m.pure(y)
@@ -2518,7 +2519,7 @@ object SSADL {
   case object E extends T
   case object F extends T
 
-  implicit val eqT:Eq[T] = new Eq[T]{
+  using val eqT:Eq[T] = new Eq[T]{
     override def eqv(x: T, y: T): Boolean = (x,y) match 
     {
       case (A,A) => true
@@ -2531,7 +2532,7 @@ object SSADL {
     }
   }
 
-  implicit val partialOrderT:PartialOrder[T] = new PartialOrder[T] {
+  using val partialOrderT:PartialOrder[T] = new PartialOrder[T] {
     override def partialCompare(x: T, y: T): Double = (x,y) match {
       case (x,y) if x == y => 0.0
       case (A,B) => -1.0
@@ -2548,3 +2549,4 @@ object SSADL {
 
 
 }
+*/

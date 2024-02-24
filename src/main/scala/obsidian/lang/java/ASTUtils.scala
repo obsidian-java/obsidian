@@ -1,6 +1,6 @@
 package obsidian.lang.java
 
-import com.github.luzhuomi.scalangj.Syntax._
+import com.github.luzhuomi.scalangj.Syntax.*
 
 object ASTUtils {
     def isWhileStmt(stmt:Stmt):Boolean = stmt match {

@@ -1,15 +1,15 @@
 package obsidian.lang.java
 
 import com.github.luzhuomi.scalangj.Lexer
-import com.github.luzhuomi.scalangj.Parser._
-import com.github.luzhuomi.scalangj.Syntax._
-import com.github.luzhuomi.scalangj.Pretty._
-import obsidian.lang.java._ 
-import obsidian.lang.java.Flatten._
+import com.github.luzhuomi.scalangj.Parser.*
+import com.github.luzhuomi.scalangj.Syntax.*
+import com.github.luzhuomi.scalangj.Pretty.*
+import obsidian.lang.java.*
+import obsidian.lang.java.Flatten.*
 
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.{funsuite, matchers}
 
-class TestFlatten1 extends FunSuite with Matchers {
+class TestFlatten1 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
 public static void main(String [] args) {
 	int x = 0;
@@ -30,6 +30,7 @@ public static void main (String[] args)
 }    
     """
     val f_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(F_METHODSTR)).get.get 
+    import FlatResult.*
     test("TestFlatten1") {
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
@@ -49,7 +50,7 @@ public static void main (String[] args)
 
 
 
-class TestFlatten2 extends FunSuite with Matchers {
+class TestFlatten2 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
 public static void main(String [] args) {
 	int x = 0;
@@ -70,6 +71,7 @@ public static void main (String[] args)
 }    
     """
     val f_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(F_METHODSTR)).get.get 
+    import FlatResult.*
     test("TestFlatten2") {
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
@@ -88,7 +90,7 @@ public static void main (String[] args)
 }
 
 
-class TestFlatten3 extends FunSuite with Matchers {
+class TestFlatten3 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
 public static void main(String [] args) {
     int x = 0;
@@ -113,6 +115,7 @@ public static void main (String[] args)
 } 
     """
     val f_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(F_METHODSTR)).get.get 
+    import FlatResult.*
     test("TestFlatten3") {
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {

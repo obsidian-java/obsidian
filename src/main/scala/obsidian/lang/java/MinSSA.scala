@@ -2,15 +2,15 @@ package obsidian.lang.java
 
 
 import cats.kernel.Semilattice
-import cats._
-import cats.implicits._
+import cats.*
+import cats.implicits.*
 import cats.data.StateT
-import com.github.luzhuomi.scalangj.Syntax._
+import com.github.luzhuomi.scalangj.Syntax.*
 import scala.collection.immutable
 
-import obsidian.lang.java.Common._
-import obsidian.lang.java.ASTPath._
-import obsidian.lang.java.ASTUtils._
+import obsidian.lang.java.Common.*
+import obsidian.lang.java.ASTPath.*
+import obsidian.lang.java.ASTUtils.*
 
 /**
  * all variables must be declared and initialized in the source program
@@ -136,34 +136,34 @@ object MinSSA {
     def appSubst(subst:Map[Name,Name], a:A):A
   }
   object snOps {
-    def appSubst[A](subst:Map[Name,Name], a:A)(implicit sn:SubstName[A]):A = sn.appSubst(subst, a)
+    def appSubst[A](subst:Map[Name,Name], a:A)(using sn:SubstName[A]):A = sn.appSubst(subst, a)
   }
   
-  implicit def appSubstList[A](implicit sna:SubstName[A]) = new SubstName[List[A]] {
+  given appSubstList[A](using sna:SubstName[A]):SubstName[List[A]] = new SubstName[List[A]] {
     override def appSubst(subst:Map[Name, Name], l:List[A]):List[A] = l.map(sna.appSubst(subst,_))
   }
 
-  implicit def appSubstOption[A](implicit sna:SubstName[A]) = new SubstName[Option[A]] {
+  given appSubstOption[A](using sna:SubstName[A]):SubstName[Option[A]]  = new SubstName[Option[A]] {
     override def appSubst(subst:Map[Name, Name], o:Option[A]):Option[A] = o.map(sna.appSubst(subst,_))
   }
 
-  implicit def appSusbtMap[K,A](implicit sna:SubstName[A]) = new SubstName[Map[K,A]] {
+  given appSusbtMap[K,A](using sna:SubstName[A]):SubstName[Map[K,A]] = new SubstName[Map[K,A]] {
     override def appSubst(subst:Map[Name, Name], m:Map[K, A]):Map[K, A] = m.map( { case (k,v) => (k, sna.appSubst(subst,v)) })
   }
 
 
-  implicit def appSusbtList[K,A](implicit sna:SubstName[A]) = new SubstName[List[(K,A)]] {
+  given appSusbtList[K,A](using sna:SubstName[A]):SubstName[List[(K,A)]] = new SubstName[List[(K,A)]] {
     override def appSubst(subst:Map[Name, Name], m:List[(K, A)]):List[(K, A)] = m.map( { case (k,v) => (k, sna.appSubst(subst,v)) })
   }
 
 
-  implicit def appSubstSSABlock:SubstName[SSABlock] = new SubstName[SSABlock] { 
+  given appSubstSSABlock:SubstName[SSABlock] = new SubstName[SSABlock] { 
     override def appSubst(subst:Map[Name,Name], b:SSABlock): SSABlock = b match {
       case SSABlock(lbl, stmts) => SSABlock(lbl, snOps.appSubst(subst, stmts))
     }
   }
 
-  implicit def appSubstSSAStmt:SubstName[SSAStmt] = new SubstName[SSAStmt] {
+  given appSubstSSAStmt:SubstName[SSAStmt] = new SubstName[SSAStmt] {
     override def appSubst(subst:Map[Name,Name], s:SSAStmt): SSAStmt = s match {
       case SSAVarDecls(mods, ty, varDecls) => s // nothing to substitute since vardecls appear at the start of a method
       case SSAAssert(e, msg) => SSAAssert(snOps.appSubst(subst, e), snOps.appSubst(subst,msg))
@@ -183,7 +183,7 @@ object MinSSA {
     }
   }
 
-  implicit def appSubstStmt:SubstName[Stmt] = new SubstName[Stmt] {
+  given appSubstStmt:SubstName[Stmt] = new SubstName[Stmt] {
     override def appSubst(subst:Map[Name, Name], stmt:Stmt):Stmt = stmt match { 
       // we only need to apply subst to expression statment and assignment statement, 
       // the rest are either desugared away or not stratefied into the SSA AST
@@ -208,13 +208,13 @@ object MinSSA {
     }
   }
 
-  implicit def appSubstPhi:SubstName[Phi] = new SubstName[Phi] {
+  given appSubstPhi:SubstName[Phi] = new SubstName[Phi] {
     override def appSubst(subst:Map[Name,Name], p:Phi):Phi = p match {
       case Phi(srcVar, renVar, rhs) => Phi(srcVar, renVar, snOps.appSubst(subst, rhs))
     }
   }
 
-  implicit def appSubstExp:SubstName[Exp] = new SubstName[Exp] {
+  given appSubstExp:SubstName[Exp] = new SubstName[Exp] {
     override def appSubst(subst:Map[Name,Name], e:Exp):Exp = e match {
       case ArrayAccess(ArrayIndex(e,es)) => ArrayAccess(ArrayIndex(snOps.appSubst(subst,e), snOps.appSubst(subst,es)))
       case Cast(ty, e) => Cast(ty, snOps.appSubst(subst, e))
@@ -246,7 +246,7 @@ object MinSSA {
     }
   }
 
-  implicit def appSubstMethodInv:SubstName[MethodInvocation] = new SubstName[MethodInvocation] {
+  given appSubstMethodInv:SubstName[MethodInvocation] = new SubstName[MethodInvocation] {
     override def appSubst(subst:Map[Name,Name], methodInv:MethodInvocation):MethodInvocation = methodInv match {
       case ClassMethodCall(name, ref_types, id, args) => ClassMethodCall(snOps.appSubst(subst, name), ref_types, id, snOps.appSubst(subst, args))
       case MethodCall(name, args) => MethodCall(snOps.appSubst(subst, name), snOps.appSubst(subst, args))
@@ -256,20 +256,20 @@ object MinSSA {
     }
   }
 
-  implicit def appSubstVarInit:SubstName[VarInit] = new SubstName[VarInit] { 
+  given appSubstVarInit:SubstName[VarInit] = new SubstName[VarInit] { 
     override def appSubst(subst:Map[Name, Name], v_init:VarInit):VarInit = v_init match {
       case InitExp(e) => InitExp(snOps.appSubst(subst, e))
       case InitArray(array_init) => InitArray(snOps.appSubst(subst, array_init)) 
     }
   }
 
-  implicit def appSubstArrayInit:SubstName[ArrayInit] = new SubstName[ArrayInit] {
+  given appSubstArrayInit:SubstName[ArrayInit] = new SubstName[ArrayInit] {
     override def appSubst(subst:Map[Name, Name], array_init:ArrayInit):ArrayInit = array_init match {
       case ArrayInit(var_inits) => ArrayInit(snOps.appSubst(subst, var_inits))
     }
   }
 
-  implicit def appSubstLhs:SubstName[Lhs] = new SubstName[Lhs] {
+  given appSubstLhs:SubstName[Lhs] = new SubstName[Lhs] {
     override def appSubst(subst:Map[Name, Name], lhs:Lhs):Lhs = lhs match {
       case NameLhs(n) => NameLhs(snOps.appSubst(subst, n))
       case FieldLhs(field_access) => FieldLhs(snOps.appSubst(subst, field_access))
@@ -277,7 +277,7 @@ object MinSSA {
     }
   }
 
-  implicit def appSubstFieldAccess:SubstName[FieldAccess] = new SubstName[FieldAccess] {
+  given appSubstFieldAccess:SubstName[FieldAccess] = new SubstName[FieldAccess] {
     override def appSubst(subst:Map[Name, Name], fieldAccess:FieldAccess):FieldAccess = fieldAccess match {
       case ClassFieldAccess(name, id) => ClassFieldAccess(snOps.appSubst(subst, name), id)
       case PrimaryFieldAccess(e, id) => PrimaryFieldAccess(snOps.appSubst(subst, e), id)
@@ -285,14 +285,14 @@ object MinSSA {
     }
   }
 
-  implicit def appSubstArrayIdx:SubstName[ArrayIndex] = new SubstName[ArrayIndex] {
+  given appSubstArrayIdx:SubstName[ArrayIndex] = new SubstName[ArrayIndex] {
     override def appSubst(subst: Map[Name,Name], a: ArrayIndex): ArrayIndex = a match {
       case ArrayIndex(e,es) => ArrayIndex(snOps.appSubst(subst, e), snOps.appSubst(subst, es))
     }
   }
 
 
-  implicit def appSubstName:SubstName[Name] = new SubstName[Name] {
+  given appSubstName:SubstName[Name] = new SubstName[Name] {
     override def appSubst(subst:Map[Name,Name], n:Name):Name = subst.get(n) match {
       case None => n
       case Some(rn) => rn
@@ -534,13 +534,15 @@ object MinSSA {
   type ErrorM = String
 
 
-  sealed trait SSAResult[+A]
+  enum SSAResult[+A] {
+    case SSAError(msg:ErrorM) extends SSAResult[Nothing]
+    
+    case SSAOk[A](result:A) extends SSAResult[A]
+  }
 
-  case class SSAError(msg:ErrorM) extends SSAResult[Nothing]
-  
-  case class SSAOk[A](result:A) extends SSAResult[A]
+  import SSAResult.*
 
-  implicit def ssaResultFunctor: Functor[SSAResult] =
+  given ssaResultFunctor: Functor[SSAResult] =
     new Functor[SSAResult] {
       override def map[A, B](fa: SSAResult[A])(f: A => B): SSAResult[B] =
         fa match {
@@ -549,7 +551,7 @@ object MinSSA {
         }
     }
 
-  implicit def ssaResultApplicative: ApplicativeError[SSAResult, ErrorM] = 
+  given ssaResultApplicative: ApplicativeError[SSAResult, ErrorM] = 
     new ApplicativeError[SSAResult, ErrorM] {
       override def ap[A, B](ff: SSAResult[A => B])(fa: SSAResult[A]): SSAResult[B] =
         ff match {
@@ -572,7 +574,7 @@ object MinSSA {
         }
     }
 
-  implicit def ssaResultMonadError(implicit app:ApplicativeError[SSAResult, ErrorM]):MonadError[SSAResult, ErrorM] = {
+  given ssaResultMonadError(using app:ApplicativeError[SSAResult, ErrorM]):MonadError[SSAResult, ErrorM] = {
     new MonadError[SSAResult, ErrorM] {
       override def raiseError[A](e: ErrorM): SSAResult[A] = app.raiseError(e)
 
@@ -611,7 +613,7 @@ object MinSSA {
     * @param m
     * @return
     */
-  def setECtx(tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
+  def setECtx(tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get
     st1 <- m.pure(st match {
       case State(vm, eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs, srcLabelEnv, conf) => State(vm, tctx, aenv, eenv, benv, cenv, nestedDecls, methInvs, srcLabelEnv,conf)
@@ -627,7 +629,7 @@ object MinSSA {
     * @param m
     * @return
     */
-  def setVM(vm:VarMap)(implicit m:MonadError[SSAState, ErrorM]): SState[State, Unit] = for {
+  def setVM(vm:VarMap)(using m:MonadError[SSAState, ErrorM]): SState[State, Unit] = for {
     st <- get
     st1 <- m.pure(st match {
       case State(_,eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs, srcLabelEnv,conf) => State(vm, eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs,srcLabelEnv,conf)
@@ -635,7 +637,7 @@ object MinSSA {
     _   <- put(st1)
   } yield ()
   
-  def removeVarFromVM(v:Name)(implicit m:MonadError[SSAState, ErrorM]): SState[State, Unit] = for {
+  def removeVarFromVM(v:Name)(using m:MonadError[SSAState, ErrorM]): SState[State, Unit] = for {
     st <- get
     st1 <- m.pure(st match {
       case State(vm ,eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs, srcLabelEnv,conf) => State(vm - v, eCtx, aenv, eenv, benv, cenv, nestedDecls, methInvs,srcLabelEnv,conf)
@@ -653,7 +655,7 @@ object MinSSA {
     * @param m
     * @return
     */
-  def addNestedVarDecls(tctx:TCtx, id:Ident, ty:Type, mods:List[Modifier])(implicit m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
+  def addNestedVarDecls(tctx:TCtx, id:Ident, ty:Type, mods:List[Modifier])(using m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
     st <- get
     st1  <- m.pure(st match {
       case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs, srcLblEnv,conf) => {
@@ -672,7 +674,7 @@ object MinSSA {
     * @param m
     * @return
     */
-  def addMethodInv(tctx:TCtx, methinv:MethodInvocation)(implicit m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
+  def addMethodInv(tctx:TCtx, methinv:MethodInvocation)(using m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
     st <- get 
     st1  <- m.pure(st match {
       case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs, srcLblEnv,conf) => {
@@ -683,7 +685,7 @@ object MinSSA {
     _  <- put(st1)
   } yield ()
 
-  def addSrcLabel(label:Ident, ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
+  def addSrcLabel(label:Ident, ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get
     st1 <- m.pure(st match {
       case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs, srcLblEnv,conf) => {
@@ -701,7 +703,7 @@ object MinSSA {
     * @param m
     * @return
     */
-  def addAEnv(tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
+  def addAEnv(tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get 
     st1  <- m.pure(st match {
       case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs, srcLblEnv,conf) => {
@@ -722,7 +724,7 @@ object MinSSA {
   */
   
 
-  def addEEnv(tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
+  def addEEnv(tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get 
     st1  <- m.pure(st match {
       case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs, srcLblEnv,conf) => {
@@ -742,7 +744,7 @@ object MinSSA {
     * @return
     */
 
-  def addBEnv(bctx:TCtx, tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
+  def addBEnv(bctx:TCtx, tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get 
     st1  <- m.pure(st match {
       case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs, srcLblEnv,conf) => {
@@ -763,7 +765,7 @@ object MinSSA {
     */
 
 
-  def addCEnv(bctx:TCtx, tctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
+  def addCEnv(bctx:TCtx, tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get 
     st1  <- m.pure(st match {
       case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs, srcLblEnv,conf) => {
@@ -780,7 +782,7 @@ object MinSSA {
     * @param m
     * @return
     */
-  def usingCtxtAsID(implicit m:MonadError[SSAState, ErrorM]):SState[State, Boolean] = for {
+  def usingCtxtAsID(using m:MonadError[SSAState, ErrorM]):SState[State, Boolean] = for {
     st <- get
   } yield st match {
     case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs, srcLblEnv,SSAEnvConfig(ctxtAsID, _)) => ctxtAsID
@@ -792,7 +794,7 @@ object MinSSA {
     * @param m
     * @return
     */
-  def getCharArray(implicit m:MonadError[SSAState, ErrorM]):SState[State, List[Char]] = for {
+  def getCharArray(using m:MonadError[SSAState, ErrorM]):SState[State, List[Char]] = for {
     st <- get
   } yield st match {
     case State(varMap, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs, srcLblEnv,SSAEnvConfig(ctxtAsID, arr)) => arr
@@ -818,7 +820,7 @@ object MinSSA {
   }
 
   
-  def extendVarsWithContextAndLabel(vars: List[Name], sctx:SCtx, tctx:TCtx, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
+  def extendVarsWithContextAndLabel(vars: List[Name], sctx:SCtx, tctx:TCtx, lbl:Label)(using m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
     st <- get
     st1 <- st match {
       case State(vm0, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs, srcLblEnv,conf) => for {
@@ -836,7 +838,7 @@ object MinSSA {
   } yield ()
 
   // do we still need this? 
-  def extendAllVarsWithContextAndLabel(sctx:SCtx, tctx:TCtx, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
+  def extendAllVarsWithContextAndLabel(sctx:SCtx, tctx:TCtx, lbl:Label)(using m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
     st <- get
     st1 <- st match {
       case State(vm0, eCtx, aenv, eenv, benv, cenv, nDecls, methInvs, srcLblEnv,conf) => for {
@@ -863,8 +865,8 @@ object MinSSA {
   * @param m
   * @return
   */
-  def mkName(n:Name, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Name] = n match 
-    {
+  def mkName(n:Name, lbl:Label)(using m:MonadError[SSAState, ErrorM]):SState[State, Name] = { 
+    n match {
       case Name(Nil) => m.raiseError("SSA construction failed, mkName is applied to an empty name.")
       case Name(ids) => for {
         pre <- m.pure(ids.init)
@@ -873,6 +875,7 @@ object MinSSA {
         y   <- m.pure(appIdStr(x, s))
       } yield Name(pre++List(y))
     }
+  }
   
   /**
     * convert a label (TCtxt) to a string
@@ -881,7 +884,7 @@ object MinSSA {
     * @param m
     * @return
     */
-  def lblToStr(lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State, String] = for {
+  def lblToStr(lbl:Label)(using m:MonadError[SSAState, ErrorM]):SState[State, String] = for {
     flag <- usingCtxtAsID
     res <- 
       if (flag) { m.pure(lbl.toString()) }
@@ -891,7 +894,7 @@ object MinSSA {
     }
   } yield res
 
-  implicit val eqTCtx:Eq[TCtx] = new Eq[TCtx]{
+  given eqTCtx:Eq[TCtx] = new Eq[TCtx]{
     override def eqv(x: TCtx, y: TCtx): Boolean = (x,y) match {
       case (TBox, TBox) => true
       case (TLast(ctx1), TLast(ctx2)) => eqv(ctx1, ctx2)
@@ -1071,12 +1074,12 @@ object MinSSA {
     case _         => None
   }
 
-  def appDec(dec:TCtx => Option[TCtx], ts:List[TCtx]):List[TCtx] = ts.map(dec(_)).filter( x => !x.isEmpty).flatMap({
+  def appDec(dec:TCtx => Option[TCtx], ts:List[TCtx]):List[TCtx] = ts.map(dec(_)).filter( x => !x.isEmpty).flatMap(x => x match {
     case Some(c) => List(c)
     case None => Nil
   })
 
-  def appDec2(dec:TCtx => Option[TCtx], ts:BEnv):BEnv = ts.flatMap({ 
+  def appDec2(dec:TCtx => Option[TCtx], ts:BEnv):BEnv = ts.flatMap( x => x match { 
     case (c1,Some(c2)) => (dec(c1), dec(c2)) match {
       case (Some(c3), Some(c4)) => List((c3,Some(c4)))
       case (Some(c3), None) => List((c3,None))
@@ -1095,12 +1098,10 @@ object MinSSA {
   // ****************************** implementing partial order begin ************************************************************
   // return the domain of a mapping
 
-  def dom[A,B](m:List[(A,B)]):List[A] = m.map{
-    case (a,b) => a
-  }
+  def dom[A,B](m:List[(A,B)]):List[A] = m.map(x => x match { case (a,b) => a } )
 
 
-  implicit def partialOrderTCtx(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv):PartialOrder[TCtx] = new PartialOrder[TCtx]{
+  def partialOrderTCtx(aenv:AEnv, eenv:EEnv, benv:BEnv, cenv:CEnv):PartialOrder[TCtx] = new PartialOrder[TCtx]{
     override def partialCompare(x: TCtx, y: TCtx): Double = 
     { 
       (x,y) match {
@@ -1388,7 +1389,7 @@ object MinSSA {
     * @param m
     * @return
     */
-  def kmethodDecl(md:MethodDecl)(implicit m:MonadError[SSAState, ErrorM]):SState[State, SSAMethodDecl] = md match {
+  def kmethodDecl(md:MethodDecl)(using m:MonadError[SSAState, ErrorM]):SState[State, SSAMethodDecl] = md match {
     case MethodDecl(modifiers, type_params, return_ty, fname, formal_params, ex_types, exp, body) => body match {
       case MethodBody(None) => m.pure(SSAMethodDecl(modifiers, type_params, return_ty, fname, formal_params, ex_types, exp, SSAMethodBody(Nil)))
       case MethodBody(Some(block)) => {
@@ -1424,7 +1425,7 @@ object MinSSA {
     * @return
     */
   
-  def kstmtBlock(stmt:Stmt, ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,List[SSABlock]] = stmt match {
+  def kstmtBlock(stmt:Stmt, ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,List[SSABlock]] = stmt match {
     // case StmtBlock(Block(blkStmts)) => kblkStmts(blkStmts,ctx)
     case StmtBlock(blk) => kBlock(blk,ctx)
     case _ => for {
@@ -1441,7 +1442,7 @@ object MinSSA {
     * @param m
     * @return
     */
-  def kBlock(blk:Block, ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,List[SSABlock]] = blk match {
+  def kBlock(blk:Block, ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,List[SSABlock]] = blk match {
     case Block(blkStmts) => kblkStmts(blkStmts,ctx)
   }
 
@@ -1455,7 +1456,7 @@ object MinSSA {
     * @return
     */
 
-  def kblkStmts(blkStmts:List[BlockStmt], ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, List[SSABlock]] = blkStmts match {
+  def kblkStmts(blkStmts:List[BlockStmt], ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, List[SSABlock]] = blkStmts match {
     case Nil => m.pure(Nil)
     case (bstmt::Nil) => for {
       _ <- addAEnv(kctx(ctx))
@@ -1477,7 +1478,7 @@ object MinSSA {
     * @param m
     * @return
     */
-  def kblkStmt(blkStmt:BlockStmt, ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,SSABlock] = blkStmt match {
+  def kblkStmt(blkStmt:BlockStmt, ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,SSABlock] = blkStmt match {
     case BlockStmt_(stmt) => kstmt(stmt, ctx) 
     case LocalClass(_) => m.raiseError("SSA construction failed, local class is not supported.")
     case LocalVars(mods, ty, varDecls) => kVarDecls(mods, ty, varDecls, ctx)
@@ -1494,7 +1495,7 @@ object MinSSA {
     * @param m
     * @return
     */
-  def kVarDecls(mods:List[Modifier], ty:Type, varDecls:List[VarDecl], ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, SSABlock] = for {
+  def kVarDecls(mods:List[Modifier], ty:Type, varDecls:List[VarDecl], ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, SSABlock] = for {
     tctx <- m.pure(kctx(ctx))
     // a new case, combining KVD and KSTMT assignment
     // we first record all the variable name and type
@@ -1505,7 +1506,7 @@ object MinSSA {
     varDecls1 <- kVarDecls(varDecls, tctx)
   } yield SSABlock(tctx, List(SSAVarDecls(mods, ty, varDecls1)))
   
-  def recordVarDecls(mods:List[Modifier], ty:Type, varDecls:List[VarDecl], tCtx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,Unit] = varDecls match {
+  def recordVarDecls(mods:List[Modifier], ty:Type, varDecls:List[VarDecl], tCtx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,Unit] = varDecls match {
     case Nil => m.pure(())
     case (varDecl::rest) => varDecl match {
       case VarDecl(VarId(id), v_init) => for {
@@ -1517,7 +1518,7 @@ object MinSSA {
     }
   }
 
-  def kVarDecls(varDecls:List[VarDecl], tCtx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State,List[VarDecl]] = varDecls match {
+  def kVarDecls(varDecls:List[VarDecl], tCtx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,List[VarDecl]] = varDecls match {
     case Nil => m.pure(Nil)
     case (varDecl::rest) => varDecl match {
       case VarDecl(VarId(id), ov_init) => for {
@@ -1544,7 +1545,7 @@ object MinSSA {
     }
   }
 
-  def kVarInit(vInit:VarInit, tCtx:TCtx)(implicit m:MonadError[SSAState, ErrorM]): SState[State, VarInit] = vInit match {
+  def kVarInit(vInit:VarInit, tCtx:TCtx)(using m:MonadError[SSAState, ErrorM]): SState[State, VarInit] = vInit match {
     case InitExp(exp) => for {
       exp1 <- kexp(exp, tCtx) 
     } yield InitExp(exp1)
@@ -1563,7 +1564,7 @@ object MinSSA {
     * @return
     */
 
-  def kexp(e:Exp, ctx:TCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Exp] = e match {
+  def kexp(e:Exp, ctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Exp] = e match {
     case ArrayAccess(ArrayIndex(e, es)) => for {
       e1 <- kexp(e, ctx)
       es1 <- es.traverse(kexp(_, ctx))
@@ -1681,7 +1682,7 @@ object MinSSA {
     */
   
 
-  def kstmt(stmt:Stmt, ctx:SCtx)(implicit m:MonadError[SSAState, ErrorM]):SState[State, SSABlock] = {
+  def kstmt(stmt:Stmt, ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, SSABlock] = {
     val tctx = kctx(ctx)
     val lbl = tctx
     stmt match {
@@ -2083,7 +2084,7 @@ object MinSSA {
     * @return
     */
 
-  def mkPhi(st0:State, st1:State, st2:State, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State, List[Phi]] = (st0, st1, st2) match {
+  def mkPhi(st0:State, st1:State, st2:State, lbl:Label)(using m:MonadError[SSAState, ErrorM]):SState[State, List[Phi]] = (st0, st1, st2) match {
     /*
     case (State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1,  _, _, _), State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, _, _,_)) if ((eenv1 ++ dom(benv1 ++ cenv1)).contains(eCtx1)) && ((eenv2 ++ dom(benv2 ++ cenv2)).contains(eCtx2)) => for {
       // do we still need this case? it means dead code
@@ -2145,7 +2146,7 @@ object MinSSA {
     * @param m
     * @return
     */    
-  def genVarDecls(implicit m:MonadError[SSAState, ErrorM]):SState[State, List[SSAStmt]] = for {
+  def genVarDecls(using m:MonadError[SSAState, ErrorM]):SState[State, List[SSAStmt]] = for {
     st <- get
     stmts <- st match {
       case State(vm, eCtx, aenv, eenv, benv, cenv, nestedDecls, methodInvs, srcLblEnv, conf) => for {
@@ -2232,7 +2233,7 @@ object MinSSA {
     * @param m
     * @return
     */
-  def mkId(id:Ident, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State, Ident] = for {
+  def mkId(id:Ident, lbl:Label)(using m:MonadError[SSAState, ErrorM]):SState[State, Ident] = for {
     s <- lblToStr(lbl)    
   } yield(appIdStr(id,s))
 
@@ -2256,7 +2257,7 @@ object MinSSA {
     * @return
     */
 
-  def updatePhiFromCEnv(phi:Phi, st:State, parentctx:TCtx)(implicit m:MonadError[SSAState,ErrorM]):SState[State,Phi] = (st,phi) match {
+  def updatePhiFromCEnv(phi:Phi, st:State, parentctx:TCtx)(using m:MonadError[SSAState,ErrorM]):SState[State,Phi] = (st,phi) match {
       case (State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, nestedDecls2, methInvs2, srcLblEnv2, conf2), Phi(v,v_vlbl,rhs_map)) => { 
       {
         def go(ctxk:TCtx):SState[State, (Label, Name)] = for {
@@ -2277,7 +2278,7 @@ object MinSSA {
   }
 
 
-  def updatePhiFromBEnv(phi:Phi, st:State, parentctx:TCtx)(implicit m:MonadError[SSAState,ErrorM]):SState[State,Phi] = (st,phi) match {
+  def updatePhiFromBEnv(phi:Phi, st:State, parentctx:TCtx)(using m:MonadError[SSAState,ErrorM]):SState[State,Phi] = (st,phi) match {
       case (State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, nestedDecls2, methInvs2, srcLblEnv2, conf2), Phi(v,v_vlbl,rhs_map)) => { 
       {
         def go(ctxb:TCtx):SState[State, (Label, Name)] = for {
@@ -2308,9 +2309,9 @@ object MinSSA {
     * @return
     */
 
-  def mkSubstFromStates(st0:State, st1:State, st2:State, lbl1:Label)(implicit m:MonadError[SSAState,ErrorM]):SState[State,Map[Name,Name]] = {
+  def mkSubstFromStates(st0:State, st1:State, st2:State, lbl1:Label)(using m:MonadError[SSAState,ErrorM]):SState[State,Map[Name,Name]] = {
     
-    def go(vs:List[Name], aenv:AEnv, eenv:EEnv, benv: BEnv, cenv: CEnv, eCtx:TCtx, vm:VarMap, lbl:Label)(implicit m:MonadError[SSAState, ErrorM]):SState[State,List[(Name,Name)]] = vs.traverse(v => for {
+    def go(vs:List[Name], aenv:AEnv, eenv:EEnv, benv: BEnv, cenv: CEnv, eCtx:TCtx, vm:VarMap, lbl:Label)(using m:MonadError[SSAState, ErrorM]):SState[State,List[(Name,Name)]] = vs.traverse(v => for {
           v_lbl1 <- mkName(v,lbl) // the v_l1 to be renamed back to the original
           v_ori <- Rleq(aenv, eenv, benv, cenv, eCtx, vm, v) match {
             case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub during the while stmt conversion.")
