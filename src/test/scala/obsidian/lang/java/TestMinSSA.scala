@@ -110,23 +110,22 @@ public static boolean add(int v) {
     val ssa = SSAMethodDecl(List(Public, Static),List(),Some(PrimType_(BooleanT)),Ident("add"),List(FormalParam(List(),PrimType_(IntT),false,VarId(Ident("v")))),List(),None,
         SSAMethodBody(List(
             SSABlock(THead(TBox),List(
-                SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(
-                    VarDecl(VarId(Ident("nvals_TTail(TTail(TTail(THead(TBox))))")),None))), 
-                SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(
-                    VarDecl(VarId(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(THead(TBox)))))))))))")),None))), 
+                SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(VarDecl(VarId(Ident("nvals_TTail(TTail(TTail(THead(TBox))))")),None))), 
+                SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(VarDecl(VarId(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(THead(TBox)))))))))))")),None))), 
                 SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(VarDecl(VarId(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))")),None))), 
                 SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(VarDecl(VarId(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))")),None))), 
-                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox))))))))))))))))")),None))), 
                 SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))")),None))), 
-                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(TTail(TTail(TTail(THead(TBox)))))")),None))), 
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox))))))))))))))))")),None))), 
                 SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePostPhi)))))))))))))")),None))), 
-                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))")),None))), 
                 SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")),None))), 
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(TTail(TTail(TTail(THead(TBox)))))")),None))), 
+                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))")),None))), 
                 SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident("res_TTail(TTail(TTail(TTail(TTail(THead(TBox))))))")),None))), 
                 SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox))))))))))")),None))), 
                 SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox)))))))))")),None))), 
                 SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))")),None))), 
-                SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(VarDecl(VarId(Ident("nvals_THead(TBox)")),None))))), 
+                SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(VarDecl(VarId(Ident("nvals_THead(TBox)")),None))))
+            ), 
             SSABlock(TTail(THead(TBox)),List(SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(THead(TBox))")),None))))), 
             SSABlock(TTail(TTail(THead(TBox))),List(SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident("res_TTail(TTail(THead(TBox)))")),None))))), 
             SSABlock(TTail(TTail(TTail(THead(TBox)))),List(
@@ -312,14 +311,14 @@ public static void f(int v) {
     
     val ssa = SSAMethodDecl(List(Public, Static),List(),None,Ident("f"),List(FormalParam(List(),PrimType_(IntT),false,VarId(Ident("v")))),List(),None,
         SSAMethodBody(List(
-            SSABlock(THead(TBox),List(
-                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TElse(TLast(TWhile(TLast(TBox)))))))")),None))), 
-                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TThen(TLast(TBox)))))")),None))), 
-                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePostPhi)))))")),None))), 
-                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePrePhi(1))))))")),None))), 
-                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TIfPostPhi)))")),None))), 
-                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(THead(TBox))")),None))), 
-                SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_THead(TBox)")),None))))), 
+            SSABlock(THead(TBox),
+                List(SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TIfPostPhi)))")),None))), 
+                    SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TElse(TLast(TWhile(TLast(TBox)))))))")),None))), 
+                    SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePostPhi)))))")),None))), 
+                    SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePrePhi(1))))))")),None))), 
+                    SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(THead(TBox))")),None))), 
+                    SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TThen(TLast(TBox)))))")),None))), 
+                    SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_THead(TBox)")),None))))), 
             SSABlock(TTail(THead(TBox)),List(
                 SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_TTail(THead(TBox))")))),EqualA,Lit(IntLit(0)))))))), 
             SSABlock(TTail(TTail(THead(TBox))),List(

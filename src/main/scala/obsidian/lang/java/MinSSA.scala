@@ -1877,7 +1877,7 @@ object MinSSA {
       case Synchronized(exp, blk) => m.raiseError("SSA construction failed, Synchronized statement is not supported.") // todo
 
       case Throw(exp) => for {
-          _  <- addAEnv(tctx)
+        _  <- addAEnv(tctx)
         // lbl  <- toLbl(tctx)
         exp1 <- kexp(exp, tctx)
         _    <- addEEnv(tctx)
@@ -2163,7 +2163,7 @@ object MinSSA {
                   m.raiseError("SSA construction failed, genVarDecls - the renamed variable is a not a simple id.")
                 }
               }
-              ctxm.toList.traverse(go(_))
+              ctxm.toList.traverse(go(_)) // TODO should sort it first so that the list is more deterministics for testing?
             }
           }
         })
