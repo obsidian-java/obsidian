@@ -11,7 +11,7 @@ import obsidian.lang.java.scalangj.Syntax.{Ident, MethodDecl}
 
 import scala.annotation.tailrec
 
-// an implemntation of Cyntron's algorithm
+// an implemntation of Cytron's algorithm
 object SSACFG {
 
   type NodeId = ASTPath
