@@ -102,6 +102,7 @@ object Label {
 
   val initStateInfo = StateInfo(0, "obsLbl")
 
+
   enum LabelResult[+A] {
     case LabelError(msg: String) extends LabelResult[Nothing]
     case LabelOk[A](result: A) extends LabelResult[A]
