@@ -5,7 +5,7 @@ import cats.kernel.Semilattice
 import cats.*
 import cats.implicits.*
 import cats.data.StateT
-import com.github.luzhuomi.scalangj.Syntax.*
+import obsidian.lang.java.scalangj.Syntax.*
 import scala.collection.immutable
 
 import obsidian.lang.java.Common.*

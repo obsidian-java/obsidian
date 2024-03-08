@@ -7,7 +7,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable
 
 // constructing CPS from SSA
-import com.github.luzhuomi.scalangj.Syntax.*
+import obsidian.lang.java.scalangj.Syntax.*
 import obsidian.lang.java.ASTUtils.*
 import obsidian.lang.java.Common.*
 import obsidian.lang.java.MinSSA.{SSABlock, SSAStmt, SSAIf, SSAWhile, SSATry, SSAAssert, SSAAssignments, SSABreak, SSAContinue, SSAEmpty, charcode, Label, TCtx, Phi}

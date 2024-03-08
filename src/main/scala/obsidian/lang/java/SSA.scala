@@ -6,7 +6,7 @@ import cats.implicits.*
 
 import cats.data.State
 import obsidian.lang.java.CFG.{AssignmentsNode, CFG, HasVarcfgOps, Node, NodeId, getLVars, getRVars, getSuccs}
-import com.github.luzhuomi.scalangj.Syntax.{Ident, MethodDecl}
+import obsidian.lang.java.scalangj.Syntax.{Ident, MethodDecl}
 
 import scala.annotation.tailrec
 

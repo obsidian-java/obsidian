@@ -1,7 +1,7 @@
 package obsidian.lang.java
 
 import scala.collection.Map.*
-import com.github.luzhuomi.scalangj.Syntax.*
+import obsidian.lang.java.scalangj.Syntax.*
 
 /**
   * an AST Path is a sequence of integers that represent the hierachical position of a statement

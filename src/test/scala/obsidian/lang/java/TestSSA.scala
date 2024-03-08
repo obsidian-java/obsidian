@@ -4,9 +4,9 @@ import obsidian.lang.java.CFG.*
 import obsidian.lang.java.SSA.*
 import obsidian.lang.java.Label.*
 import obsidian.lang.java.Flatten.*
-import com.github.luzhuomi.scalangj.Lexer
-import com.github.luzhuomi.scalangj.Parser.*
-import com.github.luzhuomi.scalangj.Syntax.*
+import obsidian.lang.java.scalangj.Lexer
+import obsidian.lang.java.scalangj.Parser.*
+import obsidian.lang.java.scalangj.Syntax.*
 import org.scalatest.*
 import org.scalatest.prop.TableDrivenPropertyChecks.*
 import org.scalatest.AppendedClues.convertToClueful

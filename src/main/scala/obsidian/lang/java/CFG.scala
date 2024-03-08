@@ -4,7 +4,7 @@ import cats.*
 import cats.implicits.*
 import cats.data.StateT
 
-import com.github.luzhuomi.scalangj.Syntax.*
+import obsidian.lang.java.scalangj.Syntax.*
 import obsidian.lang.java.ASTUtils.*
 import obsidian.lang.java.ASTPath.*
 

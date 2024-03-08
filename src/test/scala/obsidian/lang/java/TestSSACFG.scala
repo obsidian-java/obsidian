@@ -1,10 +1,10 @@
 package obsidian.lang.java
 
 import obsidian.lang.java.CFG.{CFGResult, cfgOps, initStateInfo}
-import com.github.luzhuomi.scalangj.Lexer
-import com.github.luzhuomi.scalangj.Parser.*
-import com.github.luzhuomi.scalangj.Syntax.*
-import com.github.luzhuomi.scalangj.Pretty.*
+import obsidian.lang.java.scalangj.Lexer
+import obsidian.lang.java.scalangj.Parser.*
+import obsidian.lang.java.scalangj.Syntax.*
+import obsidian.lang.java.scalangj.Pretty.*
 import obsidian.lang.java.SSACFG.*
 import obsidian.lang.java.*
 import obsidian.lang.java.Desugar.*

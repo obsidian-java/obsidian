@@ -7,7 +7,7 @@ import cats.data.StateT
 import cats.{ApplicativeError, Functor, MonadError}
 import obsidian.lang.java.ASTPath.ASTPath
 import obsidian.lang.java.SSA.{DomTree, Phi, SDomTable}
-import com.github.luzhuomi.scalangj.Syntax.{Ident, MethodDecl}
+import obsidian.lang.java.scalangj.Syntax.{Ident, MethodDecl}
 
 import scala.annotation.tailrec
 

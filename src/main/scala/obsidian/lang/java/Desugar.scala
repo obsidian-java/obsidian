@@ -1,8 +1,8 @@
 package obsidian.lang.java
 
 import scala.collection.Map.*
-import com.github.luzhuomi.scalangj.Syntax.*
-import com.github.luzhuomi.scalangj.Syntax
+import obsidian.lang.java.scalangj.Syntax.*
+import obsidian.lang.java.scalangj.Syntax
 import obsidian.lang.java.ASTUtils.*
 
 
