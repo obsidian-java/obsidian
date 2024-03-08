@@ -1,6 +1,6 @@
 package obsidian.lang.java
 
-
+// TODO: should benchmark MinSSA with SSA
 /*
 import obsidian.lang.java._ 
 import obsidian.lang.java.Label._

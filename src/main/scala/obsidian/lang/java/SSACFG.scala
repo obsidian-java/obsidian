@@ -11,6 +11,7 @@ import com.github.luzhuomi.scalangj.Syntax.{Ident, MethodDecl}
 
 import scala.annotation.tailrec
 
+// an implemntation of Cyntron's algorithm
 object SSACFG {
 
   type NodeId = ASTPath
