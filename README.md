@@ -3,10 +3,21 @@ Control flow obfuscation for Java code
 
 It is work in progress
 
+# TODOS:
+
+1. some of the Scala v2 codes are still inline, e.g. we should convert sealed traits and their case classes extension to Scala 3 enum. 
+2. port the obfuscation pipeline from Main.scala into a library package, and expose the function call.
+3. look into building wrapper as a VS code extension.
+    1. e.g. https://github.com/pme123/vscode-scalajs-hello
+4. MinSSA does not handle the following
+    1. synchronized method, variable, class, which should be an easy fix. 
+    2. try-catch block, this one is hard.
+
 # Documentation
 
 * [Code Obfuscation using CPS](https://github.com/obsidian-java/obsidian/raw/master/pepm21-fixed.pdf)
 * [Structured SSA construction](https://github.com/obsidian-java/obsidian/raw/master/ftfjp23-fixed.pdf)
+
 # Example 
 
 Some examples in Java
