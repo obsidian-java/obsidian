@@ -1,13 +1,13 @@
-package com.github.luzhuomi.obsidian
+package obsidian.lang.java
 
-import com.github.luzhuomi.obsidian.CFG.{CFGError, CFGOk, cfgOps, initStateInfo}
+import obsidian.lang.java.CFG.{CFGError, CFGOk, cfgOps, initStateInfo}
 import com.github.luzhuomi.scalangj.Lexer
 import com.github.luzhuomi.scalangj.Parser._
 import com.github.luzhuomi.scalangj.Syntax._
 import com.github.luzhuomi.scalangj.Pretty._
-import com.github.luzhuomi.obsidian.SSACFG._
-import com.github.luzhuomi.obsidian._
-import com.github.luzhuomi.obsidian.Desugar._
+import obsidian.lang.java.SSACFG._
+import obsidian.lang.java._
+import obsidian.lang.java.Desugar._
 import org.scalatest.{AppendedClues, FunSuite, Matchers}
 
 class TestSSACFGFib extends FunSuite with Matchers with AppendedClues{

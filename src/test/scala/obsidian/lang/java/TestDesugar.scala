@@ -1,11 +1,11 @@
-package com.github.luzhuomi.obsidian
+package obsidian.lang.java
 
 import com.github.luzhuomi.scalangj.Lexer
 import com.github.luzhuomi.scalangj.Parser._
 import com.github.luzhuomi.scalangj.Syntax._
 import com.github.luzhuomi.scalangj.Pretty._
-import com.github.luzhuomi.obsidian._ 
-import com.github.luzhuomi.obsidian.Desugar._
+import obsidian.lang.java._ 
+import obsidian.lang.java.Desugar._
 
 
 import org.scalatest.{FunSuite, Matchers}
@@ -293,7 +293,6 @@ public static void main (String[] args)
       throw exception_desugared;
     }
   }
-  finally {  }
 }
     """
     val d_methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(D_METHODSTR)).get.get

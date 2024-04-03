@@ -1,4 +1,4 @@
-package com.github.luzhuomi.obsidian
+package obsidian.lang.java
 
 
 
@@ -129,7 +129,7 @@ import cats.implicits._
 import cats.data.StateT
 import com.github.luzhuomi.scalangj.Syntax._
 import com.github.luzhuomi.scalangj.Syntax
-import com.github.luzhuomi.obsidian.ASTUtils._
+import obsidian.lang.java.ASTUtils._
 object Label {
 
   /**

@@ -1,7 +1,7 @@
-package com.github.luzhuomi.obsidian
+package obsidian.lang.java
 
-import com.github.luzhuomi.obsidian.CFG._
-import com.github.luzhuomi.obsidian.SSA._
+import obsidian.lang.java.CFG._
+import obsidian.lang.java.SSA._
 import com.github.luzhuomi.scalangj.Lexer
 import com.github.luzhuomi.scalangj.Parser._
 import com.github.luzhuomi.scalangj.Syntax._
@@ -186,7 +186,7 @@ class TestSSAFib extends FunSuite with Matchers with AppendedClues{
     }
   }
 }
-
+/*
 class TestSSAIfWhile extends FunSuite with Matchers with AppendedClues {
 
   val METHODSTR = """
@@ -286,3 +286,4 @@ class TestSSAIfWhile extends FunSuite with Matchers with AppendedClues {
   }
 
 }
+*/

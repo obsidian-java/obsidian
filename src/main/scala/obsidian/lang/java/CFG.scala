@@ -1,17 +1,17 @@
-package com.github.luzhuomi.obsidian
+package obsidian.lang.java
 
 import cats._
 import cats.implicits._
 import cats.data.StateT
 
 import com.github.luzhuomi.scalangj.Syntax._
-import com.github.luzhuomi.obsidian.ASTUtils._
-import com.github.luzhuomi.obsidian.ASTPath._
-// import com.github.luzhuomi.scalangj.Syntax
-// import _root_.cats.syntax.contravariant
+import obsidian.lang.java.ASTUtils._
+import obsidian.lang.java.ASTPath._
 
 /*
  Control Flow Graph construction
+ 
+ Do we still need this module?
  */
 
 object CFG {
@@ -1414,6 +1414,7 @@ object CFG {
                 } yield ()
               }
             } yield ()
+          case Try(try_blk, List(catch_blk@Catch(params, blk)), None) => buildCFG(Try(try_blk, List(catch_blk), Some(Block(Nil))), p) 
           case Try(try_blk, _, _) => m.raiseError("An error is encountered during the CFG construction. try-catch-finally block should have been desugared to have one catch block and one finally block.")
           case Labeled(id, stmt) => // label shoudl have same path as its containing statement, for the ease of building the labl map
             for {
