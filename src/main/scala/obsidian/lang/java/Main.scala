@@ -7,9 +7,7 @@ import obsidian.lang.java.scalangj.Syntax.*
 import obsidian.lang.java.scalangj.Lexer
 import obsidian.lang.java.*
 
-import obsidian.lang.java.Flatten.* 
-import obsidian.lang.java.MinSSA.*
-import obsidian.lang.java.CPS.*
+import obsidian.lang.java.Obfuscate.*
 import os.Path
 
 
@@ -66,46 +64,17 @@ public class Fib
                                 case ClassBody(decls) => ClassBody(decls.map( decl => decl match {
                                     case InitDecl(is_static, blk) => decl
                                     case MemberDecl_(member) => {
-                                        val obs_member =member match {
-                                            case ConstructorDecl(modifiers, type_params, id, formal_parms, ex_types, body) => member
-                                            case FieldDecl(modifiers, ty, var_decls) => member
-                                            case MemberClassDecl(class_decl) => member // TODO
-                                            case MemberInterfaceDecl(iface_decl) => member // TODO
-                                            case MethodDecl(modifiers, type_params, ty, id, formal_params, ex_types, exp, body) if id == Ident("main") => member
-                                            case MethodDecl(modifiers, type_params, ty, id, formal_params, ex_types, exp, body) => {
-                                                Flatten.flatMethodDecl(MethodDecl(modifiers, type_params, ty, id, formal_params, ex_types, exp, body)).run(Flatten.initStateInfo) match {
-                                                    case FlatResult.FlatError(message) => {
-                                                        println(message);
-                                                        member // failed
-                                                    } 
-                                                    case FlatResult.FlatOk((st, f_methodDecl)) => {
-                                                        val d_methodDecl = Desugar.dsgOps.desugar(f_methodDecl)
-                                                        MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.initState) match {
-                                                            case MinSSA.SSAResult.SSAError(message) => {
-                                                                println(message)
-                                                                member // failed
-                                                            }
-                                                            case MinSSA.SSAResult.SSAOk((st, ssa_methodDecl)) => { 
-                                                                val charcodes = getCharCodes(st)
-                                                                CPS.cpsmethoddecl(ssa_methodDecl).run(CPS.initState(charcodes)) match {
-                                                                    case CPSResult.CPSError(message) => {
-                                                                        println(message)
-                                                                        member // failed
-                                                                    }
-                                                                    case CPSResult.CPSOk((st, cps_methodDecl)) => 
-                                                                       cps_methodDecl
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
+                                        val obs_member = obfMemberMethod(member) match {
+                                            case Left(err) => {
+                                                println(err) 
+                                                member
                                             }
+                                            case Right(m) => m
                                         }
                                         MemberDecl_(obs_member)
                                     }
                                 }))
                             }
-                            println(id)
                             ClassDecl_(modifiers, id, type_params, ref_type, ref_types, obs_body)
                         }
                     }
