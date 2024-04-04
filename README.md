@@ -9,7 +9,9 @@ It is work in progress
 2. port the obfuscation pipeline from Main.scala into a library package, and expose the function call.
 3. look into building wrapper as a VS code extension.
     1. e.g. https://github.com/pme123/vscode-scalajs-hello
-    2. do we need to cross build both obsidian and scalangj for both scala JVM and scala.js? https://www.scala-js.org/doc/project/cross-build.html
+    2. do we need to cross build both obsidian and scalangj for both scala JVM and scala.js? 
+        * https://www.scala-js.org/doc/project/cross-build.html
+        * https://www.scala-lang.org/2020/11/03/scalajs-for-scala-3.html
 4. MinSSA does not handle the following
     1. synchronized method, variable, class, which should be an easy fix. 
     2. try-catch block, this one is hard.
