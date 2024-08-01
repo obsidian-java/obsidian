@@ -18,38 +18,18 @@ public class Fib
 {
 
 
-    public static void f() {
+    public static int f() {
         int x; 
         int s;
         x = 0;
         s = 0;
         while (x < 10) {
             s = x + s;
+            x = x + 1;
         }
+        return s;
     }
 
-    public static int fib(int n)
-    {
-        int f1;
-        int f2;
-        int i;
-        int t;
-        f1 =1;
-        f2 =1;
-        i = 0;
-        t = 0; // all variables must be initialized
-        while(i<n) {
-            t = f1 + f2;
-            f1 = f2;
-            f2 = t;
-            i = i +1;
-        }
-        return f2;
-    }
-
-    public static void  main(String argv[]) {
-	System.out.println(fib(10));
-    }
 }
     """
     def run(cu:CompilationUnit):CompilationUnit = cu match {
