@@ -24,6 +24,7 @@ public static void main(String [] args) {
         s = x + s;
     }
 }
+
     """
     val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
 
