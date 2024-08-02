@@ -203,7 +203,7 @@ object CPS {
                 exp               <- cpsexp(e)
                 (declppp, expppp) <- cpsk(phiK, lbl)
             } yield ((declp ++ declpp ++ declppp, seq(ifelse( thunk(exp), expp, exppp), expppp)))
-            case List(SSAWhile(phi_pre, e, blks, phi_post)) => for {
+            case List(SSAWhile(phi_pre, e, blks)) => for {
                 lbl2              <- minlabel(phi_pre)
                 (decl, exp)       <- cpsk(phi_pre, lbl2)
                 expp              <- cpsexp(e)
@@ -269,7 +269,7 @@ object CPS {
                 exp               <- cpsexp(e)
                 (declppp, expppp) <- cpsblk(blksppp, phiK, phiR)
             } yield ((declp ++ declpp ++ declppp, seq(ifelse( thunk(exp), expp, exppp), expppp)))
-            case List(SSAWhile(phi_pre, e, blks, phi_post)) => for {
+            case List(SSAWhile(phi_pre, e, blks)) => for {
                 lbl2              <- minlabel(phi_pre)
                 (decl, exp)       <- cpsk(phi_pre, lbl2)
                 expp              <- cpsexp(e)
