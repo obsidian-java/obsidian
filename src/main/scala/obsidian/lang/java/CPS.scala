@@ -170,7 +170,15 @@ object CPS {
                     LocalVars(mods, ret_typ, List(VarDecl(VarId(resIdent), None))),
                     LocalVars(mods, exceptType, List(VarDecl(VarId(exIdent), None))))
                 // Ctxt class 
-                ctxtCls = LocalClass(null) // fix me
+                ctxtId = Ident("Ctxt")
+                ctxtVarId = Ident("ctxt")
+                // class Ctxt { ... }
+                ctxtClassDef = LocalClass(mkCtxtClass(ctxtId, inner_cps_decls, declspp))
+                // Ctxt ctxt = new Ctxt();
+                ctxtClassVarDecl = LocalVars(mods, RefType_(ClassRefType(ClassType(List((ctxtId, Nil))))), 
+                        List(VarDecl(VarId(ctxtVarId), Some(InitExp(InstanceCreation(
+                            Nil,TypeDeclSpecifier_(ClassType(List((ctxtId, Nil)))) ,Nil, None
+                        ))))))
                 appStmt = {
                     // M_cps.apply(arg1).apply(arg2)...
                     val mcps_app_in_args = curryApply(ExpName(Name(List(idcps))), in_args.map(a=>ExpName(Name(List(a)))))
@@ -183,13 +191,23 @@ object CPS {
                     val d = eapply(e, f)
                     BlockStmt_(ExpStmt(d))
                 }
-                bodypp = MethodBody(Some(Block(declspp ++ inner_cps_decls ++ List(decl) ++  List(
+                bodypp = MethodBody(Some(Block( List(ctxtClassDef, ctxtClassVarDecl) ++ declspp ++ inner_cps_decls ++ List(decl) ++  List(
                     appStmt, 
                     BlockStmt_(Return(Some(ExpName(Name(List(resIdent)))))) // return res
                 )))) // TODO: fixme
             
             } yield MethodDecl(modifiers, type_params, oty, id, formal_params, ex_types, exp, bodypp)
         }
+    }
+
+    def mkCtxtClass(classId:Ident, localVars:List[BlockStmt], res_and_except:List[BlockStmt]):ClassDecl = {
+        val classMods = Nil
+        val classTyParams = Nil
+        val refType = None
+        val refTypes = Nil
+        val decls =  Nil // TODO fixme
+        val body = ClassBody(decls)
+        ClassDecl_(classMods, classId, classTyParams,refType, refTypes, body) // fix me
     }
 
     def cpsbody(body:MinSSA.SSAMethodBody)(using m:MonadError[CPSState,ErrorM]):SState[State, MethodBody] = body match {
