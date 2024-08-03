@@ -131,31 +131,32 @@ object CPS {
             for {
                 (inner_cps_decls, lamb) <- body match {
                     case MinSSA.SSAMethodBody(blks) => {
-                            val vardecls = blks.flatMap(ssablk => ssablk match {
-                                case SSABlock(label, stmts) => stmts.map( stmt => stmt match {
-                                    case SSAVarDecls(mods, ty, varDecls) => List(LocalVars(mods, ty, varDecls))
-                                    case _ => Nil
+                        // TODO: move this into a nested class Ctxt. 
+                        val vardecls = blks.flatMap(ssablk => ssablk match {
+                            case SSABlock(label, stmts) => stmts.map( stmt => stmt match {
+                                case SSAVarDecls(mods, ty, varDecls) => List(LocalVars(mods, ty, varDecls))
+                                case _ => Nil
+                            })
+                        })
+                        val notVarDecls = blks.flatMap(ssablk => ssablk match {
+                            case SSABlock(label, stmts) => {
+                                val stmtsp = stmts.filter(s => s match {
+                                    case SSAVarDecls(mods, ty, varDecls) => false
+                                    case _ => true
                                 })
-                            })
-                            val notVarDecls = blks.flatMap(ssablk => ssablk match {
-                                case SSABlock(label, stmts) => {
-                                    val stmtsp = stmts.filter(s => s match {
-                                        case SSAVarDecls(mods, ty, varDecls) => false
-                                        case _ => true
-                                    })
-                                    if (stmtsp.isEmpty) { Nil }
-                                    else {List(SSABlock(label, stmtsp))} 
-                                }
-                            })
-                            for {
-                                (decs, exp) <- cpsblk(notVarDecls, Nil, Nil)
-                            } yield (vardecls.flatten ++ decs, 
-                                Lambda(LambdaSingleParam(raiseIdent), LambdaExpression_(
-                                    Lambda(LambdaSingleParam(kIdent), LambdaExpression_(
-                                        eapply(eapply(exp,ExpName(Name(List(raiseIdent)))), thunk(eapply(ExpName(Name(List(kIdent))), ExpName(Name(List(resIdent)))))
-                                    )))
-                                ))
-                            )
+                                if (stmtsp.isEmpty) { Nil }
+                                else {List(SSABlock(label, stmtsp))} 
+                            }
+                        })
+                        for {
+                            (decs, exp) <- cpsblk(notVarDecls, Nil, Nil)
+                        } yield (vardecls.flatten ++ decs, 
+                            Lambda(LambdaSingleParam(raiseIdent), LambdaExpression_(
+                                Lambda(LambdaSingleParam(kIdent), LambdaExpression_(
+                                    eapply(eapply(exp,ExpName(Name(List(raiseIdent)))), thunk(eapply(ExpName(Name(List(kIdent))), ExpName(Name(List(resIdent)))))
+                                )))
+                            ))
+                        )
                     }
                 }
                 // x1 -> ... xn -> raise -> k -> {E(raise)(()->k(res))}
@@ -164,13 +165,16 @@ object CPS {
                 decl  = LocalVars(mods, itysArrExceptVoidArrTpVoidArrVoid, 
                             List(VarDecl(VarId(idcps), Some(InitExp(bodyp)))))
                 // t' res ; Exception ex
+                // move this into the nested ctxt class
                 declspp = List(
                     LocalVars(mods, ret_typ, List(VarDecl(VarId(resIdent), None))),
                     LocalVars(mods, exceptType, List(VarDecl(VarId(exIdent), None))))
+                // Ctxt class 
+                ctxtCls = LocalClass(null) // fix me
                 appStmt = {
                     // M_cps.apply(arg1).apply(arg2)...
                     val mcps_app_in_args = curryApply(ExpName(Name(List(idcps))), in_args.map(a=>ExpName(Name(List(a)))))
-                    val e = eapply(mcps_app_in_args, ExpName(Name(List(idraiseIdent))))
+                    val e = eapply(mcps_app_in_args, ExpName(Name(List(idHandlerIdent))))
                     // r -> { res = r; return;}
                     val f = Lambda(LambdaSingleParam(Ident("r")), LambdaBlock(Block(List(
                         BlockStmt_(ExpStmt(Assign(NameLhs(Name(List(resIdent))), EqualA, ExpName(Name(List(Ident("r"))))))),
@@ -202,7 +206,7 @@ object CPS {
                 (declpp, exppp)   <- cpsblk(blkspp, phi, phiR)
                 exp               <- cpsexp(e)
                 (declppp, expppp) <- cpsk(phiK, lbl)
-            } yield ((declp ++ declpp ++ declppp, seq(ifelse( thunk(exp), expp, exppp), expppp)))
+            } yield ((declp ++ declpp ++ declppp, seq(ifelse( exp, expp, exppp), expppp)))
             case List(SSAWhile(phi_pre, e, blks)) => for {
                 lbl2              <- minlabel(phi_pre)
                 (decl, exp)       <- cpsk(phi_pre, lbl2)
@@ -210,7 +214,7 @@ object CPS {
                 (declpp, exppp)   <- cpsblk(blks, phi_pre, phiR)
                 (declppp, expppp) <- cpsk(phiK, lbl)
 
-            } yield (decl ++ declpp ++ declppp, seq(exp, loop( thunk(expp), exppp, expppp)))
+            } yield (decl ++ declpp ++ declppp, seq(exp, loop( expp, exppp, expppp)))
             case List(MinSSA.SSAThrow(e)) => for {
                 exp          <- cpsexp(e)
                 xeAsmts      <- cpsphi(phiR,lbl)
@@ -230,7 +234,8 @@ object CPS {
                 }
                 mods         <- m.pure(List())
                 ml           <- mkId("m", lbl)
-                body         <- m.pure(Block((resAsmts ++ List(Return(Some(MethodInv(MethodCall(Name(List(kIdent)), List())))))).map(BlockStmt_(_))))
+                // body         <- m.pure(Block((resAsmts ++ List(Return(Some(MethodInv(MethodCall(Name(List(kIdent)), List())))))).map(BlockStmt_(_))))
+                body         <- m.pure(Block((resAsmts ++ List(Return(Some(MethodInv(PrimaryMethodCall(ExpName(Name(List(kIdent))), Nil, Ident("apply") , List(nullExp))))))).map(BlockStmt_(_))))
                 decl         <- m.pure(LocalVars(mods, exceptVoidArrVoidVoidArrVoid, 
                                         List(VarDecl(VarId(ml), Some(InitExp(Lambda(LambdaSingleParam(raiseIdent), 
                                                     LambdaExpression_(Lambda(LambdaSingleParam(kIdent), LambdaBlock(body))))))))))
@@ -240,7 +245,8 @@ object CPS {
                 stmtsp        <- cpsstmts(stmts) // this should be an identity function
                 mods          <- m.pure(List())
                 ml            <- mkId("m", lbl)
-                body          <- m.pure(Block((stmtsp ++ List(Return(Some(MethodInv(MethodCall(Name(List(kIdent)), List())))))).map(BlockStmt_(_))))
+                // body          <- m.pure(Block((stmtsp ++ List(Return(Some(MethodInv(MethodCall(Name(List(kIdent)), List())))))).map(BlockStmt_(_))))
+                body         <- m.pure(Block((stmtsp ++ List(Return(Some(MethodInv(PrimaryMethodCall(ExpName(Name(List(kIdent))), Nil, Ident("apply") , List(nullExp))))))).map(BlockStmt_(_))))
                 decl          <- m.pure(LocalVars(mods, exceptVoidArrVoidVoidArrVoid, 
                                         List(VarDecl(VarId(ml), Some(InitExp(Lambda(LambdaSingleParam(raiseIdent), 
                                                     LambdaExpression_(Lambda(LambdaSingleParam(kIdent), LambdaBlock(body))))))))))
@@ -268,21 +274,23 @@ object CPS {
                 (declpp, exppp)   <- cpsblk(blkspp, phi, phiR)
                 exp               <- cpsexp(e)
                 (declppp, expppp) <- cpsblk(blksppp, phiK, phiR)
-            } yield ((declp ++ declpp ++ declppp, seq(ifelse( thunk(exp), expp, exppp), expppp)))
+            } yield ((declp ++ declpp ++ declppp, seq(ifelse( exp, expp, exppp), expppp)))
             case List(SSAWhile(phi_pre, e, blks)) => for {
                 lbl2              <- minlabel(phi_pre)
                 (decl, exp)       <- cpsk(phi_pre, lbl2)
                 expp              <- cpsexp(e)
                 (declpp, exppp)   <- cpsblk(blks, phi_pre, phiR)
                 (declppp, expppp) <- cpsblk(blksppp, phiK, phiR)
-            } yield (decl ++ declpp ++ declppp, seq(exp, loop( thunk(expp), exppp, expppp)))
+            } yield (decl ++ declpp ++ declppp, seq(exp, loop( expp, exppp, expppp)))
 
 
             case List(MinSSA.SSAAssignments(stmts)) => for {
                 stmtsp        <- cpsstmts(stmts) // this should be an identity function
                 mods          <- m.pure(List())
                 ml            <- mkId("m", lbl)
-                body          <- m.pure(Block((stmtsp ++ List(Return(Some(MethodInv(MethodCall(Name(List(kIdent)), List())))))).map(BlockStmt_(_))))
+                // body          <- m.pure(Block((stmtsp ++ List(Return(Some(MethodInv(MethodCall(Name(List(kIdent)), List())))))).map(BlockStmt_(_))))
+                body         <- m.pure(Block((stmtsp ++ List(Return(Some(MethodInv(PrimaryMethodCall(ExpName(Name(List(kIdent))), Nil, Ident("apply") , List(nullExp))))))).map(BlockStmt_(_))))
+
                 decl          <- m.pure(LocalVars(mods, exceptVoidArrVoidVoidArrVoid, 
                                         List(VarDecl(VarId(ml), Some(InitExp(Lambda(LambdaSingleParam(raiseIdent), 
                                                     LambdaExpression_(Lambda(LambdaSingleParam(kIdent), LambdaBlock(body))))))))))
@@ -318,7 +326,9 @@ object CPS {
         xeAsmts      <- cpsphi(phi, lbl)
         mods         <- m.pure(List())
         mkl          <- mkId("mk", lbl)
-        body         <- m.pure(Block((xeAsmts ++ List(Return(Some(MethodInv(MethodCall(Name(List(kIdent)), List())))))).map(BlockStmt_(_))))
+        // body         <- m.pure(Block((xeAsmts ++ List(Return(Some(MethodInv(MethodCall(Name(List(kIdent)), List())))))).map(BlockStmt_(_))))
+        body         <- m.pure(Block((xeAsmts ++ List(Return(Some(MethodInv(PrimaryMethodCall(ExpName(Name(List(kIdent))), Nil, Ident("apply") , List(nullExp))))))).map(BlockStmt_(_))))
+
         decl         <- m.pure(LocalVars(mods, exceptVoidArrVoidVoidArrVoid, 
                                 List(VarDecl(VarId(mkl), Some(InitExp(Lambda(LambdaSingleParam(raiseIdent), 
                                             LambdaExpression_(Lambda(LambdaSingleParam(kIdent), LambdaBlock(body))))))))))
@@ -411,8 +421,8 @@ object CPS {
     {
         val thunkede1 = thunk(e1) 
         val args = List(thunkede1, e2, e3) 
-        val ifelsename = Name(List(Ident("loop")))
-        MethodInv(MethodCall(ifelsename, args))   
+        val loopname = Name(List(Ident("loop")))
+        MethodInv(MethodCall(loopname, args))   
     }
 
     // this will return a delayed expression () -> e
@@ -448,28 +458,34 @@ object CPS {
     }
 
 
+
+    val funcIdent = Ident("Function")
+    val javaIdent = Ident("java") 
+    val utilIdent = Ident("util") 
+    val functionIdent = Ident("function") 
+
+    val javautilfunctionPrefix = List( (javaIdent, Nil), (utilIdent, Nil), (functionIdent, Nil))
+
     // some helper functions to construct types
     // partial function, t1 and t2 must be RefType, otherwise, a corresponding boxed type will be 
     // created to replace t1 (like wise, t2)
     def mkArrType(t1:Type, t2:Type):Type = (t1, t2) match {
         case (RefType_(s1), RefType_(s2)) => 
-            RefType_(ClassRefType(ClassType(List((funcIdent, List(ActualType(s1),ActualType(s2)))))))
+            RefType_(ClassRefType(ClassType(javautilfunctionPrefix ++ List((funcIdent, List(ActualType(s1),ActualType(s2)))))))
         case (PrimType_(p1), PrimType_(p2)) => {
             val s1 = ClassRefType(prim2Class(p1))
             val s2 = ClassRefType(prim2Class(p2))
-            RefType_(ClassRefType(ClassType(List((funcIdent, List(ActualType(s1),ActualType(s2)))))))
+            RefType_(ClassRefType(ClassType(javautilfunctionPrefix ++ List((funcIdent, List(ActualType(s1),ActualType(s2)))))))
         }
         case (RefType_(s1), PrimType_(p2)) => {
             val s2 = ClassRefType(prim2Class(p2))
-            RefType_(ClassRefType(ClassType(List((funcIdent, List(ActualType(s1),ActualType(s2)))))))
+            RefType_(ClassRefType(ClassType(javautilfunctionPrefix ++ List((funcIdent, List(ActualType(s1),ActualType(s2)))))))
         }
         case (PrimType_(p1), RefType_(s2)) => {
             val s1 = ClassRefType(prim2Class(p1))
-            RefType_(ClassRefType(ClassType(List((funcIdent, List(ActualType(s1),ActualType(s2)))))))
+            RefType_(ClassRefType(ClassType(javautilfunctionPrefix ++ List((funcIdent, List(ActualType(s1),ActualType(s2)))))))
         }
     }
-    // val funcIdents = List(Ident("java"), Ident("util"), Ident("function"), Ident("Function"))
-    val funcIdent = Ident("Function")
 
     val exceptIdent = Ident("Exception")
     val voidIdent = Ident("Void")
@@ -478,7 +494,10 @@ object CPS {
     val unitIdent = Ident("unit")
     val resIdent = Ident("res")
     val exIdent = Ident("ex")
-    val idraiseIdent = Ident("id_raise")
+    val idHandlerIdent = Ident("idHandler")
+    val nullIdent = Ident("null")
+    val nullExp = ExpName(Name(List(nullIdent)))
+
 
     val exceptRefType = ClassRefType(ClassType(List((exceptIdent, List()))))
     val voidRefType   = ClassRefType(ClassType(List((voidIdent, List()))))
