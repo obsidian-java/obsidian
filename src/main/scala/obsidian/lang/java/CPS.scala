@@ -22,13 +22,15 @@ object CPS {
       * @param chararray - the character array for generating id from context, passed from the SSA generation step
       */
     case class State(
+        cid: Option[Ident], // context class var id 
+        localVarMap: Map[Name, Name], // list of all local vars
         chararray: List[Char]
     )
 
     type ErrorM = String
 
 
-    def initState(carr:List[Char]):State = State(carr)
+    def initState(carr:List[Char]):State = State(None, Map(), carr)
 
 
     enum CPSResult[+A] {
@@ -101,9 +103,49 @@ object CPS {
 
     def put(st:State):SState[State, Unit] = StateT { _ => CPSOk((st,()))}     
 
+
+    def getCtxtId:SState[State, Option[Ident]] = for {
+        st <- get 
+    } yield st.cid
+
+    def getCtxtIdPrefix:SState[State, List[Ident]] = for {
+        oid <- getCtxtId
+        pf = oid match {
+            case None => Nil 
+            case Some(id) => List(id)
+        }
+    } yield pf
+
+    def setCtxtId(id:Ident):SState[State, Unit] = for {
+        st <- get
+        st1 = st match  {
+            case State(cid, vars, chararray) =>  State(Some(id), vars, chararray)
+        }
+        _ <- put(st1)
+    } yield ()
+
+    def getLocalVarsMap:SState[State, Map[Name, Name]] = for { 
+        st <- get 
+        m = st match {
+            case State(cid, localVarMap, chararray) => localVarMap
+        }
+    } yield m
+
+    def setLocalVarsMap(m:Map[Name, Name]):SState[State, Unit] = for {
+        st <- get 
+        st1 = st match {
+            case State(cid, localVarMap, chararray) => State(cid, m, chararray)
+        }
+        _ <- put(st1)
+    } yield () 
+
     type VarDecl = BlockStmt // actually must be LocalVars(mods, ty, var_decls)
 
 
+    /**
+     * convert a SSA Method Declration into an obfuscated CPS function 
+     * 
+     * */
     def cpsmethoddecl(methd:MinSSA.SSAMethodDecl)(using m:MonadError[CPSState,ErrorM]):SState[State, MemberDecl] = methd match {
         case MinSSA.SSAMethodDecl(
             modifiers, // List[Modifier],
@@ -123,21 +165,29 @@ object CPS {
                 case None => voidType
                 case Some(ty) => ty
             }
+            // Ctxt class 
+            val ctxtId = Ident("Ctxt")
+            val ctxtVarId = Ident("ctxt")
+
             // (Exception => Void) => (re_typ => Void) => Void
             val exceptVoidArrTpVoidArrVoid = exceptVoidArrTVoidArrVoid(ret_typ)
             // ity1 -> ... ityn -> (Exception => Void) => (re_typ => Void) => Void
             val itysArrExceptVoidArrTpVoidArrVoid = curryType(in_typs, exceptVoidArrTpVoidArrVoid)
             // (some inner cps decl,  raise -> k -> {E(raise)(()->k(res))} )
             for {
-                (inner_cps_decls, lamb) <- body match {
+                _ <- setCtxtId(ctxtVarId)
+                (local_var_decls, inner_cps_decls, lamb) <- body match {
                     case MinSSA.SSAMethodBody(blks) => {
-                        // TODO: move this into a nested class Ctxt. 
+                        // separatting the variable declaration blocks from the non 
+                        // variable declraation blocks
+                        // variable declaration block statement
                         val vardecls = blks.flatMap(ssablk => ssablk match {
                             case SSABlock(label, stmts) => stmts.map( stmt => stmt match {
                                 case SSAVarDecls(mods, ty, varDecls) => List(LocalVars(mods, ty, varDecls))
                                 case _ => Nil
                             })
                         })
+                        // non variable declaration block statement
                         val notVarDecls = blks.flatMap(ssablk => ssablk match {
                             case SSABlock(label, stmts) => {
                                 val stmtsp = stmts.filter(s => s match {
@@ -148,9 +198,25 @@ object CPS {
                                 else {List(SSABlock(label, stmtsp))} 
                             }
                         })
+                        val localVarDecls = vardecls.flatten
+                        // the localvars map for the monad environment, it will be used in cpsexp and cpsstmt 
+                        // the mapping environment is from var_id (without ctxt. prefix) to ctxt.var_id
+                        val localVarsMap:Map[Name, Name] = localVarDecls.flatMap((decl:BlockStmt) => decl match {
+                            case LocalVars(modifiers, ty, var_decls) => {
+                                var_decls.map(var_decl => var_decl match {
+                                    case obsidian.lang.java.scalangj.Syntax.VarDecl(vid, var_init) => {
+                                        val id = idFromVarDeclId(vid)
+                                        (Name(List(id)), Name(List(ctxtId, id)))
+                                    }
+                                })
+                            }
+                            case _ => Nil
+                        }).toMap
+                        // convert the non variable declaration block statement
                         for {
+                            _ <- setLocalVarsMap(localVarsMap)
                             (decs, exp) <- cpsblk(notVarDecls, Nil, Nil)
-                        } yield (vardecls.flatten ++ decs, 
+                        } yield (localVarDecls, decs, 
                             Lambda(LambdaSingleParam(raiseIdent), LambdaExpression_(
                                 Lambda(LambdaSingleParam(kIdent), LambdaExpression_(
                                     eapply(eapply(exp,ExpName(Name(List(raiseIdent)))), thunk(eapply(ExpName(Name(List(kIdent))), ExpName(Name(List(resIdent)))))
@@ -169,11 +235,8 @@ object CPS {
                 declspp = List(
                     LocalVars(mods, ret_typ, List(VarDecl(VarId(resIdent), None))),
                     LocalVars(mods, exceptType, List(VarDecl(VarId(exIdent), None))))
-                // Ctxt class 
-                ctxtId = Ident("Ctxt")
-                ctxtVarId = Ident("ctxt")
                 // class Ctxt { ... }
-                ctxtClassDef = LocalClass(mkCtxtClass(ctxtId, inner_cps_decls, declspp))
+                ctxtClassDef = LocalClass(mkCtxtClass(ctxtId, local_var_decls, declspp))
                 // Ctxt ctxt = new Ctxt();
                 ctxtClassVarDecl = LocalVars(mods, RefType_(ClassRefType(ClassType(List((ctxtId, Nil))))), 
                         List(VarDecl(VarId(ctxtVarId), Some(InitExp(InstanceCreation(
@@ -200,12 +263,25 @@ object CPS {
         }
     }
 
+    /**
+     * Create a nested context class
+     *   1. convert the local variable declarations found in the obfuscated function into the member field declarations of 
+     * the nested context class. 
+     *  @param classId - the name of the nested context class 
+     *  @param localVars - the list of local variable declaration found in the obfuscated function (where this class should be nested in)
+     *  @param res_and_except - the result and exception variable declaration of the obfuscated function 
+     * 
+     *  @return the nested context class declaration 
+     */ 
     def mkCtxtClass(classId:Ident, localVars:List[BlockStmt], res_and_except:List[BlockStmt]):ClassDecl = {
         val classMods = Nil
         val classTyParams = Nil
         val refType = None
         val refTypes = Nil
-        val decls =  Nil // TODO fixme
+        val decls =  (localVars ++ res_and_except).flatMap ( (bstmt:BlockStmt) => bstmt match {
+            case LocalVars(mods, refType, vardecls) => List(MemberDecl_(FieldDecl(mods, refType, vardecls)))
+            case _ => Nil
+        })
         val body = ClassBody(decls)
         ClassDecl_(classMods, classId, classTyParams,refType, refTypes, body) // fix me
     }
@@ -217,6 +293,13 @@ object CPS {
         } yield MethodBody(Some(Block(blkStmts)))
     }
 
+    /**
+     * convert a non variable declaration statement block into CPS
+     *  @param blks - the block 
+     *  @param phiK - the normal flow phi accumulated
+     *  @param phiR - the exception flow phi accmulated 
+     *  @return a CPS expression
+     * */
     def cpsblk(blks:List[SSABlock], phiK:List[Phi], phiR:List[Phi])(using m:MonadError[CPSState, ErrorM]):SState[State, (List[VarDecl], Exp)] = blks match {
         case List(SSABlock(lbl, stmts)) => stmts match {
             case List(SSAIf(e, blksp, blkspp, phi)) => for {
@@ -244,10 +327,11 @@ object CPS {
                                                     LambdaExpression_(Lambda(LambdaSingleParam(kIdent), LambdaBlock(body))))))))))
             } yield (List(decl), ExpName(Name(List(mkl))))
             case List(MinSSA.SSAReturn(oe)) => for {
+                ctxtVarPref  <- getCtxtIdPrefix
                 resAsmts     <- oe match {
                     case Some(e) => for {
                         exp  <- cpsexp(e)
-                    } yield List(ExpStmt(Assign(NameLhs(Name(List(resIdent))), EqualA, exp)))
+                    } yield List(ExpStmt(Assign(NameLhs(Name(ctxtVarPref ++ List(resIdent))), EqualA, exp)))
                     case None    => m.pure(Nil)
                 }
                 mods         <- m.pure(List())
@@ -364,7 +448,9 @@ object CPS {
         (phi:Phi) => phi match {
             case Phi(srcVar, renVar, rhs) => lookup(rhs,ctxt) match {
                 case None => m.raiseError("cpsphi failed: the rhs of the phi assignment does not contain the input ctxt.")
-                case Some(n) => m.pure(ExpStmt(Assign(NameLhs(renVar), EqualA, ExpName(n))))
+                case Some(n) => for { 
+                    pf <- getCtxtIdPrefix
+                } yield ExpStmt(Assign(NameLhs(appNamePrefix(pf,renVar)), EqualA, ExpName(appNamePrefix(pf, n))))
             }
         }
     )
@@ -376,8 +462,12 @@ object CPS {
       * @param m
       * @return
       */
-    def cpsexp(e:Exp)(using m:MonadError[CPSState, ErrorM]):SState[State, Exp] = m.pure(e)
-
+    def cpsexp(e:Exp)(using m:MonadError[CPSState, ErrorM]):SState[State, Exp] = for {
+        // TODO:
+        // we need to apply append ctxt variable prefix to all the name everywhere? in e 
+        // we need to keep track of the list of local variable names. 
+        e1 <- m.pure(e)
+    } yield e1 
 
     /**
       * convert a list of assignment stmts from SSA to CPS, it should be an identity function
@@ -386,6 +476,9 @@ object CPS {
       * @param m
       * @return
       */
+    // TODO:
+    // we need to apply append ctxt variable prefix to all the name everywhere? in e 
+    // we need to keep track of the list of local variable names. 
     def cpsstmts(stmts:List[Stmt])(using m:MonadError[CPSState, ErrorM]):SState[State, List[Stmt]] = m.pure(stmts)
 
 
@@ -400,7 +493,7 @@ object CPS {
     def mkId(s:String, ctxt:Label)(using m:MonadError[CPSState, ErrorM]):SState[State, Ident] = for {
         st <- get
         id <- st match {
-            case State(chararr) => m.pure(Ident( s + "_" + charcode(ctxt, chararr).mkString))
+            case State(cid, vars, chararr) => m.pure(Ident( s + "_" + charcode(ctxt, chararr).mkString))
         }
     } yield (id)
 
@@ -475,6 +568,10 @@ object CPS {
         }
     }
 
+
+    def appNamePrefix(pf:List[Ident], name:Name):Name = name match {
+        case Name(ids) => Name(pf ++ ids)
+    }
 
 
     val funcIdent = Ident("Function")

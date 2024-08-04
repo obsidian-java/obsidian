@@ -60,4 +60,30 @@ object ASTUtils {
         case VarId(id) => id
         case VarDeclArray(vid) => idFromVarDeclId(vid)
     }
+
+    // the following functions should be moved to scalangj
+    // apply name -> name substitution everywhere in statment
+
+    trait NameSubst[A] {
+        def applySubst(m:Map[Name,Name], a:A):A
+    }
+
+
+    given applySubstOption[A](using ns:NameSubst[A]):NameSubst[Option[A]] = new NameSubst[Option[A]] {
+        def applySubst(m:Map[Name,Name], o:Option[A]):Option[A] = o match {
+            case None => None 
+            case Some(value) => Some(ns.applySubst(m,value))
+        }
+    }
+
+    given applySubstStmt:NameSubst[Stmt] = new NameSubst[Stmt] {
+        def applySubst(m:Map[Name, Name],stmt:Stmt) :Stmt = stmt match { 
+            case Assert(exp, msg) => Assert(applySubstExp.applySubst(m, exp), msg) 
+            case BasicFor(init, loop_cond, post_update, stmt) => null // TODO 
+        }
+    }
+
+    given applySubstExp:NameSubst[Exp] = new NameSubst[Exp] { 
+        def applySubst(m:Map[Name, Name], exp:Exp):Exp = null // TODO
+    }
 }
