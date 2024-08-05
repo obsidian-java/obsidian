@@ -234,6 +234,8 @@ object ASTUtils {
             case FieldAccess_(access) => FieldAccess_(applySubstFieldAccess.applySubst(m, access))
             case InstanceCreation(type_args, type_decl, args, body) => 
                 InstanceCreation(type_args, type_decl, args.map(applySubstExp.applySubst(m,_)), body.map(applySubstClassBody.applySubst(m,_)))
+
+            case InstanceOf(e, ref_type) => InstanceOf(applySubstExp.applySubst(m,e), ref_type)
         }
     }
 
