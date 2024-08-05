@@ -8,7 +8,7 @@ import scala.collection.immutable
 
 // constructing CPS from SSA
 import obsidian.lang.java.scalangj.Syntax.*
-import obsidian.lang.java.ASTUtils.*
+import obsidian.lang.java.ASTUtils.{given, *}
 import obsidian.lang.java.Common.*
 import obsidian.lang.java.MinSSA.{SSABlock, SSAStmt, SSAIf, SSAWhile, SSATry, SSAAssert, SSAAssignments, SSABreak, SSAContinue, SSAEmpty, charcode, Label, TCtx, Phi}
 import obsidian.lang.java.MinSSA.SSAVarDecls
@@ -206,7 +206,7 @@ object CPS {
                                 var_decls.map(var_decl => var_decl match {
                                     case obsidian.lang.java.scalangj.Syntax.VarDecl(vid, var_init) => {
                                         val id = idFromVarDeclId(vid)
-                                        (Name(List(id)), Name(List(ctxtId, id)))
+                                        (Name(List(id)), Name(List(ctxtVarId, id)))
                                     }
                                 })
                             }
@@ -463,10 +463,8 @@ object CPS {
       * @return
       */
     def cpsexp(e:Exp)(using m:MonadError[CPSState, ErrorM]):SState[State, Exp] = for {
-        // TODO:
-        // we need to apply append ctxt variable prefix to all the name everywhere? in e 
-        // we need to keep track of the list of local variable names. 
-        e1 <- m.pure(e)
+        m <- getLocalVarsMap
+        e1 = applySubstExp.applySubst(m,e)
     } yield e1 
 
     /**
@@ -479,8 +477,10 @@ object CPS {
     // TODO:
     // we need to apply append ctxt variable prefix to all the name everywhere? in e 
     // we need to keep track of the list of local variable names. 
-    def cpsstmts(stmts:List[Stmt])(using m:MonadError[CPSState, ErrorM]):SState[State, List[Stmt]] = m.pure(stmts)
-
+    def cpsstmts(stmts:List[Stmt])(using m:MonadError[CPSState, ErrorM]):SState[State, List[Stmt]] = for {
+        m <- getLocalVarsMap
+        stmts1 = stmts.map(applySubstStmt.applySubst(m,_))
+    } yield stmts1 
 
     /**
       * create an Identifier by applying the chararray used in SSA phase

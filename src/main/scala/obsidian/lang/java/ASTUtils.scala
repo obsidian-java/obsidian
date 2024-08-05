@@ -64,6 +64,13 @@ object ASTUtils {
         case FormalParam(modifiers, ty, has_arity, var_decl_id) => idFromVarDeclId(var_decl_id)
     }
 
+
+    def idsFromLambdaParams(lps: LambdaParams): List[Ident] = lps match {
+        case LambdaFormalParams(formal_params) => formal_params.map(idFromFormalParam(_))
+        case LambdaInferredParams(ids) => ids
+        case LambdaSingleParam(id) => List(id)
+    }
+
     // the following functions should be moved to scalangj
     // apply name -> name substitution everywhere in statment
 
@@ -236,6 +243,44 @@ object ASTUtils {
                 InstanceCreation(type_args, type_decl, args.map(applySubstExp.applySubst(m,_)), body.map(applySubstClassBody.applySubst(m,_)))
 
             case InstanceOf(e, ref_type) => InstanceOf(applySubstExp.applySubst(m,e), ref_type)
+            case Lambda(params, body) => { 
+                val lp_ids = idsFromLambdaParams(params)
+                val fp_names = lp_ids.map(id => Name(List(id)))
+                val m1 = m -- fp_names
+                Lambda(params, applySubstLambdaExpression.applySubst(m,body))
+            }
+            case Lit(lit) => Lit(lit) 
+            case MethodInv(methodInv) => MethodInv(applySubstMethodInvocation.applySubst(m, methodInv)) // TODO: check
+            case MethodRef(name, id) => MethodRef(name, id) // TODO: check what is method ref?
+            case PostDecrement(exp) => PostDecrement(applySubstExp.applySubst(m,exp))
+            case PostIncrement(exp) => PostIncrement(applySubstExp.applySubst(m,exp)) 
+            case PreBitCompl(exp) => PreBitCompl(applySubstExp.applySubst(m,exp))
+            case PreDecrement(exp) => PreDecrement(applySubstExp.applySubst(m,exp))
+            case PreIncrement(exp) => PreIncrement(applySubstExp.applySubst(m,exp))
+            case PreMinus(exp) => PreMinus(applySubstExp.applySubst(m,exp))
+            case PreNot(exp) => PreNot(applySubstExp.applySubst(m,exp))
+            case PrePlus(exp) => PrePlus(applySubstExp.applySubst(m,exp))
+            case QualInstanceCreation(exp, type_args, id, args, body) => 
+                QualInstanceCreation(applySubstExp.applySubst(m,exp), type_args, id, args.map(applySubstExp.applySubst(m,_)), body.map(applySubstClassBody.applySubst(m,_)))
+            case This => This
+            case ThisClass(name) => ThisClass(name) 
+        }
+    }
+
+    given applySubstMethodInvocation:NameSubst[MethodInvocation] = new NameSubst[MethodInvocation] { 
+        def applySubst(m: Map[Name, Name], a: MethodInvocation): MethodInvocation = a match {
+            case ClassMethodCall(name, ref_types, id, args) => ClassMethodCall(name, ref_types, id, args.map(applySubstExp.applySubst(m,_)))
+            case MethodCall(name, args) => MethodCall(name, args.map(applySubstExp.applySubst(m,_)))
+            case PrimaryMethodCall(e, ref_types, id, args) => PrimaryMethodCall(applySubstExp.applySubst(m,e), ref_types, id, args.map(applySubstExp.applySubst(m,_)))
+            case SuperMethodCall(ref_types, id, args) => SuperMethodCall(ref_types, id, args.map(applySubstExp.applySubst(m,_)))
+            case TypeMethodCall(name, ref_types, id, args) => TypeMethodCall(name, ref_types, id, args.map(applySubstExp.applySubst(m,_)))
+        }
+    }
+
+    given applySubstLambdaExpression:NameSubst[LambdaExpression] = new NameSubst[LambdaExpression] {
+        def applySubst(m: Map[Name, Name], a: LambdaExpression): LambdaExpression = a match {
+            case LambdaBlock(blk) => LambdaBlock(applySubstBlock.applySubst(m, blk))
+            case LambdaExpression_(e) => LambdaExpression_(applySubstExp.applySubst(m, e))
         }
     }
 
