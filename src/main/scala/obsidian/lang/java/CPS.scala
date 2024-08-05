@@ -178,7 +178,7 @@ object CPS {
                 _ <- setCtxtId(ctxtVarId)
                 (local_var_decls, inner_cps_decls, lamb) <- body match {
                     case MinSSA.SSAMethodBody(blks) => {
-                        // separatting the variable declaration blocks from the non 
+                        // separating the variable declaration blocks from the non 
                         // variable declraation blocks
                         // variable declaration block statement
                         val vardecls = blks.flatMap(ssablk => ssablk match {
@@ -227,16 +227,16 @@ object CPS {
                 }
                 // x1 -> ... xn -> raise -> k -> {E(raise)(()->k(res))}
                 bodyp = curryLamb(in_args, lamb)
-                // m_cps's decl
-                decl  = LocalVars(mods, itysArrExceptVoidArrTpVoidArrVoid, 
-                            List(VarDecl(VarId(idcps), Some(InitExp(bodyp)))))
+                // the main CPS function m_cps's declaration
+                main_cps_decl  = LocalVars(mods, itysArrExceptVoidArrTpVoidArrVoid, 
+                                    List(VarDecl(VarId(idcps), Some(InitExp(bodyp)))))
                 // t' res ; Exception ex
                 // move this into the nested ctxt class
-                declspp = List(
+                ret_and_except_decls = List(
                     LocalVars(mods, ret_typ, List(VarDecl(VarId(resIdent), None))),
                     LocalVars(mods, exceptType, List(VarDecl(VarId(exIdent), None))))
                 // class Ctxt { ... }
-                ctxtClassDef = LocalClass(mkCtxtClass(ctxtId, local_var_decls, declspp))
+                ctxtClassDef = LocalClass(mkCtxtClass(ctxtId, local_var_decls, ret_and_except_decls))
                 // Ctxt ctxt = new Ctxt();
                 ctxtClassVarDecl = LocalVars(mods, RefType_(ClassRefType(ClassType(List((ctxtId, Nil))))), 
                         List(VarDecl(VarId(ctxtVarId), Some(InitExp(InstanceCreation(
@@ -254,7 +254,7 @@ object CPS {
                     val d = eapply(e, f)
                     BlockStmt_(ExpStmt(d))
                 }
-                bodypp = MethodBody(Some(Block( List(ctxtClassDef, ctxtClassVarDecl) ++ declspp ++ inner_cps_decls ++ List(decl) ++  List(
+                bodypp = MethodBody(Some(Block( List(ctxtClassDef, ctxtClassVarDecl) ++ ret_and_except_decls ++ inner_cps_decls ++ List(main_cps_decl) ++  List(
                     appStmt, 
                     BlockStmt_(Return(Some(ExpName(Name(List(resIdent)))))) // return res
                 )))) // TODO: fixme
