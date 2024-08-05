@@ -12,7 +12,6 @@ resolvers += "Maven Repository" at "https://mvnrepository.com/artifact/"
 
 resolvers += "clojars" at "https://clojars.org/repo"
 
-// resolvers += "obsidian binary github repo" at "https://raw.githubusercontent.com/luzhuomi/mavenrepo/master/"
 resolvers += "obsidian binary github repo" at "https://raw.githubusercontent.com/obsidian-java/binrepo/master/"
 
 libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "2.3.0"
@@ -25,9 +24,7 @@ libraryDependencies += "org.scala-lang" %% "toolkit" % "0.1.7"
 
 libraryDependencies += "org.typelevel" %% "cats-core" % "2.10.0"
 
-// libraryDependencies += "com.github.luzhuomi" %% "scalangj" % "0.1.5"  // apache license
-
-libraryDependencies += "obsidian.lang.java" %% "scalangj" % "0.1.5"  // apache license
+libraryDependencies += "obsidian.lang.java" %% "scalangj" % "0.1.7"  // apache license
 
 // scalacOptions ++= Seq("-feature", "-deprecation", "-Yresolve-term-conflict:package", "-Ypartial-unification" )
 
