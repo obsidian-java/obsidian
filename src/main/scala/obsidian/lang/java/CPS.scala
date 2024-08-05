@@ -13,7 +13,7 @@ import obsidian.lang.java.Common.*
 import obsidian.lang.java.MinSSA.{SSABlock, SSAStmt, SSAIf, SSAWhile, SSATry, SSAAssert, SSAAssignments, SSABreak, SSAContinue, SSAEmpty, charcode, Label, TCtx, Phi}
 import obsidian.lang.java.MinSSA.SSAVarDecls
 
-
+import obsidian.lang.java.CPSFixture.* 
 object CPS {
 
     /**
@@ -219,7 +219,7 @@ object CPS {
                         } yield (localVarDecls, decs, 
                             Lambda(LambdaSingleParam(raiseIdent), LambdaExpression_(
                                 Lambda(LambdaSingleParam(kIdent), LambdaExpression_(
-                                    eapply(eapply(exp,ExpName(Name(List(raiseIdent)))), thunk(eapply(ExpName(Name(List(kIdent))), ExpName(Name(List(resIdent)))))
+                                    eapply(eapply(exp,ExpName(Name(List(raiseIdent)))), thunk(eapply(ExpName(Name(List(kIdent))), ExpName(Name(List(ctxtVarId, resIdent))))) // TODO: check apply ctxt.res or null?
                                 )))
                             ))
                         )
@@ -248,15 +248,15 @@ object CPS {
                     val e = eapply(mcps_app_in_args, ExpName(Name(List(idHandlerIdent))))
                     // r -> { res = r; return;}
                     val f = Lambda(LambdaSingleParam(Ident("r")), LambdaBlock(Block(List(
-                        BlockStmt_(ExpStmt(Assign(NameLhs(Name(List(resIdent))), EqualA, ExpName(Name(List(Ident("r"))))))),
-                        BlockStmt_(Return(None))
+                        BlockStmt_(ExpStmt(Assign(NameLhs(Name(List(ctxtVarId, resIdent))), EqualA, ExpName(Name(List(Ident("r"))))))),
+                        BlockStmt_(Return(Some(nullExp)))
                     ))))
                     val d = eapply(e, f)
                     BlockStmt_(ExpStmt(d))
                 }
-                bodypp = MethodBody(Some(Block( List(ctxtClassDef, ctxtClassVarDecl) ++ ret_and_except_decls ++ inner_cps_decls ++ List(main_cps_decl) ++  List(
+                bodypp = MethodBody(Some(Block( List(ctxtClassDef, ctxtClassVarDecl) ++ inner_cps_decls ++ List(main_cps_decl) ++  List(
                     appStmt, 
-                    BlockStmt_(Return(Some(ExpName(Name(List(resIdent)))))) // return res
+                    BlockStmt_(Return(Some(ExpName(Name(List(ctxtVarId, resIdent)))))) // return res
                 )))) // TODO: fixme
             
             } yield MethodDecl(modifiers, type_params, oty, id, formal_params, ex_types, exp, bodypp)
@@ -281,7 +281,7 @@ object CPS {
         val decls =  (localVars ++ res_and_except).flatMap ( (bstmt:BlockStmt) => bstmt match {
             case LocalVars(mods, refType, vardecls) => List(MemberDecl_(FieldDecl(mods, refType, vardecls)))
             case _ => Nil
-        })
+        }) ++ List(id_cps, id_handler_cps, loop_cps)
         val body = ClassBody(decls)
         ClassDecl_(classMods, classId, classTyParams,refType, refTypes, body) // fix me
     }
@@ -610,9 +610,9 @@ object CPS {
     val resIdent = Ident("res")
     val exIdent = Ident("ex")
     val idHandlerIdent = Ident("idHandler")
-    val nullIdent = Ident("null")
-    val nullExp = ExpName(Name(List(nullIdent)))
-
+    // val nullIdent = Ident("null")
+    // val nullExp = ExpName(Name(List(nullIdent)))
+    val nullExp = Lit(NullLit)
 
     val exceptRefType = ClassRefType(ClassType(List((exceptIdent, List()))))
     val voidRefType   = ClassRefType(ClassType(List((voidIdent, List()))))
@@ -681,5 +681,7 @@ object CPS {
         case Nil => exp
         case (arg::argsp) => curryApply(eapply(exp,arg), argsp)
     }
+
+
 }
 
