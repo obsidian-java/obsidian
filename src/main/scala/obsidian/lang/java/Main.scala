@@ -14,10 +14,8 @@ import os.Path
 
 object Main extends App {
     val STRING = """
-public class Fib
+public class Test
 {
-
-
     public static int f() {
         int x; 
         int s;
@@ -29,7 +27,6 @@ public class Fib
         }
         return s;
     }
-
 }
     """
     def run(cu:CompilationUnit):CompilationUnit = cu match {
@@ -69,7 +66,7 @@ public class Fib
     eCU match {
         case Left(error_msg) => println(error_msg)
         case Right(cu) => {
-            val path:os.Path = os.pwd / "output" / "output.java"
+            val path:os.Path = os.pwd / "output" / "Test.java"
             val obs_cu = run(cu)
             
             println( prettyPrint(cu))
