@@ -1,19 +1,19 @@
 package obsidian.lang.java
 
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.{funsuite, matchers}
 
-import com.github.luzhuomi.scalangj.Lexer
-import com.github.luzhuomi.scalangj.Parser._
-import com.github.luzhuomi.scalangj.Syntax._
-import com.github.luzhuomi.scalangj.Pretty._
-import obsidian.lang.java._ 
+import obsidian.lang.java.scalangj.Lexer
+import obsidian.lang.java.scalangj.Parser.*
+import obsidian.lang.java.scalangj.Syntax.*
+import obsidian.lang.java.scalangj.Pretty.*
+import obsidian.lang.java.* 
 
-import obsidian.lang.java.MinSSA._
-import obsidian.lang.java.CPS._
+import obsidian.lang.java.MinSSA.*
+import obsidian.lang.java.CPS.*
 
 
 
-class TestCPS1 extends FunSuite with Matchers {
+class TestCPS1 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
 public static void main(String [] args) {
 	int x; 
@@ -24,6 +24,7 @@ public static void main(String [] args) {
         s = x + s;
     }
 }
+
     """
     val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
 
@@ -31,18 +32,18 @@ public static void main(String [] args) {
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
                 Flatten.flatMethodDecl(methodDecl).run(Flatten.initStateInfo) match {
-                    case Flatten.FlatError(message) => fail(message)
-                    case Flatten.FlatOk((st, f_methodDecl)) => {
+                    case Flatten.FlatResult.FlatError(message) => fail(message)
+                    case Flatten.FlatResult.FlatOk((st, f_methodDecl)) => {
                         val d_methodDecl = Desugar.dsgOps.desugar(f_methodDecl)
                         MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.initState) match {
-                            case MinSSA.SSAError(message) => fail(message)
-                            case MinSSA.SSAOk((st, ssa_methodDecl)) => { 
+                            case MinSSA.SSAResult.SSAError(message) => fail(message)
+                            case MinSSA.SSAResult.SSAOk((st, ssa_methodDecl)) => { 
                                 // println(ssa_methodDecl)
                                 // assert(ssa == ssa_methodDecl)
                                 val charcodes = getCharCodes(st)
                                 CPS.cpsmethoddecl(ssa_methodDecl).run(CPS.initState(charcodes)) match {
-                                    case CPS.CPSError(message) => fail(message)
-                                    case CPS.CPSOk((st, cps_methodDecl)) => 
+                                    case CPSResult.CPSError(message) => fail(message)
+                                    case CPSResult.CPSOk((st, cps_methodDecl)) => 
                                         println(prettyPrint(cps_methodDecl))
                                 }
                             }
@@ -57,7 +58,7 @@ public static void main(String [] args) {
 
 
 
-class TestCPS2 extends FunSuite with Matchers {
+class TestCPS2 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR = """
     public static int fib(int n)
     {
@@ -84,18 +85,18 @@ class TestCPS2 extends FunSuite with Matchers {
         methoddecl match {
             case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
                 Flatten.flatMethodDecl(methodDecl).run(Flatten.initStateInfo) match {
-                    case Flatten.FlatError(message) => fail(message)
-                    case Flatten.FlatOk((st, f_methodDecl)) => {
+                    case Flatten.FlatResult.FlatError(message) => fail(message)
+                    case Flatten.FlatResult.FlatOk((st, f_methodDecl)) => {
                         val d_methodDecl = Desugar.dsgOps.desugar(f_methodDecl)
                         MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.initState) match {
-                            case MinSSA.SSAError(message) => fail(message)
-                            case MinSSA.SSAOk((st, ssa_methodDecl)) => { 
+                            case MinSSA.SSAResult.SSAError(message) => fail(message)
+                            case MinSSA.SSAResult.SSAOk((st, ssa_methodDecl)) => { 
                                 // println(ssa_methodDecl)
                                 // assert(ssa == ssa_methodDecl)
                                 val charcodes = getCharCodes(st)
                                 CPS.cpsmethoddecl(ssa_methodDecl).run(CPS.initState(charcodes)) match {
-                                    case CPS.CPSError(message) => fail(message)
-                                    case CPS.CPSOk((st, cps_methodDecl)) => 
+                                    case CPS.CPSResult.CPSError(message) => fail(message)
+                                    case CPS.CPSResult.CPSOk((st, cps_methodDecl)) => 
                                         println(prettyPrint(cps_methodDecl))
                                 }
                             }

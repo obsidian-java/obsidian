@@ -1,12 +1,12 @@
 package obsidian.lang.java
 
-import cats._
-import cats.implicits._
+import cats.*
+import cats.implicits.*
 import cats.data.StateT
 
-import com.github.luzhuomi.scalangj.Syntax._
-import obsidian.lang.java.ASTUtils._
-import obsidian.lang.java.ASTPath._
+import obsidian.lang.java.scalangj.Syntax.*
+import obsidian.lang.java.ASTUtils.*
+import obsidian.lang.java.ASTPath.*
 
 /*
  Control Flow Graph construction
@@ -452,7 +452,7 @@ object CFG {
   }
 
   case class DefaultCase(wrapperId: NodeId, rhs: NodeId) extends CaseExp {
-    override def getWrapperId = wrapperId
+    override def getWrapperId() = wrapperId
   }
 
   case class ExpCase(
@@ -461,7 +461,7 @@ object CFG {
                       wrapperId: NodeId,
                       rhs: NodeId
                     ) extends CaseExp {
-    override def getWrapperId = wrapperId
+    override def getWrapperId() = wrapperId
   }
 
   // val labPref = "myLabel"
@@ -480,13 +480,14 @@ object CFG {
     Map()
   )
 
-  sealed trait CFGResult[+A]
+  enum CFGResult[+A] {
+    case CFGError(msg: String) extends CFGResult[Nothing]
+    case CFGOk[A](result: A) extends CFGResult[A]
+  }
 
-  case class CFGError(msg: String) extends CFGResult[Nothing]
-
-  case class CFGOk[A](result: A) extends CFGResult[A]
-
-  implicit def cfgResultFunctor: Functor[CFGResult] =
+  import CFGResult.*
+  
+  given cfgResultFunctor: Functor[CFGResult] =
     new Functor[CFGResult] {
       override def map[A, B](fa: CFGResult[A])(f: A => B): CFGResult[B] =
         fa match {
@@ -496,7 +497,7 @@ object CFG {
     }
 
 
-  implicit def cfgResultApplicative: ApplicativeError[CFGResult, String] =
+  given cfgResultApplicative: ApplicativeError[CFGResult, String] =
     new ApplicativeError[CFGResult, String] {
       override def ap[A, B](
                              ff: CFGResult[A => B]
@@ -523,7 +524,7 @@ object CFG {
         }
     }
 
-  implicit def cfgResultMonadError(implicit
+  given cfgResultMonadError(using
                                    app: ApplicativeError[CFGResult, String]
                                   ): MonadError[CFGResult, String] =
     new MonadError[CFGResult, String] {
@@ -574,7 +575,7 @@ object CFG {
       no need for Java?
    */
   trait CFGClass[A] {
-    def buildCFG(a: A, p: ASTPath)(implicit
+    def buildCFG(a: A, p: ASTPath)(using
                                    m: MonadError[SIState, String]
     ): State[StateInfo, Unit]
   }
@@ -582,7 +583,7 @@ object CFG {
   object cfgOps {
     def buildCFG[A](
                      a: A, p: ASTPath
-                   )(implicit aCFGCl: CFGClass[A]): State[StateInfo, Unit] = {
+                   )(using aCFGCl: CFGClass[A]): State[StateInfo, Unit] = {
       aCFGCl.buildCFG(a, p)
     }
   }
@@ -599,11 +600,11 @@ object CFG {
 
 
 
-  implicit def methodCFGInstance: CFGClass[MethodDecl] =
+  given methodCFGInstance: CFGClass[MethodDecl] =
     new CFGClass[MethodDecl] {
       override def buildCFG(
                              a: MethodDecl, p: ASTPath
-                           )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
+                           )(using m: MonadError[SIState, String]): State[StateInfo, Unit] =
         a match {
           case MethodDecl(
           modifiers,
@@ -635,22 +636,22 @@ object CFG {
         }
     }
 
-  implicit def bodyCFGInstance: CFGClass[MethodBody] =
+  given bodyCFGInstance: CFGClass[MethodBody] =
     new CFGClass[MethodBody] {
       override def buildCFG(
                              a: MethodBody, p: ASTPath
-                           )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
+                           )(using m: MonadError[SIState, String]): State[StateInfo, Unit] =
         a match {
           case MethodBody(None) => m.pure(())
           case MethodBody(Some(blk)) => cfgOps.buildCFG(blk, p)
         }
     }
 
-  implicit def blockCFGInstance: CFGClass[Block] =
+  given blockCFGInstance: CFGClass[Block] =
     new CFGClass[Block] {
       override def buildCFG(
                              a: Block, p: ASTPath
-                           )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
+                           )(using m: MonadError[SIState, String]): State[StateInfo, Unit] =
         a match {
           case Block(Nil) => { // TODO: this case is not needed? since empty block is deguared into a block containing an empty statement?
             val lhs = Nil
@@ -714,11 +715,11 @@ object CFG {
         }
     }
 
-  implicit def blockStmtCFGInstance: CFGClass[BlockStmt] =
+  given blockStmtCFGInstance: CFGClass[BlockStmt] =
     new CFGClass[BlockStmt] {
       override def buildCFG(
                              a: BlockStmt, p: ASTPath
-                           )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
+                           )(using m: MonadError[SIState, String]): State[StateInfo, Unit] =
         a match {
           case LocalClass(_) => m.raiseError("Local Class is not supported.")
           case LocalVars(modifiers, ty, var_decls) =>
@@ -796,11 +797,11 @@ object CFG {
         }
     }
 
-  implicit def stmtCFGInstance: CFGClass[Stmt] =
+  given stmtCFGInstance: CFGClass[Stmt] =
     new CFGClass[Stmt] {
       override def buildCFG(
                              a: Stmt, p: ASTPath
-                           )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
+                           )(using m: MonadError[SIState, String]): State[StateInfo, Unit] =
         a match {
           case StmtBlock(blk) => cfgOps.buildCFG(blk, p)
           case IfThen(exp, stmt) => buildCFG(IfThenElse(exp, stmt, Empty), p)
@@ -1438,11 +1439,11 @@ object CFG {
         }
     }
 
-  implicit def catchCFGInstance: CFGClass[Catch] =
+  given catchCFGInstance: CFGClass[Catch] =
     new CFGClass[Catch] {
       override def buildCFG(
                              a: Catch, p: ASTPath
-                           )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
+                           )(using m: MonadError[SIState, String]): State[StateInfo, Unit] =
         a match {
           case Catch(params, blk) =>
             for {
@@ -1457,11 +1458,11 @@ object CFG {
         }
     }
 
-  implicit def switchBlockCFGInstance: CFGClass[SwitchBlock] =
+  given switchBlockCFGInstance: CFGClass[SwitchBlock] =
     new CFGClass[SwitchBlock] {
       override def buildCFG(
                              a: SwitchBlock, p: ASTPath
-                           )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
+                           )(using m: MonadError[SIState, String]): State[StateInfo, Unit] =
         a match {
           case SwitchBlock(Default, blk_stmts) => {
             /*
@@ -1534,11 +1535,11 @@ object CFG {
 
   /* not needed, for loop is desugared into while
 
-  implicit def varDeclCFGInstance: CFGClass[ForLocalVars] =
+  given varDeclCFGInstance: CFGClass[ForLocalVars] =
     new CFGClass[ForLocalVars] {
       override def buildCFG(
           a: ForLocalVars, p: ASTPath
-      )(implicit m: MonadError[SIState, String]): State[StateInfo, Unit] =
+      )(using m: MonadError[SIState, String]): State[StateInfo, Unit] =
         a match {
 
           case ForLocalVars(modifiers, ty, var_decls) =>
@@ -1658,14 +1659,14 @@ object CFG {
   }
 
   object HasVarcfgOps {
-    def getVarsFrom[A](a: A)(implicit hv: HasVar[A]): List[Ident] =
+    def getVarsFrom[A](a: A)(using hv: HasVar[A]): List[Ident] =
       hv.getVarsFrom(a)
 
-    def getLVarsFrom[A](a: A)(implicit hv: HasVar[A]): List[Ident] =
+    def getLVarsFrom[A](a: A)(using hv: HasVar[A]): List[Ident] =
       hv.getLVarsFrom(a)
   }
 
-  implicit def getVarsFromVarDecl: HasVar[VarDecl] =
+  given getVarsFromVarDecl: HasVar[VarDecl] =
     new HasVar[VarDecl] {
       override def getVarsFrom(var_decl: VarDecl): List[Ident] =
         var_decl match {
@@ -1681,7 +1682,7 @@ object CFG {
         }
     }
 
-  implicit def getVarsFromVarInit: HasVar[VarInit] =
+  given getVarsFromVarInit: HasVar[VarInit] =
     new HasVar[VarInit] {
       override def getVarsFrom(var_init: VarInit): List[Ident] =
         var_init match {
@@ -1698,7 +1699,7 @@ object CFG {
         }
     }
 
-  implicit def getVarsFromExp: HasVar[Exp] =
+  given getVarsFromExp: HasVar[Exp] =
     new HasVar[Exp] {
       override def getLVarsFrom(exp: Exp): List[Ident] =
         exp match {
@@ -1791,7 +1792,7 @@ object CFG {
         }
     }
 
-  implicit def getVarsFromFieldAccess: HasVar[FieldAccess] =
+  given getVarsFromFieldAccess: HasVar[FieldAccess] =
     new HasVar[FieldAccess] {
       override def getLVarsFrom(field_access: FieldAccess): List[Ident] =
         List() // TODO: check whether it should indeed empty
@@ -1803,7 +1804,7 @@ object CFG {
         }
     }
 
-  implicit def getVarsFromMethodInvocation: HasVar[MethodInvocation] =
+  given getVarsFromMethodInvocation: HasVar[MethodInvocation] =
     new HasVar[MethodInvocation] {
       override def getVarsFrom(methodInv: MethodInvocation): List[Ident] =
         methodInv match {
@@ -1840,7 +1841,7 @@ object CFG {
         }
     }
 
-  implicit def getVarsFromArrayIndex: HasVar[ArrayIndex] =
+  given getVarsFromArrayIndex: HasVar[ArrayIndex] =
     new HasVar[ArrayIndex] {
       override def getVarsFrom(idx: ArrayIndex): List[Ident] =
         idx match {
@@ -1859,7 +1860,7 @@ object CFG {
         }
     }
 
-  implicit def getVarsFromName: HasVar[Name] =
+  given getVarsFromName: HasVar[Name] =
     new HasVar[Name] {
       override def getVarsFrom(n: Name): List[Ident] =
         n match {
@@ -1877,7 +1878,7 @@ object CFG {
         }
     }
 
-  implicit def getVarsFromLhs: HasVar[Lhs] =
+  given getVarsFromLhs: HasVar[Lhs] =
     new HasVar[Lhs] {
       override def getVarsFrom(lhs: Lhs): List[Ident] =
         lhs match {
@@ -1896,7 +1897,7 @@ object CFG {
         }
     }
 
-  implicit def getVarsFromLambdaParams: HasVar[LambdaParams] =
+  given getVarsFromLambdaParams: HasVar[LambdaParams] =
     new HasVar[LambdaParams] {
       override def getVarsFrom(ps: LambdaParams): List[Ident] =
         ps match {
@@ -1907,7 +1908,7 @@ object CFG {
         }
     }
 
-  implicit def getVarsFromLambdaExpression: HasVar[LambdaExpression] =
+  given getVarsFromLambdaExpression: HasVar[LambdaExpression] =
     new HasVar[LambdaExpression] {
       override def getVarsFrom(lambExp: LambdaExpression): List[Ident] =
         lambExp match {
@@ -1923,7 +1924,7 @@ object CFG {
 
     }
 
-  implicit def getVarsFromBlock: HasVar[Block] =
+  given getVarsFromBlock: HasVar[Block] =
     new HasVar[Block] {
       override def getVarsFrom(blk: Block): List[Ident] =
         blk match {
@@ -1972,7 +1973,7 @@ object CFG {
         }
     }
 
-  implicit def getVarsFromBlockStmt: HasVar[BlockStmt] =
+  given getVarsFromBlockStmt: HasVar[BlockStmt] =
     new HasVar[BlockStmt] {
       override def getVarsFrom(blkStmt: BlockStmt): List[Ident] =
         blkStmt match {
@@ -1991,7 +1992,7 @@ object CFG {
         }
     }
 
-  implicit def getVarsFromStmt: HasVar[Stmt] =
+  given getVarsFromStmt: HasVar[Stmt] =
     new HasVar[Stmt] {
       override def getVarsFrom(stmt: Stmt): List[Ident] =
         stmt match {
@@ -2096,7 +2097,7 @@ object CFG {
         }
     }
 
-  implicit def getVarsFromCatch: HasVar[Catch] =
+  given getVarsFromCatch: HasVar[Catch] =
     new HasVar[Catch] {
       override def getVarsFrom(c: Catch): List[Ident] =
         c match {
@@ -2115,7 +2116,7 @@ object CFG {
         }
     }
 
-  implicit def getVarsFromSwitchBlock: HasVar[SwitchBlock] =
+  given getVarsFromSwitchBlock: HasVar[SwitchBlock] =
     new HasVar[SwitchBlock] {
       override def getVarsFrom(switch_block: SwitchBlock): List[Ident] =
         switch_block match {
@@ -2134,7 +2135,7 @@ object CFG {
         }
     }
 
-  implicit def getVarsFromSwitchLabel: HasVar[SwitchLabel] =
+  given getVarsFromSwitchLabel: HasVar[SwitchLabel] =
     new HasVar[SwitchLabel] {
       override def getVarsFrom(switch_label: SwitchLabel): List[Ident] =
         switch_label match {
@@ -2149,7 +2150,7 @@ object CFG {
         }
     }
 
-  implicit def getVarsFromFormalParam: HasVar[FormalParam] =
+  given getVarsFromFormalParam: HasVar[FormalParam] =
     new HasVar[FormalParam] {
       override def getVarsFrom(fp: FormalParam): List[Ident] =
         fp match {
@@ -2164,7 +2165,7 @@ object CFG {
         }
     }
 
-  implicit def getVarsFromForInit: HasVar[ForInit] =
+  given getVarsFromForInit: HasVar[ForInit] =
     new HasVar[ForInit] {
       override def getVarsFrom(for_init: ForInit): List[Ident] =
         for_init match {
@@ -2186,11 +2187,11 @@ object CFG {
   }
 
   object ConvertableToLhscfgOps {
-    def getLhsFrom[A](a: A)(implicit hn: ConvertableToLhs[A]): List[Lhs] =
+    def getLhsFrom[A](a: A)(using hn: ConvertableToLhs[A]): List[Lhs] =
       hn.getLhsFrom(a)
   }
 
-  implicit def expConvertableToLhs: ConvertableToLhs[Exp] =
+  given expConvertableToLhs: ConvertableToLhs[Exp] =
     new ConvertableToLhs[Exp] {
       // dominating name
       override def getLhsFrom(exp: Exp): List[Lhs] =

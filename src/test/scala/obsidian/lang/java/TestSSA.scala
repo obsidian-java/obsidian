@@ -1,16 +1,20 @@
 package obsidian.lang.java
 
-import obsidian.lang.java.CFG._
-import obsidian.lang.java.SSA._
-import com.github.luzhuomi.scalangj.Lexer
-import com.github.luzhuomi.scalangj.Parser._
-import com.github.luzhuomi.scalangj.Syntax._
-import org.scalatest._
-import org.scalatest.prop.TableDrivenPropertyChecks._
+import obsidian.lang.java.CFG.*
+import obsidian.lang.java.SSA.*
+import obsidian.lang.java.Label.*
+import obsidian.lang.java.Flatten.*
+import obsidian.lang.java.scalangj.Lexer
+import obsidian.lang.java.scalangj.Parser.*
+import obsidian.lang.java.scalangj.Syntax.*
+import org.scalatest.*
+import org.scalatest.prop.TableDrivenPropertyChecks.*
+import org.scalatest.AppendedClues.convertToClueful
 
-class TestSSA extends FunSuite with Matchers with AppendedClues {
+class TestSSA extends funsuite.AnyFunSuite with matchers.should.Matchers {
 
 
+  import CFGResult.*
 
   val seqCFG = Map(
     List(0) -> AssignmentsNode(List(0), Nil, Nil, Nil, Nil, Nil, List(List(1))),
@@ -90,7 +94,7 @@ class TestSSA extends FunSuite with Matchers with AppendedClues {
 
 }
 
-class TestSSAFib extends FunSuite with Matchers with AppendedClues{
+class TestSSAFib extends funsuite.AnyFunSuite with matchers.should.Matchers {
   val METHODSTR =
     """
       |    public static int fib(int n)
@@ -148,7 +152,10 @@ class TestSSAFib extends FunSuite with Matchers with AppendedClues{
   val methoddecl: Decl =
     classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
 
-
+      
+  import LabelResult.*
+  import FlatResult.*
+  import CFGResult.*
 
   test("Test search(4) on fib"){
     methoddecl match {
@@ -156,13 +163,13 @@ class TestSSAFib extends FunSuite with Matchers with AppendedClues{
         Label.labelOps
           .label(methodDecl, None, None)
           .run(Label.initStateInfo) match {
-          case Label.LabelError(message) => fail(message)
-          case Label.LabelOk((st, methDecl)) => {
+          case LabelError(message) => fail(message)
+          case LabelOk((st, methDecl)) => {
             Flatten.flatMethodDecl(methDecl).run(Flatten.initStateInfo) match {
-              case Flatten.FlatError(message) => fail(message)
-              case Flatten.FlatOk((st, f_methdDecl)) => {
+              case FlatError(message) => fail(message)
+              case FlatOk((st, f_methdDecl)) => {
                 val d_methodDecl = Desugar.dsgOps.desugar(f_methdDecl)
-                val cfg = cfgOps.buildCFG(d_methodDecl, List()).run(initStateInfo) match {
+                val cfg = cfgOps.buildCFG(d_methodDecl, List()).run(CFG.initStateInfo) match {
                   case CFGError(message) => fail(message)
                   case CFGOk((st, unit)) => {
                     // println(st.cfg)

@@ -1,20 +1,21 @@
 package obsidian.lang.java
 
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.{funsuite, matchers}
 
-import com.github.luzhuomi.scalangj.Lexer
-import com.github.luzhuomi.scalangj.Parser._
-import com.github.luzhuomi.scalangj.Syntax._
-import com.github.luzhuomi.scalangj.Pretty._
-import obsidian.lang.java._ 
+import obsidian.lang.java.scalangj.Lexer
+import obsidian.lang.java.scalangj.Parser.*
+import obsidian.lang.java.scalangj.Syntax.*
+import obsidian.lang.java.scalangj.Pretty.*
+import obsidian.lang.java.* 
 // import obsidian.lang.java.Label._
-import obsidian.lang.java.SSADL._
+/*
+import obsidian.lang.java.SSADL.*
 import obsidian.lang.java.CFG.{CFGError, CFGOk, cfgOps, initStateInfo}
-import obsidian.lang.java.SSACFG._
-import obsidian.lang.java.SSABenchmark._
+import obsidian.lang.java.SSACFG.*
+import obsidian.lang.java.SSABenchmark.*
 
 
-class SSABenchmark1 extends FunSuite with Matchers {
+class SSABenchmark1 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR =
     """
       |    public static int fib(int n)
@@ -82,7 +83,7 @@ class SSABenchmark1 extends FunSuite with Matchers {
 }
 
 
-class SSABenchmark2 extends FunSuite with Matchers {
+class SSABenchmark2 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR =
     """
  public static boolean add(int v) {
@@ -163,7 +164,7 @@ class SSABenchmark2 extends FunSuite with Matchers {
 
 
 
-class SSABenchmark3 extends FunSuite with Matchers {
+class SSABenchmark3 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR =
     """
  public static void main(String [] args) {
@@ -222,7 +223,7 @@ class SSABenchmark3 extends FunSuite with Matchers {
     }
 }
 
-class SSABenchmark4 extends FunSuite with Matchers {
+class SSABenchmark4 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR =
      """
        |    public static int fun(int n)
@@ -289,7 +290,7 @@ class SSABenchmark4 extends FunSuite with Matchers {
 }
 
 
-class SSABenchmark5 extends FunSuite with Matchers {
+class SSABenchmark5 extends funsuite.AnyFunSuite with matchers.should.Matchers {
     val METHODSTR ="""
                     |    public static int fun(int m)
                     |    {
@@ -348,3 +349,4 @@ class SSABenchmark5 extends FunSuite with Matchers {
         }
     }
 }
+*/

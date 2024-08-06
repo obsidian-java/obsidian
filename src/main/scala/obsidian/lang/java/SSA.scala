@@ -1,12 +1,12 @@
 package obsidian.lang.java
 
 
-import cats._
-import cats.implicits._
+import cats.*
+import cats.implicits.*
 
 import cats.data.State
 import obsidian.lang.java.CFG.{AssignmentsNode, CFG, HasVarcfgOps, Node, NodeId, getLVars, getRVars, getSuccs}
-import com.github.luzhuomi.scalangj.Syntax.{Ident, MethodDecl}
+import obsidian.lang.java.scalangj.Syntax.{Ident, MethodDecl}
 
 import scala.annotation.tailrec
 
@@ -176,8 +176,8 @@ object SSA {
     }
   }
 
-  def phiLocs(dft: DFTable, lhsvars: VariableLocations): Map[Ident, Set[NodeId]] =
-    lhsvars.mapValues(iterDF(dft, _))
+  def phiLocs(dft: DFTable, lhsvars: VariableLocations): Map[Ident, Set[NodeId]] = 
+    lhsvars.map( (ident, nodes) => (ident, iterDF(dft, nodes)) )
 
   // we enumerate different instances of the same variable with an Int.
   // map from predecessor -> corresponding int
@@ -203,9 +203,9 @@ object SSA {
 
   def initState(lhsVarLocs: VariableLocations, phiLocs: Map[Ident, Set[NodeId]]): StateInfo =
     StateInfo(
-      lhsVarLocs.mapValues(_ => 0), // do we want these to be default Maps instead?
+      lhsVarLocs.map((ident, ns) => (ident, 0)), // do we want these to be default Maps instead?
       phiLocsToPhiRhs(phiLocs),
-      lhsVarLocs.mapValues(_ => Nil),
+      lhsVarLocs.map((ident, ns) => (ident, Nil)),
       Map(),
       Map(),
       Map(),

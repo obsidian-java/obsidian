@@ -1,6 +1,7 @@
 package obsidian.lang.java
 
-
+// TODO: should benchmark MinSSA with SSA
+/*
 import obsidian.lang.java._ 
 import obsidian.lang.java.Label._
 import obsidian.lang.java.SSADL._
@@ -12,29 +13,29 @@ object SSABenchmark {
   }
 
   object countPhiOps {
-    def cntPhi[A](a:A)(implicit cp:CountPhi[A]):Int = cp.cntPhi(a)
+    def cntPhi[A](a:A)(using cp:CountPhi[A]):Int = cp.cntPhi(a)
   }
 
-  implicit def declCntPhi:CountPhi[SSAMethodDecl] = new CountPhi[SSAMethodDecl] {
+  given declCntPhi:CountPhi[SSAMethodDecl] = new CountPhi[SSAMethodDecl] {
     override def cntPhi(a:SSAMethodDecl):Int = a match {
       case SSAMethodDecl(mods, ty_params, ty, id, fps, ex_types, exp, body) => 
         countPhiOps.cntPhi(body)
     }
   }
 
-  implicit def bodyCntphi:CountPhi[SSAMethodBody] = new CountPhi[SSAMethodBody] {
+  given bodyCntphi:CountPhi[SSAMethodBody] = new CountPhi[SSAMethodBody] {
     override def cntPhi(a:SSAMethodBody):Int = a match {
       case SSAMethodBody(blocks) => blocks.map(countPhiOps.cntPhi(_)).sum
     }
   }
 
-  implicit def blockCntPhi:CountPhi[SSABlock] = new CountPhi[SSABlock] {
+  given blockCntPhi:CountPhi[SSABlock] = new CountPhi[SSABlock] {
     override def cntPhi(a:SSABlock):Int = a match {
       case SSABlock(lbl, stmts) => stmts.map(countPhiOps.cntPhi(_)).sum
     }
   }
 
-  implicit def stmtCntPhi:CountPhi[SSAStmt] = new CountPhi[SSAStmt] {
+  given stmtCntPhi:CountPhi[SSAStmt] = new CountPhi[SSAStmt] {
     override def cntPhi(a:SSAStmt):Int = a match {
       case SSAVarDecls(mods, ty, varDecls) => 0
       case SSAAssert(exp, msg) => 0
@@ -51,11 +52,11 @@ object SSABenchmark {
     }
   }
 
-  implicit def cfgCntPhi:CountPhi[SSACFG] = new CountPhi[SSACFG] {
+  given cfgCntPhi:CountPhi[SSACFG] = new CountPhi[SSACFG] {
       override def cntPhi(a:SSACFG):Int = a.values.map(countPhiOps.cntPhi(_)).sum
   }
 
-  implicit def nodeCntPhi:CountPhi[SSANode] = new CountPhi[SSANode] {
+  given nodeCntPhi:CountPhi[SSANode] = new CountPhi[SSANode] {
       override def cntPhi(a:SSANode):Int = a match {
           case AssignmentsNode(id, stmts, localDecls, lVars, rVars, preds, succs, rhsVarReplacements, lhsVarReplacements) => 0
           case IfThenElseNode(id, thenNode, elseNode, lVars, rVars, preds, succs, rhsVarReplacements, joins) => joins.values.map( p => p._2.values.size ).sum
@@ -72,3 +73,5 @@ object SSABenchmark {
       }
   }
 }
+
+*/

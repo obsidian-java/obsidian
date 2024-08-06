@@ -1,15 +1,16 @@
 package obsidian.lang.java
 
-import com.github.luzhuomi.scalangj.Lexer
-import com.github.luzhuomi.scalangj.Parser._
-import com.github.luzhuomi.scalangj.Syntax._
-import com.github.luzhuomi.scalangj.Pretty._
-import obsidian.lang.java._
-import obsidian.lang.java.CFG._
+import obsidian.lang.java.scalangj.Lexer
+import obsidian.lang.java.scalangj.Parser.*
+import obsidian.lang.java.scalangj.Syntax.*
+import obsidian.lang.java.scalangj.Pretty.*
+import obsidian.lang.java.*
+import obsidian.lang.java.Label.*
+import obsidian.lang.java.Flatten.*
+import obsidian.lang.java.CFG.*
+import org.scalatest.{funsuite, matchers}
 
-import org.scalatest.{FunSuite, Matchers}
-
-class TestCFG1 extends FunSuite with Matchers {
+class TestCFG1 extends funsuite.AnyFunSuite with matchers.should.Matchers {
   val METHODSTR = """
     public static int fib(int n)
     {
@@ -25,6 +26,8 @@ class TestCFG1 extends FunSuite with Matchers {
         return f2;
     }
     """
+  import CFGResult.*
+
   val methoddecl: Decl =
     classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
   val cfg: CFG = Map(List(3, 0, 0) -> AssignmentsNode(List(3, 0, 0),List(List(3, 0, 0), List(3, 0, 1), List(3, 0, 2), List(3, 0, 3)),List(Ident("t")),List(Ident("t"), Ident("f1"), Ident("f2"), Ident("i")),List(Ident("f1"), Ident("f2"), Ident("f2"), Ident("t"), Ident("i")),List(List(3)),List(List(3)))
@@ -37,13 +40,13 @@ class TestCFG1 extends FunSuite with Matchers {
         Label.labelOps
           .label(methodDecl, None, None)
           .run(Label.initStateInfo) match {
-          case Label.LabelError(message) => fail(message)
-          case Label.LabelOk((st, methDecl)) => {
+          case LabelResult.LabelError(message) => fail(message)
+          case LabelResult.LabelOk((st, methDecl)) => {
             Flatten.flatMethodDecl(methDecl).run(Flatten.initStateInfo) match {
-              case Flatten.FlatError(message) => fail(message)
-              case Flatten.FlatOk((st, f_methdDecl)) => {
+              case FlatResult.FlatError(message) => fail(message)
+              case FlatResult.FlatOk((st, f_methdDecl)) => {
                 val d_methodDecl = Desugar.dsgOps.desugar(f_methdDecl)
-                cfgOps.buildCFG(d_methodDecl, List()).run(initStateInfo) match {
+                cfgOps.buildCFG(d_methodDecl, List()).run(CFG.initStateInfo) match {
                     case CFGError(message) => fail(message)
                     case CFGOk((st, unit)) => {
                         // println(st.cfg)
@@ -64,7 +67,7 @@ class TestCFG1 extends FunSuite with Matchers {
 }
 
 
-class TestCFG2 extends FunSuite with Matchers {
+class TestCFG2 extends funsuite.AnyFunSuite with matchers.should.Matchers {
   val METHODSTR = """
 public static void main(String [] args) {
 	int x = 0;
@@ -81,6 +84,8 @@ public static void main(String [] args) {
   return;
 }
     """
+  import CFGResult.*
+
   val methoddecl: Decl =
     classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
 
@@ -101,13 +106,13 @@ public static void main(String [] args) {
         Label.labelOps
           .label(methodDecl, None, None)
           .run(Label.initStateInfo) match {
-          case Label.LabelError(message) => fail(message)
-          case Label.LabelOk((st, methDecl)) => {
+          case LabelResult.LabelError(message) => fail(message)
+          case LabelResult.LabelOk((st, methDecl)) => {
             Flatten.flatMethodDecl(methDecl).run(Flatten.initStateInfo) match {
-              case Flatten.FlatError(message) => fail(message)
-              case Flatten.FlatOk((st, f_methdDecl)) => {
+              case FlatResult.FlatError(message) => fail(message)
+              case FlatResult.FlatOk((st, f_methdDecl)) => {
                 val d_methodDecl = Desugar.dsgOps.desugar(f_methdDecl)
-                cfgOps.buildCFG(d_methodDecl, List()).run(initStateInfo) match {
+                cfgOps.buildCFG(d_methodDecl, List()).run(CFG.initStateInfo) match {
                     case CFGError(message) => fail(message)
                     case CFGOk((st, unit)) => {
                         assert(st.cfg == cfg)
@@ -127,7 +132,7 @@ public static void main(String [] args) {
 }
 
 
-class TestCFG3 extends FunSuite with Matchers {
+class TestCFG3 extends funsuite.AnyFunSuite with matchers.should.Matchers {
   val METHODSTR = """
 public static void main(String [] args) {
 	int x = 0;
@@ -145,6 +150,8 @@ public static void main(String [] args) {
   return;
 }
     """
+  import CFGResult.*
+
   val methoddecl: Decl =
     classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
 
@@ -166,13 +173,13 @@ public static void main(String [] args) {
         Label.labelOps
           .label(methodDecl, None, None)
           .run(Label.initStateInfo) match {
-          case Label.LabelError(message) => fail(message)
-          case Label.LabelOk((st, methDecl)) => {
+          case LabelResult.LabelError(message) => fail(message)
+          case LabelResult.LabelOk((st, methDecl)) => {
             Flatten.flatMethodDecl(methDecl).run(Flatten.initStateInfo) match {
-              case Flatten.FlatError(message) => fail(message)
-              case Flatten.FlatOk((st, f_methdDecl)) => {
+              case FlatResult.FlatError(message) => fail(message)
+              case FlatResult.FlatOk((st, f_methdDecl)) => {
                 val d_methodDecl = Desugar.dsgOps.desugar(f_methdDecl)
-                cfgOps.buildCFG(d_methodDecl, List()).run(initStateInfo) match {
+                cfgOps.buildCFG(d_methodDecl, List()).run(CFG.initStateInfo) match {
                     case CFGError(message) => fail(message)
                     case CFGOk((st, unit)) => {
                         assert(st.cfg == cfg)
@@ -193,7 +200,7 @@ public static void main(String [] args) {
 
 
 
-class TestCFG4 extends FunSuite with Matchers {
+class TestCFG4 extends funsuite.AnyFunSuite with matchers.should.Matchers {
   val METHODSTR = """
 public static void main (String[] args)
 {
@@ -213,19 +220,21 @@ public static void main (String[] args)
                    , List(1, 0) -> AssignmentsNode(List(1, 0),List(List(1, 0)),List(Ident("i")),List(Ident("i")),List(),List(List(0)),List(List(1, 1)))
                    , List(0) -> AssignmentsNode(List(0),List(List(0)),List(Ident("x")),List(Ident("x"), Ident("args")),List(),List(),List(List(1, 0)))
                    , List(2) -> ReturnNode(List(2),List(),List(),List(List(1, 2)))) 
+  import CFGResult.*
+
   test("TestCFG4") {
     methoddecl match {
       case MemberDecl_(methodDecl @ MethodDecl(_, _, _, _, _, _, _, _)) => {
         Label.labelOps
           .label(methodDecl, None, None)
           .run(Label.initStateInfo) match {
-          case Label.LabelError(message) => fail(message)
-          case Label.LabelOk((st, methDecl)) => {
+          case LabelResult.LabelError(message) => fail(message)
+          case LabelResult.LabelOk((st, methDecl)) => {
             Flatten.flatMethodDecl(methDecl).run(Flatten.initStateInfo) match {
-              case Flatten.FlatError(message) => fail(message)
-              case Flatten.FlatOk((st, f_methdDecl)) => {
+              case FlatResult.FlatError(message) => fail(message)
+              case FlatResult.FlatOk((st, f_methdDecl)) => {
                 val d_methodDecl = Desugar.dsgOps.desugar(f_methdDecl)
-                cfgOps.buildCFG(d_methodDecl, List()).run(initStateInfo) match {
+                cfgOps.buildCFG(d_methodDecl, List()).run(CFG.initStateInfo) match {
                     case CFGError(message) => fail(message)
                     case CFGOk((st, unit)) => {
                         assert(st.cfg == cfg)
@@ -246,7 +255,7 @@ public static void main (String[] args)
 
 
 
-class TestCFG5 extends FunSuite with Matchers { // probably a bad test case, we can't handle unchecked exception
+class TestCFG5 extends funsuite.AnyFunSuite with matchers.should.Matchers { // probably a bad test case, we can't handle unchecked exception
   val METHODSTR = """
 public static void main(String [] args) {
     int x = 0;
@@ -258,6 +267,8 @@ public static void main(String [] args) {
     }
 } 
   """
+  import CFGResult.*
+
   val methoddecl: Decl =
     classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
 
@@ -277,13 +288,13 @@ public static void main(String [] args) {
         Label.labelOps
           .label(methodDecl, None, None)
           .run(Label.initStateInfo) match {
-          case Label.LabelError(message) => fail(message)
-          case Label.LabelOk((st, methDecl)) => {
+          case LabelResult.LabelError(message) => fail(message)
+          case LabelResult.LabelOk((st, methDecl)) => {
             Flatten.flatMethodDecl(methDecl).run(Flatten.initStateInfo) match {
-              case Flatten.FlatError(message) => fail(message)
-              case Flatten.FlatOk((st, f_methdDecl)) => {
+              case FlatResult.FlatError(message) => fail(message)
+              case FlatResult.FlatOk((st, f_methdDecl)) => {
                 val d_methodDecl = Desugar.dsgOps.desugar(f_methdDecl)
-                cfgOps.buildCFG(d_methodDecl, List()).run(initStateInfo) match {
+                cfgOps.buildCFG(d_methodDecl, List()).run(CFG.initStateInfo) match {
                     case CFGError(message) => fail(message)
                     case CFGOk((st, unit)) => {
                         assert(st.cfg == cfg)
@@ -303,7 +314,7 @@ public static void main(String [] args) {
 }
 
 
-class TestCFG6 extends FunSuite with Matchers { // probably a bad test case, we can't handle unchecked exception
+class TestCFG6 extends funsuite.AnyFunSuite with matchers.should.Matchers { // probably a bad test case, we can't handle unchecked exception
   val METHODSTR = """
  public static int abs(int n)
   {
@@ -314,6 +325,8 @@ class TestCFG6 extends FunSuite with Matchers { // probably a bad test case, we 
       return a;
   } 
   """
+  import CFGResult.*
+
   val methoddecl: Decl =
     classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
 
@@ -329,13 +342,13 @@ class TestCFG6 extends FunSuite with Matchers { // probably a bad test case, we 
         Label.labelOps
           .label(methodDecl, None, None)
           .run(Label.initStateInfo) match {
-          case Label.LabelError(message) => fail(message)
-          case Label.LabelOk((st, methDecl)) => {
+          case LabelResult.LabelError(message) => fail(message)
+          case LabelResult.LabelOk((st, methDecl)) => {
             Flatten.flatMethodDecl(methDecl).run(Flatten.initStateInfo) match {
-              case Flatten.FlatError(message) => fail(message)
-              case Flatten.FlatOk((st, f_methdDecl)) => {
+              case FlatResult.FlatError(message) => fail(message)
+              case FlatResult.FlatOk((st, f_methdDecl)) => {
                 val d_methodDecl = Desugar.dsgOps.desugar(f_methdDecl)
-                cfgOps.buildCFG(d_methodDecl, List()).run(initStateInfo) match {
+                cfgOps.buildCFG(d_methodDecl, List()).run(CFG.initStateInfo) match {
                     case CFGError(message) => fail(message)
                     case CFGOk((st, unit)) => {
                         // println(st.cfg)
@@ -357,7 +370,7 @@ class TestCFG6 extends FunSuite with Matchers { // probably a bad test case, we 
 
 
 
-class TestCFG7 extends FunSuite with Matchers { // probably a bad test case, we can't handle unchecked exception
+class TestCFG7 extends funsuite.AnyFunSuite with matchers.should.Matchers { // probably a bad test case, we can't handle unchecked exception
   val METHODSTR = """
 public static int fun(int n)
 {
@@ -371,6 +384,8 @@ public static int fun(int n)
    }
 }
   """
+  import CFGResult.*
+
   val methoddecl: Decl =
     classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
 
@@ -390,13 +405,13 @@ public static int fun(int n)
         Label.labelOps
           .label(methodDecl, None, None)
           .run(Label.initStateInfo) match {
-          case Label.LabelError(message) => fail(message)
-          case Label.LabelOk((st, methDecl)) => {
+          case LabelResult.LabelError(message) => fail(message)
+          case LabelResult.LabelOk((st, methDecl)) => {
             Flatten.flatMethodDecl(methDecl).run(Flatten.initStateInfo) match {
-              case Flatten.FlatError(message) => fail(message)
-              case Flatten.FlatOk((st, f_methdDecl)) => {
+              case FlatResult.FlatError(message) => fail(message)
+              case FlatResult.FlatOk((st, f_methdDecl)) => {
                 val d_methodDecl = Desugar.dsgOps.desugar(f_methdDecl)
-                cfgOps.buildCFG(d_methodDecl, List()).run(initStateInfo) match {
+                cfgOps.buildCFG(d_methodDecl, List()).run(CFG.initStateInfo) match {
                     case CFGError(message) => fail(message)
                     case CFGOk((st, unit)) => {
                         // println(st.cfg)
@@ -418,7 +433,7 @@ public static int fun(int n)
 
 
 
-class TestCFG8 extends FunSuite with Matchers { 
+class TestCFG8 extends funsuite.AnyFunSuite with matchers.should.Matchers {
   val METHODSTR = """
 public static void main(String [] args) {
 	int x = 0;
@@ -434,6 +449,7 @@ public static void main(String [] args) {
   return;
 }
     """
+  import CFGResult.*
   val methoddecl: Decl =
     classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
 
@@ -455,13 +471,13 @@ public static void main(String [] args) {
         Label.labelOps
           .label(methodDecl, None, None)
           .run(Label.initStateInfo) match {
-          case Label.LabelError(message) => fail(message)
-          case Label.LabelOk((st, methDecl)) => {
+          case LabelResult.LabelError(message) => fail(message)
+          case LabelResult.LabelOk((st, methDecl)) => {
             Flatten.flatMethodDecl(methDecl).run(Flatten.initStateInfo) match {
-              case Flatten.FlatError(message) => fail(message)
-              case Flatten.FlatOk((st, f_methdDecl)) => {
+              case FlatResult.FlatError(message) => fail(message)
+              case FlatResult.FlatOk((st, f_methdDecl)) => {
                 val d_methodDecl = Desugar.dsgOps.desugar(f_methdDecl)
-                cfgOps.buildCFG(d_methodDecl, List()).run(initStateInfo) match {
+                cfgOps.buildCFG(d_methodDecl, List()).run(CFG.initStateInfo) match {
                     case CFGError(message) => fail(message)
                     case CFGOk((st, unit)) => {
                         assert(st.cfg == cfg)
