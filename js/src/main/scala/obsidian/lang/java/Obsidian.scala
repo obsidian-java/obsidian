@@ -8,27 +8,10 @@ import obsidian.lang.java.scalangj.Lexer
 import obsidian.lang.java.*
 
 import obsidian.lang.java.Obfuscate.*
-import os.Path
 
 
 
-object Main extends App {
-    val STRING = """
-public class Test
-{
-    public static int f() {
-        int x; 
-        int s;
-        x = 0;
-        s = 0;
-        while (x < 10) {
-            s = x + s;
-            x = x + 1;
-        }
-        return s;
-    }
-}
-    """
+object Obsidian {
     def run(cu:CompilationUnit):CompilationUnit = cu match {
         case CompilationUnit(pkg_decl, imp_decls, type_decls) => {
             val obs_type_decls = type_decls.map( ty_decl => ty_decl match {
@@ -61,16 +44,4 @@ public class Test
             CompilationUnit(pkg_decl, imp_decls, obs_type_decls)
         }
     } // TODO
-
-    val eCU = parseCompilationUnit(STRING)
-    eCU match {
-        case Left(error_msg) => println(error_msg)
-        case Right(cu) => {
-            val path:os.Path = os.pwd / "output" / "Test.java"
-            val obs_cu = run(cu)
-            
-            println( prettyPrint(cu))
-            os.write(path, prettyPrint(obs_cu)) 
-        }
-    }
 }

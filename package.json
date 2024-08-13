@@ -1,0 +1,39 @@
+{
+	"name": "obsidian",
+	"displayName": "obsidian",
+	"description": "Control flow obfuscator for Java code",
+	"version": "0.0.1",
+	"engines": {
+		"vscode": "^1.84.0"
+	},
+	"publisher": "luzhuomi",
+	"categories": [
+		"Other"
+	],
+	"activationEvents": [],
+	"main": "./out/extension",
+	"contributes": {
+		"commands": [
+			{
+				"command": "extension.helloWorld",
+				"title": "Hello World"
+			},
+			{
+				"command": "extension.obsidian",
+				"title": "Obsidian"
+			}
+		]
+	},
+	"menus": {
+		"editor/context": [
+			{
+				"when": "editorHasSelection",
+				"command": "extension.obsidian",
+				"group": "navigation"
+			}
+		]
+	},
+	"devDependencies": {
+		"@types/vscode": "^1.84.1"
+	}
+}
