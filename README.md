@@ -3,16 +3,12 @@ Control flow obfuscation for Java code
 
 It is work in progress
 
+# Visual Studio Code Plug-In
+We have created a VSCode plug-in that transforms highlighted Java code into the obfuscated form. For more information, including how to run the plug-in, click [here](vscode.md).
+
 # TODOS:
 
-1. some of the Scala v2 codes are still inline, e.g. we should convert sealed traits and their case classes extension to Scala 3 enum. 
-2. port the obfuscation pipeline from Main.scala into a library package, and expose the function call. (partially done)
-3. look into building wrapper as a VS code extension.
-    1. e.g. https://github.com/pme123/vscode-scalajs-hello
-    2. do we need to cross build both obsidian and scalangj for both scala JVM and scala.js? 
-        * https://www.scala-js.org/doc/project/cross-build.html
-        * https://www.scala-lang.org/2020/11/03/scalajs-for-scala-3.html
-4. MinSSA does not handle the following
+1. MinSSA does not handle the following
     1. synchronized method, variable, class, which should be an easy fix. 
     2. try-catch block, this one is hard.
 
