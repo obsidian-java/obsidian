@@ -2,13 +2,12 @@ package obsidian.lang.java
 
 import scala.io.*
 import obsidian.lang.java.scalangj.Parser.*
-import obsidian.lang.java.scalangj.Pretty.*
+import obsidian.lang.java.scalangj.Pretty.prettyPrint
 import obsidian.lang.java.scalangj.Syntax.*
 import obsidian.lang.java.scalangj.Lexer
 import obsidian.lang.java.*
 
 import obsidian.lang.java.Obfuscate.*
-
 
 
 object Obsidian {
@@ -26,7 +25,7 @@ object Obsidian {
                                     case MemberDecl_(member) => {
                                         val obs_member = obfMemberMethod(member) match {
                                             case Left(err) => {
-                                                println(err) 
+                                                println(err)
                                                 member
                                             }
                                             case Right(m) => m
@@ -39,9 +38,11 @@ object Obsidian {
                         }
                     }
                     ClassTypeDecl(obs_class_decl)
-                } 
+                }
             })
             CompilationUnit(pkg_decl, imp_decls, obs_type_decls)
         }
     } // TODO
+
+    def generateObfuscatedCode(cu: CompilationUnit): String = prettyPrint(run(cu))
 }
