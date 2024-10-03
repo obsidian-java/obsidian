@@ -18,6 +18,47 @@ ThisBuild / scalacOptions ++= Seq("-source:future") // solve the withFilter is n
 // reference https://github.com/oleg-py/better-monadic-for#destructuring-either--io--task--flatmapf
 // we don't need this plugin once we migrate to scala 3
 
+// for publishing to github
+ThisBuild / organization := "obsidian.lang.java"
+ThisBuild / publishMavenStyle := true
+
+// TODO confirm if I need to clone repo to ~/obsidian-java/binrepo/
+// TODO 2: need write accesss to obsidian and (probably) binrepo
+publishTo in ThisBuild := Some(Resolver.file("mavenLocal",  new File(Path.userHome.absolutePath+"/obsidian-java/binrepo/"))) 
+
+//publishArtifact in Test := false
+Test / publishArtifact := false
+
+pomIncludeRepository := { _ => false }
+
+pomExtra := (
+  <url>https://github.com/obsidian-java/obsidian</url>
+  <licenses>
+    <license>
+      <name>Apache License 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+  <scm>
+    <url>git@github.com:obsidian-java/obsidian.git</url>
+    <connection>scm:git:git@github.com:obsidian-java/obsidian.git</connection>
+  </scm>
+  <developers>
+    <developer>
+      <id>luzhuomi</id>
+      <name>Kenny Zhuo Ming Lu</name>
+      <url>http://sites.google.com/site/luzhuomi</url>
+    </developer>
+    <developer>
+      <id>Chingles2404</id>
+      <name>CCH</name>
+      <url></url>
+    </developer>
+  </developers>)
+
+// end publishing to github 
+
 import scala.sys.process._
 
 lazy val root = project.in(file("."))
@@ -40,7 +81,7 @@ lazy val root = project.in(file("."))
     ScalablyTypedConverterPlugin
   )
 
-  lazy val obsidian = crossProject(JSPlatform, JVMPlatform).in(file("."))
+lazy val obsidian = crossProject(JSPlatform, JVMPlatform).in(file("."))
   .settings(
     name := "obsidian",
     version := "0.1.0",
