@@ -1,5 +1,5 @@
 name := "obsidian"
-version := "0.1.0"
+version := "0.0.1"
 
 Global / sbtVersion := "1.9.7"
 
