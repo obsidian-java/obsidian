@@ -1,5 +1,5 @@
 name := "obsidian"
-version := "0.0.1"
+version := "0.0.2"
 
 Global / sbtVersion := "1.9.7"
 
@@ -71,7 +71,7 @@ lazy val root = project.in(file("."))
 lazy val obsidian = crossProject(JSPlatform, JVMPlatform).in(file("."))
   .settings(
     name := "obsidian",
-    version := "0.0.1",
+    version := "0.0.2",
     libraryDependencies ++= Seq(
       "org.scala-lang.modules" %%% "scala-parser-combinators" % "2.3.0",
       "org.scalactic" %%% "scalactic" % "3.2.9",
