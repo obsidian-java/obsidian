@@ -59,8 +59,6 @@ pomExtra := (
 
 // end publishing to github 
 
-import scala.sys.process._
-
 lazy val root = project.in(file("."))
   .aggregate(obsidian.js, obsidian.jvm)
   .settings(
@@ -84,4 +82,7 @@ lazy val obsidian = crossProject(JSPlatform, JVMPlatform).in(file("."))
       "org.typelevel" %%% "cats-core" % "2.10.0",
       "obsidian.lang.java" %%% "scalangj" % "0.1.8"
     ),
+  ).
+  jsSettings(
+    scalaJSUseMainModuleInitializer := true
   )
