@@ -3,6 +3,56 @@ Control flow obfuscation for Java code
 
 It is work in progress
 
+## Usage
+
+Compiled binaries are available in the [binrepo](https://github.com/obsidian-java/binrepo/tree/main/obsidian/lang/java/obsidian_3) repository.
+
+To utilize these binaries as a developer looking to utilize the Obsidian library for code obfuscation, add the following repository to your dependancy file and add the Obsidian library as a dependancy.
+
+You should now be able to import it like any other library and use it in your code.
+```java
+import obsidian.lang.java.obsidian.Obsidian
+```
+
+### Gradle
+```groovy
+repositories {
+    maven {
+        url 'https://raw.githubusercontent.com/obsidian-java/binrepo/master/'
+    }
+}
+// ...
+dependencies {
+    implementation 'obsidian:obsidian:0.0.2'
+}
+```
+
+### SBT
+```scala
+ThisBuild / resolvers += "obsidian binary github repo" at "https://raw.githubusercontent.com/obsidian-java/binrepo/master/"
+
+// ...
+
+libraryDependencies += "obsidian.lang.java" %%% "obsidian" % "0.0.2"
+```
+
+### Maven
+```xml
+<repositories>
+    <repository>
+        <id>obsidian-java</id>
+        <url>https://raw.github.com/obsidian-java/binrepo/master</url>
+    </repository>
+</repositories>
+// ...
+<dependencies>
+    <dependency>
+        <groupId>obsidian.lang.java</groupId>
+        <artifactId>obsidian</artifactId>
+        <version>0.0.2</version>
+</dependency>
+```
+
 ## Install (development version)
 As a developer for obsidian, follow the following instructions to set up your environment.
 
