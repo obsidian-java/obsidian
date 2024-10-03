@@ -1,4 +1,4 @@
-package obsidian.lang.java
+package obsidian.lang.java.obsidian
 
 /** We need a labelling step before the desugaring step (or even before the
   * flattening step?) to loop / switch with continue and break statements
@@ -85,7 +85,7 @@ import cats.implicits.*
 import cats.data.StateT
 import obsidian.lang.java.scalangj.Syntax.*
 import obsidian.lang.java.scalangj.Syntax
-import obsidian.lang.java.ASTUtils.*
+import obsidian.lang.java.obsidian.ASTUtils.*
 object Label {
 
   /** State object of the label monad

@@ -1,13 +1,13 @@
-package obsidian.lang.java
+package obsidian.lang.java.obsidian
 
 import scala.io.*
 import obsidian.lang.java.scalangj.Parser.*
 import obsidian.lang.java.scalangj.Pretty.prettyPrint
 import obsidian.lang.java.scalangj.Syntax.*
 import obsidian.lang.java.scalangj.Lexer
-import obsidian.lang.java.*
+import obsidian.lang.java.obsidian.*
 
-import obsidian.lang.java.Obfuscate.*
+import obsidian.lang.java.obsidian.Obfuscate.*
 
 
 object Obsidian {

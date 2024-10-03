@@ -1,4 +1,4 @@
-package obsidian.lang.java
+package obsidian.lang.java.obsidian
 
 
 import org.scalatest.{funsuite, matchers}
@@ -7,9 +7,9 @@ import obsidian.lang.java.scalangj.Lexer
 import obsidian.lang.java.scalangj.Parser.*
 import obsidian.lang.java.scalangj.Syntax.*
 import obsidian.lang.java.scalangj.Pretty.*
-import obsidian.lang.java.*
-import obsidian.lang.java.Flatten.*
-import obsidian.lang.java.MinSSA.*
+import obsidian.lang.java.obsidian.*
+import obsidian.lang.java.obsidian.Flatten.*
+import obsidian.lang.java.obsidian.MinSSA.*
 
 
 class TestMinSSA1 extends funsuite.AnyFunSuite with matchers.should.Matchers {

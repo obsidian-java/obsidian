@@ -1,10 +1,10 @@
-package obsidian.lang.java
+package obsidian.lang.java.obsidian
 
 import obsidian.lang.java.scalangj.Lexer
 import obsidian.lang.java.scalangj.Parser.*
 import obsidian.lang.java.scalangj.Syntax.*
-import obsidian.lang.java.*
-import obsidian.lang.java.ASTPath.*
+import obsidian.lang.java.obsidian.*
+import obsidian.lang.java.obsidian.ASTPath.*
 
 import org.scalatest.{funsuite, matchers}
 
@@ -258,4 +258,3 @@ public static void main (String[] args)
       }
   }
 }
-

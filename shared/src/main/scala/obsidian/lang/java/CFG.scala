@@ -1,12 +1,12 @@
-package obsidian.lang.java
+package obsidian.lang.java.obsidian
 
 import cats.*
 import cats.implicits.*
 import cats.data.StateT
 
 import obsidian.lang.java.scalangj.Syntax.*
-import obsidian.lang.java.ASTUtils.*
-import obsidian.lang.java.ASTPath.*
+import obsidian.lang.java.obsidian.ASTUtils.*
+import obsidian.lang.java.obsidian.ASTPath.*
 
 /*
  Control Flow Graph construction

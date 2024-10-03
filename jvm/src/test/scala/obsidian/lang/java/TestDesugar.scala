@@ -1,11 +1,11 @@
-package obsidian.lang.java
+package obsidian.lang.java.obsidian
 
 import obsidian.lang.java.scalangj.Lexer
 import obsidian.lang.java.scalangj.Parser.*
 import obsidian.lang.java.scalangj.Syntax.*
 import obsidian.lang.java.scalangj.Pretty.*
-import obsidian.lang.java.*
-import obsidian.lang.java.Desugar.*
+import obsidian.lang.java.obsidian.*
+import obsidian.lang.java.obsidian.Desugar.*
 
 
 import org.scalatest.{funsuite, matchers}

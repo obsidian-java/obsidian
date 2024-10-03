@@ -1,13 +1,13 @@
-package obsidian.lang.java
+package obsidian.lang.java.obsidian
 
 import obsidian.lang.java.scalangj.Lexer
 import obsidian.lang.java.scalangj.Parser.*
 import obsidian.lang.java.scalangj.Syntax.*
 import obsidian.lang.java.scalangj.Pretty.*
-import obsidian.lang.java.*
-import obsidian.lang.java.Label.*
-import obsidian.lang.java.Flatten.*
-import obsidian.lang.java.CFG.*
+import obsidian.lang.java.obsidian.*
+import obsidian.lang.java.obsidian.Label.*
+import obsidian.lang.java.obsidian.Flatten.*
+import obsidian.lang.java.obsidian.CFG.*
 import org.scalatest.{funsuite, matchers}
 
 class TestCFG1 extends funsuite.AnyFunSuite with matchers.should.Matchers {
@@ -495,6 +495,3 @@ public static void main(String [] args) {
     }
   }
 }
-
-
-

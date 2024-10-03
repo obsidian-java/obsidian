@@ -1,4 +1,5 @@
-package obsidian.lang.java
+package obsidian.lang.java.obsidian
+
 import obsidian.lang.java.scalangj.Syntax.*
 
 object CPSFixture {

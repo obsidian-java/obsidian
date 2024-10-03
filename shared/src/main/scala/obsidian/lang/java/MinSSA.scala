@@ -1,4 +1,4 @@
-package obsidian.lang.java
+package obsidian.lang.java.obsidian
 
 
 import cats.kernel.Semilattice
@@ -8,9 +8,9 @@ import cats.data.StateT
 import obsidian.lang.java.scalangj.Syntax.*
 import scala.collection.immutable
 
-import obsidian.lang.java.Common.*
-import obsidian.lang.java.ASTPath.*
-import obsidian.lang.java.ASTUtils.*
+import obsidian.lang.java.obsidian.Common.*
+import obsidian.lang.java.obsidian.ASTPath.*
+import obsidian.lang.java.obsidian.ASTUtils.*
 
 /**
  * all variables must be declared and initialized in the source program

@@ -22,9 +22,7 @@ ThisBuild / scalacOptions ++= Seq("-source:future") // solve the withFilter is n
 ThisBuild / organization := "obsidian.lang.java"
 ThisBuild / publishMavenStyle := true
 
-// TODO confirm if I need to clone repo to ~/obsidian-java/binrepo/
-// TODO 2: need write accesss to obsidian and (probably) binrepo
-publishTo in ThisBuild := Some(Resolver.file("mavenLocal",  new File(Path.userHome.absolutePath+"/obsidian-java/binrepo/"))) 
+ThisBuild / publishTo := Some(Resolver.file("mavenLocal",  new File(Path.userHome.absolutePath+"/obsidian-java/binrepo/"))) 
 
 //publishArtifact in Test := false
 Test / publishArtifact := false

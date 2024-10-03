@@ -1,13 +1,13 @@
-package obsidian.lang.java
+package obsidian.lang.java.obsidian
 
 /**
   * This module contains all the required APIs. 
   */
 import obsidian.lang.java.scalangj.Syntax.*
 
-import obsidian.lang.java.Flatten.* 
-import obsidian.lang.java.MinSSA.*
-import obsidian.lang.java.CPS.*
+import obsidian.lang.java.obsidian.Flatten.* 
+import obsidian.lang.java.obsidian.MinSSA.*
+import obsidian.lang.java.obsidian.CPS.*
 
 
 object Obfuscate {

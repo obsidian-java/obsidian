@@ -1,4 +1,4 @@
-package obsidian.lang.java
+package obsidian.lang.java.obsidian
 
 import scala.collection.Map.*
 import obsidian.lang.java.scalangj.Syntax.*

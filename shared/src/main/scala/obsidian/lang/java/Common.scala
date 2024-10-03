@@ -1,4 +1,4 @@
-package obsidian.lang.java
+package obsidian.lang.java.obsidian
 
 object Common {
   /** 

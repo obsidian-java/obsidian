@@ -1,11 +1,11 @@
-package obsidian.lang.java
+package obsidian.lang.java.obsidian
 
 import cats.*
 import cats.implicits.*
 import cats.data.StateT
 import obsidian.lang.java.scalangj.Syntax.*
 import obsidian.lang.java.scalangj.Syntax
-import obsidian.lang.java.ASTUtils.*
+import obsidian.lang.java.obsidian.ASTUtils.*
 
 /**
   * We need a flattening step before the desugaring step to handle nested post-/pre-increment and assignment

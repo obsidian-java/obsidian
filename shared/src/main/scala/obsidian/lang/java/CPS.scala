@@ -1,4 +1,4 @@
-package obsidian.lang.java
+package obsidian.lang.java.obsidian
 
 import cats.*
 import cats.implicits.*
@@ -8,12 +8,12 @@ import scala.collection.immutable
 
 // constructing CPS from SSA
 import obsidian.lang.java.scalangj.Syntax.*
-import obsidian.lang.java.ASTUtils.{given, *}
-import obsidian.lang.java.Common.*
-import obsidian.lang.java.MinSSA.{SSABlock, SSAStmt, SSAIf, SSAWhile, SSATry, SSAAssert, SSAAssignments, SSABreak, SSAContinue, SSAEmpty, charcode, Label, TCtx, Phi}
-import obsidian.lang.java.MinSSA.SSAVarDecls
+import obsidian.lang.java.obsidian.ASTUtils.{given, *}
+import obsidian.lang.java.obsidian.Common.*
+import obsidian.lang.java.obsidian.MinSSA.{SSABlock, SSAStmt, SSAIf, SSAWhile, SSATry, SSAAssert, SSAAssignments, SSABreak, SSAContinue, SSAEmpty, charcode, Label, TCtx, Phi}
+import obsidian.lang.java.obsidian.MinSSA.SSAVarDecls
 
-import obsidian.lang.java.CPSFixture.* 
+import obsidian.lang.java.obsidian.CPSFixture.* 
 object CPS {
 
     /**
@@ -715,4 +715,3 @@ object CPS {
 
 
 }
-
