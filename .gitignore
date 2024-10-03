@@ -11,4 +11,4 @@ build.properties
 metals.sbt
 package-lock.json
 node_modules
-
+.vscode
