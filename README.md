@@ -3,8 +3,17 @@ Control flow obfuscation for Java code
 
 It is work in progress
 
-## Usage
 
+# Usage
+
+## Visual Studio Code Plug-In - TODO Migrate to new repo
+We have created a VSCode plug-in that transforms highlighted Java code into the obfuscated form. For more information, including how to run the plug-in, click [here](vscode.md).
+
+## IntelliJ IDEA Plug-In
+
+...
+
+## In-code
 Compiled binaries are available in the [binrepo](https://github.com/obsidian-java/binrepo/tree/main/obsidian/lang/java/obsidian_3) repository.
 
 To utilize these binaries as a developer looking to utilize the Obsidian library for code obfuscation, add the following repository to your dependancy file and add the Obsidian library as a dependancy.
@@ -53,10 +62,10 @@ libraryDependencies += "obsidian.lang.java" %%% "obsidian" % "0.0.2"
 </dependency>
 ```
 
-## Install (development version)
+# Development (Setup Guide)
 As a developer for obsidian, follow the following instructions to set up your environment.
 
-### Obsidian environment setup 
+## Obsidian environment setup 
 > builds and publish binaries to binrepo repository for library download
 ```bash
 # Clone binrepo repository to this specific location
@@ -71,9 +80,6 @@ sbt compile && sbt publish
 # Check if the library is published
 cd ~/obsidian-java/binrepo && git status
 ```
-
-# Visual Studio Code Plug-In - TODO Migrate to new repo
-We have created a VSCode plug-in that transforms highlighted Java code into the obfuscated form. For more information, including how to run the plug-in, click [here](vscode.md).
 
 # TODOS:
 
