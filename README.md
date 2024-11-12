@@ -6,7 +6,7 @@ It is work in progress
 
 # Usage
 
-## Visual Studio Code Plug-In - TODO Migrate to new repo
+## Visual Studio Code Plug-In
 We have created a VSCode plug-in that transforms highlighted Java code into the obfuscated form. For more information, including how to run the plug-in, click [here](https://github.com/obsidian-java/vscode-obsidian).
 
 ## IntelliJ IDEA Plug-In
