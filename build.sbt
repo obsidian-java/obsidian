@@ -66,6 +66,9 @@ lazy val root = project.in(file("."))
     moduleName := "obsidian",
     libraryDependencies ++= Seq("com.lihaoyi" %%% "utest" % "0.8.2" % "test"),
     testFrameworks += new TestFramework("utest.runner.Framework")
+  ).settings(
+    Compile / run := (obsidian.jvm / Compile / run).evaluated,
+    Compile / mainClass := Some("obsidian.lang.java.obsidian.Main")
   )
 
 lazy val obsidian = crossProject(JSPlatform, JVMPlatform).in(file("."))
