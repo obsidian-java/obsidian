@@ -93,6 +93,9 @@ cd ~/code && git clone git@github.com:obsidian-java/obsidian.git && cd obsidian
 # Compile and run
 sbt compile
 sbt run # Runs main class demo in Main.scala
+
+# run tests
+sbt test
 ```
 
 ## Publishing Steps
