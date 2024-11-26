@@ -1,5 +1,5 @@
 name := "obsidian"
-version := "0.1.0"
+version := "0.0.2"
 
 Global / sbtVersion := "1.9.7"
 
@@ -18,7 +18,44 @@ ThisBuild / scalacOptions ++= Seq("-source:future") // solve the withFilter is n
 // reference https://github.com/oleg-py/better-monadic-for#destructuring-either--io--task--flatmapf
 // we don't need this plugin once we migrate to scala 3
 
-import scala.sys.process._
+// for publishing to github
+ThisBuild / organization := "obsidian.lang.java"
+ThisBuild / publishMavenStyle := true
+
+ThisBuild / publishTo := Some(Resolver.file("mavenLocal",  new File(Path.userHome.absolutePath+"/obsidian-java/binrepo/"))) 
+
+//publishArtifact in Test := false
+Test / publishArtifact := false
+
+pomIncludeRepository := { _ => false }
+
+pomExtra := (
+  <url>https://github.com/obsidian-java/obsidian</url>
+  <licenses>
+    <license>
+      <name>Apache License 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+  <scm>
+    <url>git@github.com:obsidian-java/obsidian.git</url>
+    <connection>scm:git:git@github.com:obsidian-java/obsidian.git</connection>
+  </scm>
+  <developers>
+    <developer>
+      <id>luzhuomi</id>
+      <name>Kenny Zhuo Ming Lu</name>
+      <url>http://sites.google.com/site/luzhuomi</url>
+    </developer>
+    <developer>
+      <id>Chingles2404</id>
+      <name>CCH</name>
+      <url></url>
+    </developer>
+  </developers>)
+
+// end publishing to github 
 
 lazy val root = project.in(file("."))
   .aggregate(obsidian.js, obsidian.jvm)
@@ -27,23 +64,17 @@ lazy val root = project.in(file("."))
     publishLocal := {},
 
     moduleName := "obsidian",
-
-    Compile / fastOptJS / artifactPath := baseDirectory.value / "out" / "extension.js",
-    Compile / fullOptJS / artifactPath := baseDirectory.value / "out" / "extension.js",
-    install := installDependenciesTask.dependsOn(Compile / fastOptJS).value,
     libraryDependencies ++= Seq("com.lihaoyi" %%% "utest" % "0.8.2" % "test"),
-    Compile / npmDependencies ++= Seq("vscode" -> "1.84.1"),
     testFrameworks += new TestFramework("utest.runner.Framework")
-  )
-  .enablePlugins(ScalaJSBundlerPlugin)
-  .enablePlugins(
-    ScalablyTypedConverterPlugin
+  ).settings(
+    Compile / run := (obsidian.jvm / Compile / run).evaluated,
+    Compile / mainClass := Some("obsidian.lang.java.Main")
   )
 
-  lazy val obsidian = crossProject(JSPlatform, JVMPlatform).in(file("."))
+lazy val obsidian = crossProject(JSPlatform, JVMPlatform).in(file("."))
   .settings(
     name := "obsidian",
-    version := "0.1.0",
+    version := "0.0.2",
     libraryDependencies ++= Seq(
       "org.scala-lang.modules" %%% "scala-parser-combinators" % "2.3.0",
       "org.scalactic" %%% "scalactic" % "3.2.9",
@@ -52,31 +83,7 @@ lazy val root = project.in(file("."))
       "org.typelevel" %%% "cats-core" % "2.10.0",
       "obsidian.lang.java" %%% "scalangj" % "0.1.8"
     ),
+  ).
+  jsSettings(
+    scalaJSUseMainModuleInitializer := true
   )
-  .jsSettings(
-    scalaJSUseMainModuleInitializer := true,
-    Compile / npmDependencies ++= Seq("vscode" -> "1.84.1"),
-    install := installDependenciesTask.dependsOn(Compile / fastOptJS).value,
-    Compile / fastOptJS / artifactPath := (ThisBuild / baseDirectory).value / "out" / "extension.js",
-    Compile / fullOptJS / artifactPath := (ThisBuild / baseDirectory).value / "out" / "extension.js",
-  )
-  .enablePlugins(
-    ScalaJSBundlerPlugin,
-    ScalablyTypedConverterPlugin
-  )
-
-lazy val install = taskKey[Unit]("install dependencies")
-def installDependenciesTask: Def.Initialize[Task[Unit]] =
-  Def
-    .task[Unit] {
-      val base = (ThisProject / baseDirectory).value
-      val log = (ThisProject / streams).value.log
-      if (!(base / "node_module").exists) {
-        val pb =
-          new java.lang.ProcessBuilder("npm", "install")
-            .directory(base)
-            .redirectErrorStream(true)
-
-        pb ! log
-      }
-    }

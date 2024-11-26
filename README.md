@@ -3,8 +3,109 @@ Control flow obfuscation for Java code
 
 It is work in progress
 
-# Visual Studio Code Plug-In
-We have created a VSCode plug-in that transforms highlighted Java code into the obfuscated form. For more information, including how to run the plug-in, click [here](vscode.md).
+
+# Usage
+
+## Visual Studio Code Plug-In
+We have created a VSCode plug-in that transforms highlighted Java code into the obfuscated form. For more information, including how to run the plug-in, click [here](https://github.com/obsidian-java/vscode-obsidian).
+
+## IntelliJ IDEA Plug-In
+Alternatively obsidian can be used as an IntelliJ IDEA plug-in to similarily obfuscate highlighed Java code in the editor. For more information, including how to install and run the plug-in, click [here](https://github.com/obsidian-java/intellij-obsidian)
+
+## In-code
+Compiled binaries are available in the [binrepo](https://github.com/obsidian-java/binrepo/tree/main/obsidian/lang/java/obsidian_3) repository.
+
+To utilize these binaries as a developer looking to utilize the Obsidian library for code obfuscation, add the following repository to your dependancy file and add the Obsidian library as a dependancy.
+
+You should now be able to import it like any other library and use it in your code.
+```java
+import obsidian.lang.java.obsidian.Obsidian
+```
+
+### Gradle
+```groovy
+repositories {
+    maven {
+        url 'https://raw.githubusercontent.com/obsidian-java/binrepo/master/'
+    }
+}
+// ...
+dependencies {
+    implementation 'obsidian:obsidian:0.0.2'
+}
+```
+
+### SBT
+```scala
+ThisBuild / resolvers += "obsidian binary github repo" at "https://raw.githubusercontent.com/obsidian-java/binrepo/master/"
+
+// ...
+
+libraryDependencies += "obsidian.lang.java" %%% "obsidian" % "0.0.2"
+```
+
+### Maven
+```xml
+<repositories>
+    <repository>
+        <id>obsidian-java</id>
+        <url>https://raw.github.com/obsidian-java/binrepo/master</url>
+    </repository>
+</repositories>
+// ...
+<dependencies>
+    <dependency>
+        <groupId>obsidian.lang.java</groupId>
+        <artifactId>obsidian</artifactId>
+        <version>0.0.2</version>
+</dependency>
+```
+
+# Development (Setup Guide)
+As a developer for obsidian, follow the following instructions to set up your environment.
+
+## Obsidian environment setup 
+> Obfuscates the following demo Java code in `Main.scala`
+```java
+public class Test
+{
+    public static int f() {
+        int x; 
+        int s;
+        x = 0;
+        s = 0;
+        while (x < 10) {
+            s = x + s;
+            x = x + 1;
+        }
+        return s;
+    }
+}
+```
+
+```bash
+# Clone binrepo repository to this specific location
+cd ~ && mkdir obsidian-java && git clone git@github.com:obsidian-java/binrepo.git
+
+# Clone obsidian repository to any location
+cd ~/code && git clone git@github.com:obsidian-java/obsidian.git && cd obsidian
+
+# Compile and run
+sbt compile
+sbt run # Runs main class demo in Main.scala
+
+# run tests
+sbt test
+```
+
+## Publishing Steps
+> builds and publish binaries to binrepo repository for library download
+```bash
+# publish obsidian library to ~/obsidian-java/binrepo folder
+sbt publish
+# Check if the library is published
+cd ~/obsidian-java/binrepo && git status
+```
 
 # TODOS:
 
