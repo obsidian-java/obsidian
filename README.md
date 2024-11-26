@@ -65,7 +65,24 @@ libraryDependencies += "obsidian.lang.java" %%% "obsidian" % "0.0.2"
 As a developer for obsidian, follow the following instructions to set up your environment.
 
 ## Obsidian environment setup 
-> builds and publish binaries to binrepo repository for library download
+> Obfuscates the following demo Java code in `Main.scala`
+```java
+public class Test
+{
+    public static int f() {
+        int x; 
+        int s;
+        x = 0;
+        s = 0;
+        while (x < 10) {
+            s = x + s;
+            x = x + 1;
+        }
+        return s;
+    }
+}
+```
+
 ```bash
 # Clone binrepo repository to this specific location
 cd ~ && mkdir obsidian-java && git clone git@github.com:obsidian-java/binrepo.git
@@ -73,9 +90,16 @@ cd ~ && mkdir obsidian-java && git clone git@github.com:obsidian-java/binrepo.gi
 # Clone obsidian repository to any location
 cd ~/code && git clone git@github.com:obsidian-java/obsidian.git && cd obsidian
 
-# Compile and publish obsidian library to ~/obsidian-java/binrepo folder
-sbt compile && sbt publish
+# Compile and run
+sbt compile
+sbt run # Runs main class demo in Main.scala
+```
 
+## Publishing Steps
+> builds and publish binaries to binrepo repository for library download
+```bash
+# publish obsidian library to ~/obsidian-java/binrepo folder
+sbt publish
 # Check if the library is published
 cd ~/obsidian-java/binrepo && git status
 ```
