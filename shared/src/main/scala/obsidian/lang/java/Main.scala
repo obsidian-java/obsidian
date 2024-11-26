@@ -8,7 +8,6 @@ import obsidian.lang.java.obsidian.Obsidian.*
 //import os.Path
 
 
-
 object Main extends App {
     val STRING = """
 public class Test
