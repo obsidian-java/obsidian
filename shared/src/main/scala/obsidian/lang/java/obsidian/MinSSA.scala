@@ -18,7 +18,7 @@ import obsidian.lang.java.obsidian.ASTUtils.*
  * */
 
 object MinSSA {
-  case class SSAMethodDecl(
+  case class SSAMethodDecl( // method decl
       modifiers: List[Modifier],
       type_params: List[TypeParam],
       ty: Option[Type],
@@ -29,11 +29,11 @@ object MinSSA {
       body: SSAMethodBody
   )
 
-  case class SSAMethodBody(
+  case class SSAMethodBody( // the body of a method, which is a list of blocks.
       blocks: List[SSABlock]
   )
 
-  case class SSABlock(
+  case class SSABlock( // an SSA block is a label with a list of statements.
       label: Label,
       stmts: List[SSAStmt]
   )
@@ -42,21 +42,23 @@ object MinSSA {
 
   sealed trait SSAStmt 
   // to handle nested decl, not in the paper
-  case class SSAVarDecls(mods:List[Modifier], ty:Type, varDecls:List[VarDecl]) extends SSAStmt
+  case class SSAVarDecls(mods:List[Modifier], ty:Type, varDecls:List[VarDecl]) extends SSAStmt // TODO: it should contain no change, but double check
 
-  case class SSAAssert(exp:Exp, msg:Option[Exp]) extends SSAStmt
+  case class SSAAssert(exp:Exp, msg:Option[Exp]) extends SSAStmt   // TODO: it should contain no change, but double check
 
-  case class SSAAssignments(stmts: List[Stmt]) extends SSAStmt
+  case class SSAAssignments(stmts: List[Stmt]) extends SSAStmt // a list of assignment statements, we assume there is no exception occur 
 
-  case class SSAExps(stmts: List[Stmt]) extends SSAStmt
+  case class SSAExps(stmts: List[Stmt]) extends SSAStmt // a list of expression statements, we assume there is no exception occur
   
   case class SSAReturn(oexp:Option[Exp]) extends SSAStmt
 
   case class SSAThrow(exp:Exp) extends SSAStmt
 
+  /* KIV for now, they are not supposed to work.
   case class SSABreak(tlbl:Label) extends SSAStmt
 
   case class SSAContinue(tlbl:Label) extends SSAStmt
+  */ 
 
   // it defers from the paper here, we don't keep a method invocation as a seperate case
   //      it is combined with the assignments and exps cases, as there might be multiple
@@ -64,37 +66,49 @@ object MinSSA {
   //      we keep track of the function call and its context in the state
   // case class SSAMethodInvocation(methodInv:MethodInvocation) extends SSAStmt
 
-  case object SSAEmpty extends SSAStmt
+  case object SSAEmpty extends SSAStmt // nop
 
   /**
     * 
     *
     * @param tryStmts: try blocks
-    * @param phi_peri: Phis before the catch block
     * @param catchParam: parameters for the catch block
+    * @param catchPhis: 
     * @param catchStmts: catch blocks
-    * @param phi_post: Phis after the catch block
+    * // 
+    * @param joinPhis:
+    * @param joinStmts:
+    * @param exceptPhis:
     */
   case class SSATry(
-    tryStmts:List[SSABlock], 
-    phi_peri: List[Phi],
-    catchParam: FormalParam,
-    catchStmts:List[SSABlock],
-    phi_post: List[Phi] 
+    tryStmts:List[SSABlock],    // the first B bar
+    catchParam: FormalParam,    // the ex
+    catchPhis: List[Phi],       // the phi assignments before the catch block
+    catchStmts:List[SSABlock],  // the 2nd B bar (i.e. the catch block)
+    joinPhis: List[Phi],        // the phi assignments before the join block
+    joinStmts: List[SSABlock],  // the 3rd B bar 
+      // (i.e. the continuation after the try catch block,
+      //  if 1) none from tryStmts throws or 
+      //  2)  and some statement from tryStmts throws and none from catchStmts throws)
+    exceptPhis: List[Phi]       // the phi assignments for the except 
   ) extends SSAStmt
 
   
   /**
     * 
     *
-    * @param phis: Phis at the entry of the while stmt
+    * @param joinPhis: Phis at the entry of the while stmt and joinStmts
     * @param exp: boolean expression
-    * @param stmts
+    * @param stmts: the body
+    * @param joinStmts: the the continuation after while loop, if no exception occurs
+    * @param exceptPhis: Phis assignments for the except
     */
   case class SSAWhile(
-    phis: List[Phi],
+    joinPhis: List[Phi],
     exp: Exp,
     stmts:List[SSABlock],
+    joinStmts: List[SSABlock],
+    exceptPhis: List[Phi] 
   ) extends SSAStmt
 
 
@@ -103,15 +117,24 @@ object MinSSA {
     * @param exp boolean expression
     * @param thenStmts then blocks
     * @param elseStmts else blocks
-    * @param phi_post: Phis at the exit of the while stmt
+    * @param joinPhis: Phis at the exit of the while stmt
+    * @param joinStmts: the the continuation after if-else, if no exception occurs
+    * @param exceptPhis: Phis assignments for the except
     */
   case class SSAIf(
     exp:Exp,
     thenStmts:List[SSABlock],
     elseStmts:List[SSABlock],
-    phi_post: List[Phi]
+    joinPhis: List[Phi], 
+    joinStmts: List[SSABlock],
+    exceptPhis: List[Phi]
   ) extends SSAStmt
 
+  case class SSAAttempt( // attempt E.m(E) as x { \bar{B} }
+      methodInv:MethodInvocation, // E.m(E) 
+      lhs: Lhs, // as x 
+      stmts: List[SSABlock]
+  ) extends SSAStmt
 
   // type Label = ASTPath 
 
@@ -128,6 +151,10 @@ object MinSSA {
     // rhs:Map[Label, Name] // changed back to List[(Label, Name)], so that we can find the entry will min label w/o re-sorting
     rhs:List[(Label, Name)]
   )
+
+  ////////////////////////////////////
+  // REWRITING FRONTIER
+  ////////////////////////////////////
 
 
   trait SubstName[A] {
@@ -169,15 +196,41 @@ object MinSSA {
       case SSAExps(es) => SSAExps(snOps.appSubst(subst, es))
       case SSAReturn(o) => SSAReturn(snOps.appSubst(subst, o))
       case SSAThrow(e) => SSAThrow(snOps.appSubst(subst,e))
+      /* 
       case SSABreak(lbl) => s
-      case SSAContinue(lbl) => s 
+      case SSAContinue(lbl) => s
+      */ 
       case SSAEmpty => s 
-      case SSATry(tryStmts, phi_peri, catchParam, catchStmts, phi_post) => 
-        SSATry(snOps.appSubst(subst, tryStmts), snOps.appSubst(subst, phi_peri), catchParam, snOps.appSubst(subst, catchStmts), snOps.appSubst(subst, phi_post))
-      case SSAWhile(phis,e, stmts) => 
-        SSAWhile(snOps.appSubst(subst, phis), snOps.appSubst(subst, e), snOps.appSubst(subst, stmts))
-      case SSAIf(e, tStmts, eStmts, phi) => 
-        SSAIf(snOps.appSubst(subst, e), snOps.appSubst(subst, tStmts), snOps.appSubst(subst, eStmts), snOps.appSubst(subst, phi))
+      case SSATry(tryStmts, catchParam, catchPhis, catchStmts, joinPhis, joinStmts, exceptPhis) => {
+        SSATry(snOps.appSubst(subst, tryStmts), 
+            catchParam, 
+            snOps.appSubst(subst, catchPhis), 
+            snOps.appSubst(subst, catchStmts), 
+            snOps.appSubst(subst, joinPhis),
+            snOps.appSubst(subst, joinStmts), 
+            snOps.appSubst(subst, exceptPhis))
+      }
+      case SSAWhile(joinPhis, exp, stmts, joinStmts, exceptPhis) => {
+        SSAWhile(snOps.appSubst(subst, joinPhis), 
+          snOps.appSubst(subst,exp),
+          snOps.appSubst(subst,stmts),
+          snOps.appSubst(subst,joinStmts),
+          snOps.appSubst(subst,exceptPhis)
+        )
+      }
+      case SSAIf(exp, thenStmts, elseStmts, joinPhis, joinStmts, exceptPhis) => {
+        SSAIf(snOps.appSubst(subst, exp),
+          snOps.appSubst(subst, thenStmts), 
+          snOps.appSubst(subst, elseStmts), 
+          snOps.appSubst(subst, joinPhis),
+          snOps.appSubst(subst, joinStmts), 
+          snOps.appSubst(subst, exceptPhis))
+      }
+      case SSAAttempt(methodInv, lhs, stmts) => {
+        SSAAttempt(snOps.appSubst(subst,methodInv), 
+          snOps.appSubst(subst, lhs),
+          snOps.appSubst(subst, stmts))
+      }
     }
   }
 
@@ -323,7 +376,8 @@ object MinSSA {
   
   case class SCatch(ctx: SCtx) extends SCtx
 
-
+  // substitute the SBox from the outter context by the inner. 
+  // putSCtx(SLast(SBox), SHead(SBox)) --> SLast(SHead(SBox))
   def putSCtx(outter:SCtx, inner:SCtx): SCtx = outter match {
     case SBox => inner 
     case SLast(o) => SLast(putSCtx(o, inner))
@@ -338,22 +392,36 @@ object MinSSA {
 
   /**
     * Target language context (SSA)
-    * CTX ::= Box | CTX; | CTX; \overline{B} | B; CTX | if E {CTX} else {\overline{B}} | 
-    *     if E {\overline{B}} else {CTX} join {\overline{\phi}}  | 
-    *     if E {CTX} else {\overline{B}} join {\overline{\phi}}  |
-    *     if E {\overline{B}} else {\overline{B}} join {BBox}    | 
-    *     join {BBox} while E { \overline{B}} |  
-    *     join {\overline{\phi}} while E { CTX } |
-    *     try {Ctx} join {\overline{\phi}} catch (T x) {\overline{B}} join {\overline{\phi}} |
-    *     try {\overline{B}} join {BBox} catch (T x) {\overline{B}} join {\overline{\phi}} |
-    *     try {\overline{B}} join {\overline{\phi}} catch (T x) {CTX} join {\overline{\phi}} | 
-    *     try {\overline{B}} join {\overline{\phi}} catch (T x) {\overline{B}} join {BBox}}
+
+    * CTX ::= Box | nop; | CTX; \overline{B} | B; CTX | 
+    *     if E {CTX} else {\overline{B}} join {\overline{\phi}} {\overline{B}} except {\overline{\phi}} | 
+    *     if E {\overline{B}} else {CTX} join {\overline{\phi}} {\overline{B}} except {\overline{\phi}}  | 
+    *     if E {\overline{B}} else {\overline{B}} join {BBox} {\overline{B}} except {\overline{\phi}}  | 
+    *     if E {\overline{B}} else {\overline{B}} join {\overline{\phi}} {CTX} except {\overline{\phi}}  | 
+    *     if E {\overline{B}} else {\overline{B}} join {\overline{\phi}} {\overline{B}} except {BBox}  | 
+    *     join {BBox} while E {\overline{B}} next {\overline{B}} except {\overline{phi}} |  
+    *     join {\overline{phi}} while E {CTX} next {\overline{B}} except {\overline{phi}} |  
+    *     join {\overline{phi}} while E {\overline{B}} next {CTX} except {\overline{phi}} | 
+    *     join {\overline{phi}} while E {\overline{B}} next {\overline{B}} except {BBox} | 
+    *     try {CTX} catch (T x) {\overline{\phi}} {\overline{B}} join {\overline{\phi}} {\overline{B}} except {\overline{\phi}} |
+    *     try {\overline{B}} catch (T x) {BBox} {\overline{B}} join {\overline{\phi}} {\overline{B}} except {\overline{\phi}} |
+    *     try {\overline{B}} catch (T x) {\overline{\phi}} {CTX} join {\overline{\phi}} {\overline{B}} except {\overline{\phi}} |
+    *     try {\overline{B}} catch (T x) {\overline{\phi}} {\overline{B}} join {BBox} {\overline{B}} except {\overline{\phi}} |
+    *     try {\overline{B}} catch (T x) {\overline{\phi}} {\overline{B}} join {\overline{\phi}} {CTX} except {\overline{\phi}} |
+    *     try {\overline{B}} catch (T x) {\overline{\phi}} {\overline{B}} join {\overline{\phi}} {\overline{B}} except {BBox} |
+    *     attempt BBox next {\overline{B}} | 
+    *     attempt E.m(E) as x next {CTX}  | 
+    *     throw 
     */
   sealed trait TCtx 
 
   case object TBox extends TCtx               // 0
 
-  case class TLast(ctx:TCtx) extends TCtx     // 1
+  // we don't need TLast, the last statement must be either 
+  //   a nop, return, throw, if-else-join, try-catch-join, while-join
+  // case class TLast(ctx:TCtx) extends TCtx   // 1
+
+  case object TNop extends TCtx // 1 
 
   case class THead(ctx:TCtx) extends TCtx     // 2
 
@@ -363,23 +431,46 @@ object MinSSA {
 
   case class TElse(ctx:TCtx) extends TCtx     // 5
 
-  case object TIfPostPhi extends TCtx         // 6
+  case object TIfJoinPhi extends TCtx         // 6
 
-  case class TWhilePrePhi(b:Int) extends TCtx  // 7
+  case class TIfJoin(ctx:TCtx) extends TCtx   // 7 
 
-  case class TWhile(ctx:TCtx) extends TCtx     // 8
+  case object TifExceptPhi extends TCtx       // 8
 
-  case class TTry(ctx:TCtx) extends TCtx       // 9
 
-  case object TTryPeriPhi extends TCtx         // a
+  case class TWhileJoinPhi(b:Int) extends TCtx // 9 
 
-  case class TCatch(ctx:TCtx) extends TCtx     // b
+  case class TWhile(ctx:TCtx) extends TCtx     // a
 
-  case object TTryPostPhi extends TCtx         // c
+  case class TWhileNext(ctx:TCtx) extends TCtx // b 
+
+  case object TWhileExcept extends TCtx        // c 
+
+  // rewriting frontier 
+
+  case class TTry(ctx:TCtx) extends TCtx       // d
+
+  case object TCatchPhi extends TCtx           // e
+
+  case class TCatch(ctx:TCtx) extends TCtx     // f
+
+  case object TTryJoinPhi extends TCtx         // g
+
+  case class TTryJoin(ctx:TCtx) extends TCtx   // h
+
+  case object TTryExceptPhi extends TCtx       // i
+
+  case object TAttempt extends TCtx // j 
+
+  case class TAttemptNext(ctx:TCtx) extends TCtx // k 
+
+  case object TThrow extends TCtx // l 
 
   
-  val chararray:List[Char] = "0123456789abcdef".toList
+  val chararray:List[Char] = "0123456789abcdefghi".toList
 
+
+  // homework 1)
   // character coding for the Target Ctx // this mapping can be randomized 
   def charcode(ctx:TCtx, arr:List[Char]):List[Char] = ctx match {
     case TBox => List(arr(0))
@@ -398,6 +489,7 @@ object MinSSA {
   }
 
 
+  // homework 2)
   def putTCtx(outter:TCtx, inner:TCtx): TCtx = outter match {
     case TBox => inner 
     case TLast(o) => TLast(putTCtx(o, inner))
@@ -1598,6 +1690,7 @@ object MinSSA {
 
       case EnhancedFor(modifiers, ty, id, exp, stmt) => m.raiseError("SSA construction failed, EnhancedFor should have been desugared.")
 
+      /* break and continue are not supported yet.
       case Break(None) => m.raiseError("SSA construction failed, Break statement is associated with no label. It should have been pre-processed.")
       case Break(Some(id)) => for {
         st <- get
@@ -1625,6 +1718,7 @@ object MinSSA {
           }
         }
       } yield r
+      */
 
       case Do(stmt, exp) => m.raiseError("SSA construction failed, Do should have been desguared.")
 
