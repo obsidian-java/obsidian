@@ -3,6 +3,14 @@
 .metals
 .scalafmt.conf
 target
-project
 .bloop
-
+.bsp
+out
+project/project
+build.properties
+metals.sbt
+package-lock.json
+node_modules
+.vscode
+.idea
+.DS_Store
