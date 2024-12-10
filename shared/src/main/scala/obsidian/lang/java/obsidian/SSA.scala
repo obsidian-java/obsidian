@@ -3,10 +3,6 @@ package obsidian.lang.java.obsidian
 import cats.*
 import cats.implicits.*
 
-
-import cats._
-import cats.implicits._
-
 import cats.data.State
 import obsidian.lang.java.obsidian.CFG.{AssignmentsNode, CFG, HasVarcfgOps, Node, NodeId, getLVars, getRVars, getSuccs}
 import obsidian.lang.java.scalangj.Syntax.{Ident, MethodDecl}

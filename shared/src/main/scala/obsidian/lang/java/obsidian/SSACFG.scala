@@ -3,10 +3,6 @@ package obsidian.lang.java.obsidian
 import cats.*
 import cats.implicits.*
 
-
-import cats._
-import cats.implicits._
-
 import cats.data.StateT
 import cats.{ApplicativeError, Functor, MonadError}
 import obsidian.lang.java.obsidian.ASTPath.ASTPath

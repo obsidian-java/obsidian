@@ -499,17 +499,20 @@ object MinSSA {
 
 
   // homework 2)
-  def putTCtx(outter:TCtx, inner:TCtx): TCtx = outter match {
+  def putTCtx(outer:TCtx, inner:TCtx): TCtx = outer match {
     case TBox => inner 
-    case TLast(o) => TLast(putTCtx(o, inner))
     case THead(o) => THead(putTCtx(o, inner))
     case TTail(o) => TTail(putTCtx(o, inner))
     case TThen(o) => TThen(putTCtx(o, inner))
     case TElse(o) => TElse(putTCtx(o, inner))
+    case TIfJoin(o) => TIfJoin(putTCtx(o, inner))
     case TWhile(o) => TWhile(putTCtx(o, inner))
+    case TWhileNext(o) => TWhileNext(putTCtx(o, inner))
     case TTry(o) => TTry(putTCtx(o, inner))
     case TCatch(o) => TCatch(putTCtx(o, inner))
-    case _ => outter
+    case TTryJoin(o) => TTryJoin(putTCtx(o, inner))
+    case TAttemptNext(o) => TAttemptNext(putTCtx(o, inner))
+    case _ => outer
   }
 
 
