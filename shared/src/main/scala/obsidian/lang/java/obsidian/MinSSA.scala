@@ -435,7 +435,7 @@ object MinSSA {
 
   case class TIfJoin(ctx:TCtx) extends TCtx   // 7 
 
-  case object TifExceptPhi extends TCtx       // 8
+  case object TIfExceptPhi extends TCtx       // 8
 
 
   case class TWhileJoinPhi(b:Int) extends TCtx // 9 
@@ -474,18 +474,27 @@ object MinSSA {
   // character coding for the Target Ctx // this mapping can be randomized 
   def charcode(ctx:TCtx, arr:List[Char]):List[Char] = ctx match {
     case TBox => List(arr(0))
-    case TLast(ctx2) => List(arr(1)) ++ charcode(ctx2, arr)
+    case TNop => List(arr(1))
     case THead(ctx2) => List(arr(2)) ++ charcode(ctx2, arr)
     case TTail(ctx2) => List(arr(3)) ++ charcode(ctx2, arr)
     case TThen(ctx2) => List(arr(4)) ++ charcode(ctx2, arr)
     case TElse(ctx2) => List(arr(5)) ++ charcode(ctx2, arr)
-    case TIfPostPhi  => List(arr(6))
-    case TWhilePrePhi(_) => List(arr(7))
-    case TWhile(ctx2) => List(arr(8)) ++ charcode(ctx2, arr)
-    case TTry(ctx2) => List(arr(9)) ++ charcode(ctx2, arr)
-    case TTryPeriPhi => List(arr(10))
-    case TCatch(ctx2) => List(arr(11)) ++ charcode(ctx2, arr)
-    case TTryPostPhi => List(arr(12))
+    case TIfJoinPhi  => List(arr(6))
+    case TIfJoin(ctx2) => List(arr(7)) ++ charcode(ctx2, arr)
+    case TIfExceptPhi => List(arr(8))
+    case TWhileJoinPhi(_) => List(arr(9))
+    case TWhile(ctx2) => List(arr(10)) ++ charcode(ctx2, arr)
+    case TWhileNext(ctx2) => List(arr(11)) ++ charcode(ctx2, arr)
+    case TWhileExcept => List(arr(12))
+    case TTry(ctx2) => List(arr(13)) ++ charcode(ctx2, arr)
+    case TCatchPhi => List(arr(14))
+    case TCatch(ctx2) => List(arr(15)) ++ charcode(ctx2, arr)
+    case TTryJoinPhi => List(arr(16))
+    case TTryJoin(ctx2) => List(arr(17)) ++ charcode(ctx2, arr)
+    case TTryExceptPhi => List(arr(18))
+    case TAttempt => List(arr(19))
+    case TAttemptNext(ctx2) => List(arr(20)) ++ charcode(ctx2, arr)
+    case TThrow => List(arr(21))
   }
 
 
