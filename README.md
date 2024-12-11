@@ -1,3 +1,9 @@
+# NOTICE
+
+The master repo is moved to https://github.com/obsidian-java/obsidian 
+
+This repo will be archived soon.
+
 # obsidian
 Control flow obfuscation for Java code
 
