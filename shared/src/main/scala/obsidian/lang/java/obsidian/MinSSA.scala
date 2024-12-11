@@ -394,21 +394,21 @@ object MinSSA {
     * Target language context (SSA)
 
     * CTX ::= Box | nop; | CTX; \overline{B} | B; CTX | 
-    *     if E {CTX} else {\overline{B}} join {\overline{\phi}} {\overline{B}} except {\overline{\phi}} | 
-    *     if E {\overline{B}} else {CTX} join {\overline{\phi}} {\overline{B}} except {\overline{\phi}}  | 
-    *     if E {\overline{B}} else {\overline{B}} join {BBox} {\overline{B}} except {\overline{\phi}}  | 
-    *     if E {\overline{B}} else {\overline{B}} join {\overline{\phi}} {CTX} except {\overline{\phi}}  | 
-    *     if E {\overline{B}} else {\overline{B}} join {\overline{\phi}} {\overline{B}} except {BBox}  | 
-    *     join {BBox} while E {\overline{B}} next {\overline{B}} except {\overline{phi}} |  
-    *     join {\overline{phi}} while E {CTX} next {\overline{B}} except {\overline{phi}} |  
-    *     join {\overline{phi}} while E {\overline{B}} next {CTX} except {\overline{phi}} | 
+    *     if E {CTX}          else {\overline{B}} join {\overline{\phi}} next {\overline{B}} except {\overline{\phi}} | 
+    *     if E {\overline{B}} else {CTX}          join {\overline{\phi}} next {\overline{B}} except {\overline{\phi}}  | 
+    *     if E {\overline{B}} else {\overline{B}} join {BBox}            next {\overline{B}} except {\overline{\phi}}  | 
+    *     if E {\overline{B}} else {\overline{B}} join {\overline{\phi}} next {CTX} except {\overline{\phi}}  | 
+    *     if E {\overline{B}} else {\overline{B}} join {\overline{\phi}} next {\overline{B}} except {BBox}  | 
+    *     join {BBox}           while E {\overline{B}} next {\overline{B}} except {\overline{phi}} |  
+    *     join {\overline{phi}} while E {CTX}          next {\overline{B}} except {\overline{phi}} |  
+    *     join {\overline{phi}} while E {\overline{B}} next {CTX}          except {\overline{phi}} | 
     *     join {\overline{phi}} while E {\overline{B}} next {\overline{B}} except {BBox} | 
-    *     try {CTX} catch (T x) {\overline{\phi}} {\overline{B}} join {\overline{\phi}} {\overline{B}} except {\overline{\phi}} |
-    *     try {\overline{B}} catch (T x) {BBox} {\overline{B}} join {\overline{\phi}} {\overline{B}} except {\overline{\phi}} |
-    *     try {\overline{B}} catch (T x) {\overline{\phi}} {CTX} join {\overline{\phi}} {\overline{B}} except {\overline{\phi}} |
-    *     try {\overline{B}} catch (T x) {\overline{\phi}} {\overline{B}} join {BBox} {\overline{B}} except {\overline{\phi}} |
-    *     try {\overline{B}} catch (T x) {\overline{\phi}} {\overline{B}} join {\overline{\phi}} {CTX} except {\overline{\phi}} |
-    *     try {\overline{B}} catch (T x) {\overline{\phi}} {\overline{B}} join {\overline{\phi}} {\overline{B}} except {BBox} |
+    *     try {CTX}          catch (T x) {\overline{\phi}} handle {\overline{B}} join {\overline{\phi}} next {\overline{B}} except {\overline{\phi}} |
+    *     try {\overline{B}} catch (T x) {BBox}            handle {\overline{B}} join {\overline{\phi}} next {\overline{B}} except {\overline{\phi}} |
+    *     try {\overline{B}} catch (T x) {\overline{\phi}} handle {CTX}          join {\overline{\phi}} next {\overline{B}} except {\overline{\phi}} |
+    *     try {\overline{B}} catch (T x) {\overline{\phi}} handle {\overline{B}} join {BBox}            next {\overline{B}} except {\overline{\phi}} |
+    *     try {\overline{B}} catch (T x) {\overline{\phi}} handle {\overline{B}} join {\overline{\phi}} next {CTX}          except {\overline{\phi}} |
+    *     try {\overline{B}} catch (T x) {\overline{\phi}} handle {\overline{B}} join {\overline{\phi}} next {\overline{B}} except {BBox} |
     *     attempt BBox next {\overline{B}} | 
     *     attempt E.m(E) as x next {CTX}  | 
     *     throw 
@@ -431,14 +431,14 @@ object MinSSA {
 
   case class TElse(ctx:TCtx) extends TCtx     // 5
 
-  case object TIfJoinPhi extends TCtx         // 6
+  case object TIfJoin extends TCtx            // 6
 
-  case class TIfJoin(ctx:TCtx) extends TCtx   // 7 
+  case class TIfNext(ctx:TCtx) extends TCtx   // 7  
 
-  case object TIfExceptPhi extends TCtx       // 8
+  case object TIfExcept extends TCtx        // 8
 
 
-  case class TWhileJoinPhi(b:Int) extends TCtx // 9 
+  case class TWhileJoin(b:Int) extends TCtx // 9 
 
   case class TWhile(ctx:TCtx) extends TCtx     // a
 
@@ -446,21 +446,20 @@ object MinSSA {
 
   case object TWhileExcept extends TCtx        // c 
 
-  // rewriting frontier 
 
   case class TTry(ctx:TCtx) extends TCtx       // d
 
-  case object TCatchPhi extends TCtx           // e
+  case object TCatch extends TCtx              // e
 
-  case class TCatch(ctx:TCtx) extends TCtx     // f
+  case class TCatchHandle(ctx:TCtx) extends TCtx     // f
 
-  case object TTryJoinPhi extends TCtx         // g
+  case object TTryJoin extends TCtx         // g
 
-  case class TTryJoin(ctx:TCtx) extends TCtx   // h
+  case class TTryNext(ctx:TCtx) extends TCtx   // h
 
-  case object TTryExceptPhi extends TCtx       // i
+  case object TTryExcept extends TCtx       // i
 
-  case object TAttempt extends TCtx // j 
+  case object TAttempt extends TCtx         // j 
 
   case class TAttemptNext(ctx:TCtx) extends TCtx // k 
 
@@ -479,19 +478,19 @@ object MinSSA {
     case TTail(ctx2) => List(arr(3)) ++ charcode(ctx2, arr)
     case TThen(ctx2) => List(arr(4)) ++ charcode(ctx2, arr)
     case TElse(ctx2) => List(arr(5)) ++ charcode(ctx2, arr)
-    case TIfJoinPhi  => List(arr(6))
-    case TIfJoin(ctx2) => List(arr(7)) ++ charcode(ctx2, arr)
-    case TIfExceptPhi => List(arr(8))
-    case TWhileJoinPhi(_) => List(arr(9))
+    case TIfJoin  => List(arr(6))
+    case TIfNext(ctx2) => List(arr(7)) ++ charcode(ctx2, arr)
+    case TIfExcept => List(arr(8))
+    case TWhileJoin(_) => List(arr(9))
     case TWhile(ctx2) => List(arr(10)) ++ charcode(ctx2, arr)
     case TWhileNext(ctx2) => List(arr(11)) ++ charcode(ctx2, arr)
     case TWhileExcept => List(arr(12))
     case TTry(ctx2) => List(arr(13)) ++ charcode(ctx2, arr)
-    case TCatchPhi => List(arr(14))
-    case TCatch(ctx2) => List(arr(15)) ++ charcode(ctx2, arr)
-    case TTryJoinPhi => List(arr(16))
-    case TTryJoin(ctx2) => List(arr(17)) ++ charcode(ctx2, arr)
-    case TTryExceptPhi => List(arr(18))
+    case TCatch => List(arr(14))
+    case TCatchHandle(ctx2) => List(arr(15)) ++ charcode(ctx2, arr)
+    case TTryJoin => List(arr(16))
+    case TTryNext(ctx2) => List(arr(17)) ++ charcode(ctx2, arr)
+    case TTryExcept => List(arr(18))
     case TAttempt => List(arr(19))
     case TAttemptNext(ctx2) => List(arr(20)) ++ charcode(ctx2, arr)
     case TThrow => List(arr(21))
@@ -505,21 +504,24 @@ object MinSSA {
     case TTail(o) => TTail(putTCtx(o, inner))
     case TThen(o) => TThen(putTCtx(o, inner))
     case TElse(o) => TElse(putTCtx(o, inner))
-    case TIfJoin(o) => TIfJoin(putTCtx(o, inner))
+    case TIfNext(o) => TIfNext(putTCtx(o, inner))
     case TWhile(o) => TWhile(putTCtx(o, inner))
     case TWhileNext(o) => TWhileNext(putTCtx(o, inner))
     case TTry(o) => TTry(putTCtx(o, inner))
-    case TCatch(o) => TCatch(putTCtx(o, inner))
-    case TTryJoin(o) => TTryJoin(putTCtx(o, inner))
+    case TCatchHandle(o) => TCatchHandle(putTCtx(o, inner))
+    case TTryNext(o) => TTryNext(putTCtx(o, inner))
     case TAttemptNext(o) => TAttemptNext(putTCtx(o, inner))
     case _ => outer
   }
 
 
   // variable mapping 
-  // old and wrong
-  // type VarMap = Map[Name, Map[SCtx, (TCtx, Name)]]
-  type VarMap = Map[Name, Map[TCtx, (SCtx, Name)]]
+
+  // beta
+  // type VarMap = Map[Name, Map[TCtx, (SCtx, Name)]]
+  type VarMap = Map[Name, Map[TCtx, Name]] // updated, we dont need the SCtx, which is only required for correctness proof.
+  // SCTx can be derived from TCtx, TCtx |-> SCtx mapping is a functional mapping, but SCtx |-> TCtx might not be.
+ 
   
   def unionVarMap(vm1:VarMap, vm2:VarMap):VarMap = vm2.toList.foldLeft(vm1)( (vm, kv) => kv match {
     case (name, m) => vm.get(name) match {
@@ -530,36 +532,37 @@ object MinSSA {
 
   def diffVarMap(vm1:VarMap, vm2:VarMap):VarMap = listToVarMap(varMapToList(vm1).toSet.diff(varMapToList(vm2).toSet).toList)
 
-  def listToVarMap(l:List[(Name, (TCtx, (SCtx, Name)))]):VarMap = l.foldLeft(Map():VarMap)( (vm, kv) => kv match {
-    case (name, (tctx, (sctx, tname))) => vm.get(name) match {
-      case None => vm + (name -> Map(tctx -> (sctx, tname)))
+  def listToVarMap(l:List[(Name, (TCtx, Name))]):VarMap = l.foldLeft(Map():VarMap)( (vm, kv) => kv match {
+    case (name, (tctx, tname)) => vm.get(name) match {
+      case None => vm + (name -> Map(tctx -> tname))
       case Some(m2) => m2.get(tctx) match {
-        case None => vm + (name ->  (m2 + (tctx -> (sctx, tname))))
-        case Some((sctx1, name1)) => vm // duplicate?
+        case None => vm + (name ->  (m2 + (tctx -> (tname))))
+        case Some(name1) => vm // duplicate?
       }
     }
   })
 
-  def varMapToList(vm:VarMap):List[(Name, (TCtx, (SCtx, Name)))] = vm.toList.flatMap( { case (n, m) => {
-    m.toList.map( { case (tctx, sctx_n2) => (n, (tctx, sctx_n2)) }) 
+  def varMapToList(vm:VarMap):List[(Name, (TCtx, Name))] = vm.toList.flatMap( { case (n, m) => {
+    m.toList.map( { case (tctx, n2) => (n, (tctx, n2)) }) 
   }} )
 
 
   /**
   * A state object for the conversion function
   *
-  * @param varMap - the variable mapping
-  * @param exitCtx - the exit context from the last block
-  * @param eenv - the list of contexts that throw exception
-  * @param nestedDecls - the list of nested declared variables
+  * @param varMap - the variable mapping, i.e. the beta
+  * @param okCtx - the exit context from the last block, i.e. the "ok" context
+  * @param aenv - this the list of all "ok" context we encountered so far, (it is used in computing the Last(.))
+  * @param eenv - the list of contexts that throw exception, i.e. the set of "err" contexts
+  * @param nestedDecls - the list of nested declared variables, we need to move their declarations to the outter most level of the method body.
   * @param methodInvs - the list of method invocations
-  * @param srcLabelEnv - the list of labels existing in the src code and their contexts
+  * @param srcLabelEnv - the list of labels existing in the src code and their contexts, TODO: double check, we probably don't need this until we know how to handle continue and break
   * @param config - configuration
   */
   case class State(
     varMap: VarMap, 
-    exitCtx: TCtx,
-    aenv: AEnv, // all non phi context so far
+    okCtx: TCtx,
+    aenv: AEnv, 
     eenv: EEnv, 
     nestedDecls: List[(TCtx, Ident, Type, List[Modifier])],
     methodInvs: List[(TCtx, MethodInvocation)],
@@ -571,7 +574,7 @@ object MinSSA {
    * extract the charcodes from the environment
    * */
   def getCharCodes(st:State):List[Char] = st match {
-    case State(varMap, exitCtx, aenv, eenv, nestedDecls, methodInvs, srcLabelEnv, config) => 
+    case State(varMap, okCtx, aenv, eenv, nestedDecls, methodInvs, srcLabelEnv, config) => 
       config match {
         case SSAEnvConfig(ctxtAsID, charcodes) => charcodes
       }
@@ -600,19 +603,19 @@ object MinSSA {
 
 
   def eenvFromState(st:State):EEnv = st match {
-    case State(_, _, aenv, eenv, _, _, _, _ ) => eenv
+    case State(_, _, _, eenv, _, _, _, _ ) => eenv
   }
 
-  def eCtxFromState(st:State):TCtx = st match {
-    case State(_,ectx, aenv, _, _, _, _,_) => ectx
+  def okCtxFromState(st:State):TCtx = st match {
+    case State(_, okCtx, _, _, _, _, _,_) => okCtx
   }
 
   def srcLabelEnvFromState(st:State):Map[Ident,SCtx] = st match {
-    case State(_,ectx, aenv, _, _, _, srcLblEnv,_) => srcLblEnv
+    case State(_, _, _, _, _, _, srcLblEnv,_) => srcLblEnv
   }
 
-  type AEnv = List[TCtx]
-  type EEnv = List[TCtx] 
+  type AEnv = List[TCtx] // TODO: give a better type name to this environment
+  type EEnv = List[TCtx] // TODO: give a better type name to this environment
 
   type ErrorM = String
 
@@ -689,40 +692,40 @@ object MinSSA {
   def put(st:State):SState[State, Unit] = StateT { _ => SSAOk((st,()))} 
 
   /**
-    * setECtx - setting the exiting context in the state
+    * setOkCtx - setting the Ok exiting context in the state
     *
     * @param tctx
     * @param m
     * @return
     */
-  def setECtx(tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
+  def setOkCtx(tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get
     st1 <- m.pure(st match {
-      case State(vm, eCtx, aenv, eenv, nestedDecls, methInvs, srcLabelEnv, conf) => State(vm, tctx, aenv, eenv, nestedDecls, methInvs, srcLabelEnv,conf)
+      case State(vm, _, aenv, eenv, nestedDecls, methInvs, srcLabelEnv, conf) => State(vm, tctx, aenv, eenv, nestedDecls, methInvs, srcLabelEnv,conf)
     })
     _   <- put(st1)
   } yield ()
 
 
   /**
-    * setVM - set the given VarMap in the state
+    * setVarMap - set the given VarMap in the state
     *
     * @param vm
     * @param m
     * @return
     */
-  def setVM(vm:VarMap)(using m:MonadError[SSAState, ErrorM]): SState[State, Unit] = for {
+  def setVarMap(vm:VarMap)(using m:MonadError[SSAState, ErrorM]): SState[State, Unit] = for {
     st <- get
     st1 <- m.pure(st match {
-      case State(_,eCtx, aenv, eenv, nestedDecls, methInvs, srcLabelEnv,conf) => State(vm, eCtx, aenv, eenv, nestedDecls, methInvs,srcLabelEnv,conf)
+      case State(_, okCtx, aenv, eenv, nestedDecls, methInvs, srcLabelEnv,conf) => State(vm, okCtx, aenv, eenv, nestedDecls, methInvs,srcLabelEnv,conf)
     })
     _   <- put(st1)
   } yield ()
   
-  def removeVarFromVM(v:Name)(using m:MonadError[SSAState, ErrorM]): SState[State, Unit] = for {
+  def removeVarFromVarMap(v:Name)(using m:MonadError[SSAState, ErrorM]): SState[State, Unit] = for {
     st <- get
     st1 <- m.pure(st match {
-      case State(vm ,eCtx, aenv, eenv, nestedDecls, methInvs, srcLabelEnv,conf) => State(vm - v, eCtx, aenv, eenv, nestedDecls, methInvs,srcLabelEnv,conf)
+      case State(vm ,okCtx, aenv, eenv, nestedDecls, methInvs, srcLabelEnv,conf) => State(vm - v, okCtx, aenv, eenv, nestedDecls, methInvs,srcLabelEnv,conf)
     })
     _ <- put(st1)
   } yield ()
@@ -740,9 +743,9 @@ object MinSSA {
   def addNestedVarDecls(tctx:TCtx, id:Ident, ty:Type, mods:List[Modifier])(using m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
     st <- get
     st1  <- m.pure(st match {
-      case State(varMap, eCtx, aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => {
+      case State(varMap, okCtx, aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => {
         val nDecls1 = (nDecls.toSet + ((tctx, id, ty, mods))).toList
-        State(varMap, eCtx, aenv, eenv, nDecls1, methInvs,srcLblEnv,conf)
+        State(varMap, okCtx, aenv, eenv, nDecls1, methInvs,srcLblEnv,conf)
       }
     })
     _  <- put(st1)
@@ -759,9 +762,9 @@ object MinSSA {
   def addMethodInv(tctx:TCtx, methinv:MethodInvocation)(using m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
     st <- get 
     st1  <- m.pure(st match {
-      case State(varMap, eCtx, aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => {
+      case State(varMap, okCtx, aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => {
         val methInvs1 = (methInvs.toSet + ((tctx, methinv))).toList
-        State(varMap, eCtx, aenv, eenv, nDecls, methInvs1, srcLblEnv,conf)
+        State(varMap, okCtx, aenv, eenv, nDecls, methInvs1, srcLblEnv,conf)
       }
     })
     _  <- put(st1)
@@ -770,27 +773,27 @@ object MinSSA {
   def addSrcLabel(label:Ident, ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get
     st1 <- m.pure(st match {
-      case State(varMap, eCtx, aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => {
+      case State(varMap, okCtx, aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => {
         val srcLblEnv1 = srcLblEnv + (label -> ctx) 
-        State(varMap, eCtx, aenv, eenv, nDecls, methInvs, srcLblEnv1,conf)
+        State(varMap, okCtx, aenv, eenv, nDecls, methInvs, srcLblEnv1,conf)
       }
     })
   } yield ()
 
 
   /**
-    * addAEnv - add an context to the list of all program context env
+    * addToAEnv - add an context to the list of all program context env
     *
     * @param tctx 
     * @param m
     * @return
     */
-  def addAEnv(tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
+  def addToAEnv(tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get 
     st1  <- m.pure(st match {
-      case State(varMap, eCtx, aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => {
+      case State(varMap, okCtx, aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => {
         val aenv1 = (aenv.toSet + tctx).toList
-        State(varMap, eCtx, aenv1, eenv, nDecls, methInvs, srcLblEnv,conf)
+        State(varMap, okCtx, aenv1, eenv, nDecls, methInvs, srcLblEnv,conf)
       }
     })
     _  <- put(st1)
@@ -798,7 +801,7 @@ object MinSSA {
 
 
   /**
-    * addEEv - add the given context to the list of throwing context in the state
+    * addToEEnv - add the given context to the list of throwing context in the state
     *
     * @param tctx
     * @param m
@@ -806,12 +809,12 @@ object MinSSA {
   */
   
 
-  def addEEnv(tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
+  def addToEEnv(tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get 
     st1  <- m.pure(st match {
-      case State(varMap, eCtx, aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => {
+      case State(varMap, okCtx, aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => {
         val eenv1 = (eenv.toSet + tctx).toList
-        State(varMap, eCtx, aenv, eenv1, nDecls, methInvs, srcLblEnv,conf)
+        State(varMap, okCtx, aenv, eenv1, nDecls, methInvs, srcLblEnv,conf)
       }
     })
     _  <- put(st1)
@@ -826,7 +829,7 @@ object MinSSA {
   def usingCtxtAsID(using m:MonadError[SSAState, ErrorM]):SState[State, Boolean] = for {
     st <- get
   } yield st match {
-    case State(varMap, eCtx, aenv, eenv, nDecls, methInvs, srcLblEnv,SSAEnvConfig(ctxtAsID, _)) => ctxtAsID
+    case State(varMap, okCtx, aenv, eenv, nDecls, methInvs, srcLblEnv,SSAEnvConfig(ctxtAsID, _)) => ctxtAsID
   }
 
   /**
@@ -856,40 +859,41 @@ object MinSSA {
    * and union the eenv and nDecls
    * */
   def mergeState(st1:State, st2:State):State = (st1, st2) match {
-    case (State(vm1, eCtx1, aenv1, eenv1, nDecls1, methInvs1, srcLblEnv1,conf1), State(vm2, eCtx2, aenv2, eenv2,  nDecls2, methInvs2, srcLblEnv2,conf2)) => 
-      State(unionVarMap(vm1, vm2), eCtx1, (aenv1++aenv2).toSet.toList, (eenv1++eenv2).toSet.toList, (nDecls1 ++ nDecls2).toSet.toList, (methInvs1 ++ methInvs2).toSet.toList, (srcLblEnv1 ++ srcLblEnv2),conf1)
+    case (State(vm1, okCtx1, aenv1, eenv1, nDecls1, methInvs1, srcLblEnv1,conf1), State(vm2, okCtx2, aenv2, eenv2,  nDecls2, methInvs2, srcLblEnv2,conf2)) => 
+      State(unionVarMap(vm1, vm2), okCtx1, (aenv1++aenv2).toSet.toList, (eenv1++eenv2).toSet.toList, (nDecls1 ++ nDecls2).toSet.toList, (methInvs1 ++ methInvs2).toSet.toList, (srcLblEnv1 ++ srcLblEnv2),conf1)
   }
 
   
-  def extendVarsWithContextAndLabel(vars: List[Name], sctx:SCtx, tctx:TCtx, lbl:Label)(using m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
+  def extendVarsWithContextAndLabel(vars: List[Name], tctx:TCtx, lbl:Label)(using m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
     st <- get
     st1 <- st match {
-      case State(vm0, eCtx, aenv, eenv,  nDecls, methInvs, srcLblEnv,conf) => for {
+      case State(vm0, okCtx, aenv, eenv,  nDecls, methInvs, srcLblEnv,conf) => for {
         entries <- vars.traverse(v => for {
           v_lbl <- mkName(v, lbl)
-        } yield (v, tctx, sctx, v_lbl ))
+        } yield (v, tctx, v_lbl ))
       } yield State(entries.foldLeft(vm0)((vm, ent) => ent match {
-        case (v, tctx, sctx, v_lbl) => vm.get(v) match {
+        case (v, tctx, v_lbl) => vm.get(v) match {
           case None => vm
-          case Some(m) => vm + (v -> (m + (tctx -> (sctx, v_lbl))))
+          case Some(m) => vm + (v -> (m + (tctx -> v_lbl)))
         }
-      }), eCtx, aenv, eenv,  nDecls, methInvs, srcLblEnv,conf)
+      }), okCtx, aenv, eenv,  nDecls, methInvs, srcLblEnv,conf)
     }
     _ <- put(st1)
   } yield ()
 
   // do we still need this? 
-  def extendAllVarsWithContextAndLabel(sctx:SCtx, tctx:TCtx, lbl:Label)(using m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
+  // very likely we should remove this!!! it is not in used.
+  def extendAllVarsWithContextAndLabel(tctx:TCtx, lbl:Label)(using m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
     st <- get
     st1 <- st match {
       case State(vm0, eCtx, aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => for {
         entries <- vm0.keySet.toList.traverse(v => for {
           v_lbl <- mkName(v, lbl)
-        } yield (v, tctx, sctx, v_lbl ))
+        } yield (v, tctx, v_lbl ))
       } yield State(entries.foldLeft(vm0)((vm, ent) => ent match {
-        case (v, tctx, sctx, v_lbl) => vm.get(v) match {
+        case (v, tctx, v_lbl) => vm.get(v) match {
           case None => vm
-          case Some(m) => vm + (v -> (m + (tctx -> (sctx, v_lbl))))
+          case Some(m) => vm + (v -> (m + (tctx -> v_lbl)))
         }
       }), eCtx, aenv, eenv, nDecls, methInvs, srcLblEnv,conf)
     }
@@ -938,18 +942,34 @@ object MinSSA {
   given eqTCtx:Eq[TCtx] = new Eq[TCtx]{
     override def eqv(x: TCtx, y: TCtx): Boolean = (x,y) match {
       case (TBox, TBox) => true
-      case (TLast(ctx1), TLast(ctx2)) => eqv(ctx1, ctx2)
+      // case (TLast(ctx1), TLast(ctx2)) => eqv(ctx1, ctx2)
+      case (TNop, TNop) => true
       case (THead(ctx1), THead(ctx2)) => eqv(ctx1, ctx2)
       case (TTail(ctx1), TTail(ctx2)) => eqv(ctx1, ctx2)
-      case (TThen(ctx1), TThen(ctx2)) => eqv(ctx1, ctx2)
-      case (TElse(ctx1), TElse(ctx2)) => eqv(ctx1, ctx2)
-      case (TIfPostPhi, TIfPostPhi) => true
-      case (TWhilePrePhi(b1), TWhilePrePhi(b2)) => b1 == b2
-      case (TWhile(ctx1), TWhile(ctx2)) => eqv(ctx1, ctx2)
-      case (TTry(ctx1), TTry(ctx2)) => eqv(ctx1, ctx2)
-      case (TTryPeriPhi, TTryPeriPhi) => true
-      case (TCatch(ctx1), TCatch(ctx2)) => eqv(ctx1, ctx2)
-      case (TTryPostPhi, TTryPostPhi) => true
+
+      case (TThen(ctx1), TThen(ctx2))     => eqv(ctx1, ctx2)
+      case (TElse(ctx1), TElse(ctx2))     => eqv(ctx1, ctx2)
+      case (TIfJoin, TIfJoin)             => true
+      case (TIfNext(ctx1), TIfNext(ctx2)) => eqv(ctx1, ctx2)
+      case (TIfExcept, TIfExcept)         => true
+
+      case (TWhileJoin(b1), TWhileJoin(b2))     => b1 == b2
+      case (TWhile(ctx1), TWhile(ctx2))         => eqv(ctx1, ctx2)
+      case (TWhileNext(ctx1), TWhileNext(ctx2)) => eqv(ctx1, ctx2)
+      case (TWhileExcept, TWhileExcept)         => true 
+
+      case (TTry(ctx1), TTry(ctx2))                 => eqv(ctx1, ctx2)
+      case (TCatch, TCatch)                         => true
+      case (TCatchHandle(ctx1), TCatchHandle(ctx2)) => eqv(ctx1, ctx2)
+      case (TTryJoin, TTryJoin)                     => true
+      case (TTryNext(ctx1), TTryNext(ctx2))         => eqv(ctx1, ctx2)
+      case (TTryExcept, TTryExcept)                 => true
+
+      case (TAttempt, TAttempt)                     => true
+      case (TAttemptNext(ctx1), TAttemptNext(ctx2)) => eqv(ctx1, ctx2)
+
+      case (TThrow, TThrow)  => true
+
       case (_,_) => false 
     }
   }
@@ -961,6 +981,48 @@ object MinSSA {
   // TODO: we need to get rid of SLast and TLast, TLast is generated by conversion from SLast, 
   // SLast was created by kblkStmts as the last statement context, we should replace it by specific
   //   nop, if-else, while or try catch
+  
+
+  def isLast(tctx:TCtx):Boolean = tctx match {
+    case TNop => true
+    case TTail(tctx1)   => isLast(tctx1)
+    case TIfNext(tctx1) => isLast(tctx1)
+    case TTryNext(tctx1) => isLast(tctx1)
+    case TAttemptNext(tctx1) => isLast(tctx1)
+    case TWhileNext(tctx1) => isLast(tctx1)
+    case _  => false
+  }
+
+  def isErr(tctx:TCtx):Boolean = tctx match { 
+    case TThrow   => true
+    case TAttempt => true 
+    case TIfExcept    => true
+    case TWhileExcept => true
+    case TTryExcept   => true
+
+    case THead(tctx1) => isErr(tctx1)
+    case TTail(tctx1) => isErr(tctx1)
+    // is this check needed?
+    case TThen(tctx1) => isErr(tctx1)
+    case TElse(tctx1) => isErr(tctx1)
+
+    case TIfNext(tctx1) => isErr(tctx1)
+
+    // is this check needed?
+    case TWhile(tctx1) => isErr(tctx1)
+
+    case TWhileNext(tctx1) => isErr(tctx1)
+
+    // is this check needed?
+    case TTry(tctx1) => isErr(tctx1)
+    case TCatchHandle(tctx1) => isErr(tctx1)
+
+    case TTryNext(tctx1) => isErr(tctx1)
+    case TAttemptNext(tctx1) => isErr(tctx1)
+    case _ => false
+  }
+
+  /*
   def isLast(tctx:TCtx, aenv:AEnv):Boolean = follow(tctx,aenv) match {
     case None => true 
     case Some(_) => false
@@ -999,6 +1061,7 @@ object MinSSA {
     case _ => false
   }
 
+  */
 
   // isLast(c) == true iff follow(c) == None
   /** follow - get the following program context 
@@ -1006,23 +1069,20 @@ object MinSSA {
    * follow is called when tctx is not in eenv 
    */
   
+  // homework 3
+  // let's ponder about what is the follow(tctx) computing? 
+  // we might not need the aenv (which is the set of all ok ctxs encountered so far)  
   def follow(tctx:TCtx, aenv:AEnv):Option[TCtx] = tctx match {
-    /*
-    case TBox if ifElseEnv(aenv) => Some(TIfPostPhi) // are these necessary?
-    case TBox if whileEnv(aenv) => None // TODO: check? 
-    case TBox if tryEnv(aenv) => Some(TTryPostPhi)
-    case TBox if seqEnv(aenv) => Some(TTail(TBox))
-    */
     case TBox if aenv.length > 0 => Some(TLast(TBox)) // maybe this is sufficient?
     case TBox => None
-    /*
+
     case TLast(c) => {
       val daenv = appDec(unTLast, aenv)         
       follow(c,daenv) match {
         case Some(n) => Some(TLast(n))
         case None => None
       }
-    }*/
+    }
     case THead(c) => Some(TTail(TBox)) // fast-forward to the tail without stepping through c
     case TTail(c) => {
       val daenv = appDec(unTTail, aenv)
@@ -1081,22 +1141,15 @@ object MinSSA {
     // it would be THead(TWhilePrePhi(_)), hence there must be some TTail generated from the 
     // parent level.
   } 
-
+  */
 
   // list of extractors
 
-
+  
   def unTHead(tctx:TCtx):Option[TCtx] = tctx match {
     case THead(c) => Some(c)
     case _        => None
   }
-
-  /*
-  def unTLast(tctx:TCtx):Option[TCtx] = tctx match {
-    case TLast(c) => Some(c) 
-    case _        => None
-  }
-  */
 
   def unTTail(tctx:TCtx):Option[TCtx] = tctx match {
     case TTail(c) => Some(c)
@@ -1113,19 +1166,42 @@ object MinSSA {
     case _        => None
   }
 
+  def unTIfNext(tctx:TCtx):Option[TCtx] = tctx match {
+    case TIfNext(c) => Some(c)
+    case _          => None
+  }
+
   def unTWhile(tctx:TCtx):Option[TCtx] = tctx match {
     case TWhile(c) => Some(c)
     case _         => None
   }
+
+  def unTWhileNext(tctx:TCtx):Option[TCtx] = tctx match {
+    case TWhileNext(c) => Some(c)
+    case _             => None
+  }
+
 
   def unTTry(tctx:TCtx):Option[TCtx] = tctx match {
     case TTry(c) => Some(c) 
     case _       => None
   }
 
-  def unTCatch(tctx:TCtx):Option[TCtx] = tctx match {
-    case TCatch(c) => Some(c)
-    case _         => None
+  def unTCatchHandle(tctx:TCtx):Option[TCtx] = tctx match {
+    case TCatchHandle(c) => Some(c)
+    case _               => None
+  }
+  
+
+  def unTTryNext(tctx:TCtx):Option[TCtx] = tctx match {
+    case TTryNext(c) => Some(c) 
+    case _          => None
+  }
+
+
+  def unTAttemptNext(tctx:TCtx):Option[TCtx] = tctx match {
+    case TAttemptNext(c) => Some(c) 
+    case _               => None
   }
 
   // apply the deconstructor to the list of contexts; remove those return None
@@ -1145,6 +1221,9 @@ object MinSSA {
 
 
   def partialOrderTCtx(aenv:AEnv, eenv:EEnv):PartialOrder[TCtx] = new PartialOrder[TCtx]{
+    // TODO, we need two versions of partialCompare,
+    // 1) for ok flow
+    // 2) for err flow
     override def partialCompare(x: TCtx, y: TCtx): Double = 
     { 
       (x,y) match {
@@ -1152,13 +1231,6 @@ object MinSSA {
         // CtxOrdHole
         case (TBox, _) => -1.0 
         case (_, TBox) => 1.0
-
-        // CtxOrdInd  specialized for Last
-        case (TLast(ctx1), TLast(ctx2)) => {
-          val daenv = appDec(unTLast, aenv)
-          val deenv = appDec(unTLast, eenv)
-          partialOrderTCtx(daenv, deenv).partialCompare(ctx1,ctx2)
-        }
 
         // CtxOrdInd specialized for Head
         case (THead(ctx1), THead(ctx2)) => {
@@ -1188,14 +1260,19 @@ object MinSSA {
         }
         
         // CtxOrdThen 
-        case (TThen(c), TIfPostPhi) if isLast(c, appDec(unTThen, aenv)) && !(eenv.contains(x)) => -1.0
-        case (TThen(c), TIfPostPhi) if isLast(c, appDec(unTThen, aenv)) && (eenv.contains(x)) => Double.NaN
+        // is the check for !(eenv.contains(x)) still needed? 
+        // it seems not needed, if isLast(c) ==> isErr(c) is false ==> c can't be an error context.
+        // case (TThen(c), TIfJoin) if isLast(c) && !(eenv.contains(x)) => -1.0
+        // case (TThen(c), TIfJoin) if isLast(c, appDec(unTThen, aenv)) && (eenv.contains(x)) => Double.NaN
+        
+        case (TThen(c), TIfJoin) if isLast(c) => -1.0
         // if not last, we need to apply the transtivity
-        case (TThen(c), TIfPostPhi) if !isLast(c, appDec(unTThen, aenv)) && !(eenv.contains(x)) => follow(c, appDec(unTThen, aenv)) match {
-          case Some(n) => partialOrderTCtx(aenv, eenv).partialCompare(TThen(n), TIfPostPhi)
+        case (TThen(c), TIfJoin) => follow(c, appDec(unTThen, aenv)) match {
+          case Some(n) => partialOrderTCtx(aenv, eenv).partialCompare(TThen(n), TIfJoin)
           case None  => Double.NaN
         }
-        case (TThen(c), TIfPostPhi) if !isLast(c, appDec(unTThen, aenv)) && (eenv.contains(x)) => Double.NaN
+
+        case (TThen(c), TIfJoin) if isErr(c) => Double.NaN
 
         // CtxOrdInd specialized for TElse
         case (TElse(ctx1), TElse(ctx2)) => {
