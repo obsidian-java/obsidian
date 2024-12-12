@@ -1071,77 +1071,291 @@ object MinSSA {
   
   // homework 3
   // let's ponder about what is the follow(tctx) computing? 
-  // we might not need the aenv (which is the set of all ok ctxs encountered so far)  
-  def follow(tctx:TCtx, aenv:AEnv):Option[TCtx] = tctx match {
-    case TBox if aenv.length > 0 => Some(TLast(TBox)) // maybe this is sufficient?
-    case TBox => None
+  /** follow returns a list of contexts in the current lexical scope and might be reachable from tctx via an "ok" flow
 
-    case TLast(c) => {
-      val daenv = appDec(unTLast, aenv)         
-      follow(c,daenv) match {
-        case Some(n) => Some(TLast(n))
-        case None => None
-      }
-    }
-    case THead(c) => Some(TTail(TBox)) // fast-forward to the tail without stepping through c
+   * @param - tctx, the input context
+   * @param - aenv, the list of known contexts in the same lexical scope as tctx
+   * 
+   * @return - a list of context
+   *    
+   * */
+
+
+  def follow(tctx:TCtx, aenv:AEnv):List[TCtx] = tctx match {
+    /*
+     since allCtxs are in the same scope as Box
+     and Box <_ok Ctx for any Ctx
+     -------------------------------(FollowBox)
+     allCtxs |- follow(Box) -> allCtxs
+    */
+    case TBox => aenv
+
+    case TNop => Nil 
+    /*
+     allCtxs |- follow(B;Box) -> Ctxs
+     --------------------------------------------(FollowHead)
+     allCtxs |- follow(Ctx;\bar{B}) -> {B;Box} \cup Ctxs
+     */
+    case THead(c) => TTail(TBox)::follow(TTail(TBox), aenv) // building the closure
+    /*
+     allTailCtxs = [ Ctx | (B;Ctx) <- allCtxs ]
+     allTailCtxs |- follow(Ctx) -> Ctxs'
+     Ctxs'' = [ (B;Ctx') | Ctx' \in Ctxs' ]
+     --------------------------------------------(FollowTail)
+     allCtxs |- follow(B;Ctx) -> Ctxs''
+     */
     case TTail(c) => {
       val daenv = appDec(unTTail, aenv)
-      follow(c, daenv) match {
-        case Some(n) => Some(TTail(n))
-        case None => None
-      }
+      follow(c, daenv).map(TTail(_)) 
     }
+    /*
+     allThenCtxs =  [ Ctx | if E {Ctx} else {\bar{B}} join \bar{phi} next {\bar{B}} except \bar{phi} <- allCtxs ]
+     allThenCtxs |- follow(Ctx) -> Ctxs'
+     \exists Ctx' \in Ctxs': Last(Ctx')
+     Ctxs'' = [  if E {Ctx'} else {\bar{B}} join \bar{phi} next {\bar{B}} except \bar{phi} | Ctx' \in Ctxs' ]
+     allCtxs |- follow(if E {\bar{B}} else {\bbar{B}} join \bar{phi} next {Box} except \bar{phi}) -> Ctxs'''
+     -------------------------------------------------------------------------------------------------------------(FollowThen1)
+     allCtxs |- follow(if E {Ctx} else {\bar{B}} join \bar{phi} next {\bar{B}} except \bar{phi}) ->
+                Ctxs'' \cup { if E {\bar{B}} else {\bbar{B}} join \bar{phi} next {Box} except \bar{phi}} \cup Ctxs'''
+     */
+
+     /*
+     allThenCtxs =  [ Ctx | if E {Ctx} else {\bar{B}} join \bar{phi} next {\bar{B}} except \bar{phi} <- allCtxs ]
+     allThenCtxs |- follow(Ctx) -> Ctxs'
+     \forall Ctx' \in Ctxs': not(Last(Ctx'))
+     Ctxs'' = [  if E {Ctx'} else {\bar{B}} join \bar{phi} next {\bar{B}} except \bar{phi} | Ctx' \in Ctxs' ]
+     -------------------------------------------------------------------------------------------------------------(FollowThen2)
+     allCtxs |- follow(if E {Ctx} else {\bar{B}} join \bar{phi} next {\bar{B}} except \bar{phi}) -> Ctxs'' 
+     */
+
     case TThen(c) => {
       val daenv = appDec(unTThen, aenv)
-      follow(c, daenv) match  {
-        case Some(n) => Some(TThen(n))
-        case None => Some(TIfPostPhi)
+      val ctxsp = follow(c, daenv)
+      if (ctxsp.exists(isLast(_))) {
+        ctxsp.map(TThen(_)) ++ List(TIfNext(TBox)) ++ follow(TIfNext(TBox), aenv)
+      } else {
+        ctxsp.map(TThen(_))
       }
     }
+    // deduction rules omitted, similar to the Then cases.
     case TElse(c) => {
       val daenv = appDec(unTElse, aenv)
-      follow(c, daenv) match {
-        case Some(n) => Some(TElse(n))
-        case None => Some(TIfPostPhi)
+      val ctxsp = follow(c, daenv)
+      if (ctxsp.exists(isLast(_))) {
+        ctxsp.map(TElse(_)) ++ List(TIfNext(TBox)) ++ follow(TIfNext(TBox), aenv)
+      } else {
+        ctxsp.map(TElse(_))
       }
     }
-    case TIfPostPhi => None
+     /*
+     allCtxs |- follow((if E {\bar{B}} else {\bar{B}} join \bar{phi} next {Box} except \bar{phi}) -> Ctxs
+     -------------------------------------------------------------------------------------------------------------(FollowIfJoin)
+     allCtxs |- follow(if E {\bar{B}} else {\bar{B}} join BBox next {\bar{B}} except \bar{phi}) ->
+                 {if E {\bar{B}} else {\bar{B}} join \bar{phi} next {Box} except \bar{phi} } \cup Ctxs 
+    */   
+    case TIfJoin => TIfNext(TBox)::follow(TIfNext(TBox), aenv) // building the closure
+
+    /*
+     allNextCtxs = [ Ctx | (if E {\bar{B}} else {\bar{B}} join \bar{phi} next {Ctx} except \bar{phi}) <- allCtxs ]
+     allNextCtxs |- follow(Ctx) -> Ctxs'
+     Ctxs'' = [ (if E {\bar{B}} else {\bar{B}} join \bar{phi} next {Ctx'} except \bar{phi})  | Ctx' \in Ctxs' ]
+     ------------------------------------------------------------------------------------------------------------(FollowIfNext)
+     allCtxs |- follow(if E {\bar{B}} else {\bar{B}} join \bar{phi} next {Ctx} except \bar{phi}) -> Ctxs''
+     */
+
+    case TIfNext(c) => {
+      val daenv = appDec(unTIfNext, aenv)
+      follow(c, daenv).map(TIfNext(_))
+    }
+
+    case TIfExcept => Nil
+
+
+
+    /*
+     allTryCtxs =  [ Ctx | try {Ctx} catch (ex) \bar{phi}  handle {\bar{B}} join \bar{phi} next {\bar{B}} except \bar{phi} <- allCtxs ]
+     allTryCtxs |- follow(Ctx) -> Ctxs'
+     \exists Ctx' \in Ctxs': Last(Ctx')
+     Ctxs'' = [ try {Ctx'} catch (ex) \bar{phi} handle {\bar{B}} join \bar{phi} next {\bar{B}} except \bar{phi} | Ctx' \in Ctxs' ]
+     allCtxs |- follow(try {\bar{B}} catch (ex) \bar{phi} handle {\bar{B}} join \bar{phi} next {Box} except \bar{phi} ) -> Ctxs'''
+     -------------------------------------------------------------------------------------------------------------(FollowTry1)
+     allCtxs |- follow(try {Ctx} catch (ex) \bar{phi} handle {\bar{B}} join \bar{phi} next {\bar{B}} except \bar{phi}) ->
+                Ctxs'' \cup {try {\bar{B}} catch (ex) \bar{phi} handle {\bar{B}} join \bar{phi} next {Box} except \bar{phi}  } \cup Ctxs'''
+     */
+
+    /*
+     allTryCtxs =  [ Ctx | try {Ctx} catch (ex) \bar{phi} handle {\bar{B}} join \bar{phi} next {\bar{B}} except \bar{phi} <- allCtxs ]
+     allTryCtxs |- follow(Ctx) -> Ctxs'
+     \forall Ctx' \in Ctxs': not(Last(Ctx'))
+     Ctxs'' = [  try {Ctx'} catch (ex) handle {\bar{B}} join \bar{phi} next {\bar{B}} except \bar{phi} | Ctx' \in Ctxs' ]
+     -------------------------------------------------------------------------------------------------------------(FollowTry2)
+     allCtxs |- follow(try {Ctx} catch (ex) \bar{phi}  handle {\bar{B}} join \bar{phi} next {\bar{B}} except \bar{phi})  -> Ctxs'' 
+     */
+      
     case TTry(c) => {
       val daenv = appDec(unTTry, aenv)
-      follow(c, daenv) match {
-        case Some(n) => Some(TTry(n))
-        case None => Some(TTryPostPhi)
+      val ctxsp = follow(c, daenv)
+      if (ctxsp.exists(isLast(_))) {
+        ctxsp.map(TTry(_)) ++ List(TTryNext(TBox)) ++ follow(TTryNext(TBox), aenv)
+      } else {
+        ctxsp.map(TTry(_))
       }
     }
-    case TTryPeriPhi => follow(TCatch(TBox), aenv)
-    
-    case TCatch(c) => {
-      val daenv = appDec(unTCatch, aenv)
-      follow(c, daenv) match {
-        case Some(n) => Some(TCatch(n))
-        case None => Some(TTryPostPhi)
+
+    /*
+     allCtxs |- follow(try {\bar{B}} catch (ex) \bar{phi} handle {Box} join \bar{phi} next {\bar{B}} except \bar{phi}) -> Ctxs'
+     ----------------------------------------------------------------------------------------------------------------(FollowCatch)
+     allCtxs |- follow(try {\bar{B}} catch (ex) BBox handle {\bar{B}} join \bar{phi} next {\bar{B}} except \bar{phi} ) ->
+      {try {\bar{B}} catch (ex) \bar{phi} handle {Box} join \bar{phi} next {\bar{B}} except \bar{phi} } \cup Ctxs'
+     */
+    case TCatch => TCatchHandle(TBox)::follow(TCatchHandle(TBox), aenv) // building the closure
+
+
+
+    /*
+     allCatchHandleCtxs =  [ Ctx | try {\bar{B}} catch (ex) \bar{phi}  handle {Ctx} join \bar{phi} next {\bar{B}} except \bar{phi} <- allCtxs ]
+     allCatchHandleCtxs |- follow(Ctx) -> Ctxs'
+     \exists Ctx' \in Ctxs': Last(Ctx')
+     Ctxs'' = [ try {\bar{B}} catch (ex) \bar{phi} handle {Ctx'} join \bar{phi} next {\bar{B}} except \bar{phi} | Ctx' \in Ctxs' ]
+     allCtxs |- follow(try {\bar{B}} catch (ex) \bar{phi} handle {\bar{B}} join \bar{phi} next {Box} except \bar{phi} ) -> Ctxs'''
+     -------------------------------------------------------------------------------------------------------------(FollowCatchHandle1)
+     allCtxs |- follow(try {\bar{B}} catch (ex) \bar{phi} handle {Ctx} join \bar{phi} next {\bar{B}} except \bar{phi}) ->
+                Ctxs'' \cup {try {\bar{B}} catch (ex) \bar{phi} handle {\bar{B}} join \bar{phi} next {Box} except \bar{phi}  } \cup Ctxs'''
+     */
+
+    /*
+     allCatchHandleCtxs =  [ Ctx | try {\bar{B}} catch (ex) \bar{phi}  handle {Ctx} join \bar{phi} next {\bar{B}} except \bar{phi} <- allCtxs ]
+     allCatchHandleCtxs |- follow(Ctx) -> Ctxs'
+     \forall Ctx' \in Ctxs': not(Last(Ctx'))
+     Ctxs'' = [ try {\bar{B}} catch (ex) \bar{phi} handle {Ctx'} join \bar{phi} next {\bar{B}} except \bar{phi} | Ctx' \in Ctxs' ]
+     -------------------------------------------------------------------------------------------------------------(FollowCatchHandleTry2)
+     allCtxs |- follow(try {\bar{B}} catch (ex) \bar{phi}  handle {Ctx} join \bar{phi} next {\bar{B}} except \bar{phi})  -> Ctxs'' 
+     */
+
+
+    case TCatchHandle(c) => {
+      val daenv = appDec(unTCatchHandle, aenv)
+      val ctxsp = follow(c, daenv)
+      if (ctxsp.exists(isLast(_))) {
+        ctxsp.map(TCatchHandle(_)) ++ List(TTryNext(TBox)) ++ follow(TTryNext(TBox), aenv)
+      } else {
+        ctxsp.map(TCatchHandle(_))
       }
     }
-    case TTryPostPhi => None
-    // nothing follows at this level, 
-    // if there exists some following statment, 
-    // it would be THead(TWhilePrePhi(_)), hence there must be some TTail generated from the 
-    // parent level.
+
+    /*
+     allCtxs |- follow(try {\bar{B}} catch (ex) \bar{phi} handle {\bar{B}} join \bar{phi} next {Box} except \bar{phi}) -> Ctxs'
+     ----------------------------------------------------------------------------------------------------------------(FollowTryJoin)
+     allCtxs |- follow(try {\bar{B}} catch (ex) \bar{phi} handle {\bar{B}} join BBox next {\bar{B}} except \bar{phi} ) ->
+      {try {\bar{B}} catch (ex) \bar{phi} handle {\bar{phi}} join \bar{phi} next {Box} except \bar{phi} } \cup Ctxs'
+     */      
+    case TTryJoin => TTryNext(TBox)::follow(TTryNext(TBox), aenv) // building the closure
+
+
+    /*
+     allNextCtxs = [ Ctx | (try {\bar{B}} catch (ex) \bar{phi} handle {\bar{B}} join \bar{phi} next {Ctx} except \bar{phi}) <- allCtxs ]
+     allNextCtxs |- follow(Ctx) -> Ctxs'
+     Ctxs'' = [ (try {\bar{B}} catch (ex) \bar{phi} handle {\bar{B} join \bar{phi} next {Ctx'} except \bar{phi})  | Ctx' \in Ctxs' ]
+     ------------------------------------------------------------------------------------------------------------(FollowTryNext)
+     allCtxs |- follow(try {\bar{B}} catch (ex) \bar{phi} handle {\bar{B}} join \bar{phi} next {Ctx} except \bar{phi}) -> Ctxs''
+     */
+
+
+    case TTryNext(c) => {
+      val daenv = appDec(unTTryNext, aenv)
+      follow(c, daenv).map(TTryNext(_))
+    }
+
+    case TTryExcept => Nil
+
+
+
+    /*
+     allCtxs |- follow(join \bar{\phi} while {Box} next {\bar{B}} except \bar{phi}) -> Ctxs' 
+     ------------------------------------------------------------------------------------------------------------(FollowWhileJoin0)
+     allCtxs |- follow(join BBox^{0} while {\bar{B}} next {\bar{B}} except \bar{phi}) ->
+     { join \bar{\phi} while {Box} next {\bar{B}} except \bar{phi} \cup  Ctxs' 
+     */
+     /*
+     allCtxs |- follow(join \bar{\phi} while {\bar{B}} next {Box} except \bar{phi}) -> Ctxs'
+     ------------------------------------------------------------------------------------------------------------(FollowWhileJoin1)
+     allCtxs |- follow(join BBox^{1} while {\bar{B}} next {\bar{B}} except \bar{phi}) ->
+     { join \bar{\phi} while {\bar{B}} next {Box} except \bar{phi}
+     } \cup  Ctxs'
+     */
+    case TWhileJoin(b) if b == 0 =>
+      TWhile(TBox)::follow(TWhile(TBox), aenv)
+    case TWhileJoin(b) =>
+      TWhileNext(TBox)::follow(TWhileNext(TBox), aenv)
+
+
+    /*
+     allWhileCtxs = [ Ctx | (join \bar{\phi} while {Ctx} next {\bar{B}} except \bar{phi}) <- aenv ]
+     allWhileCtxs |- follow(Ctx) -> Ctxs'
+     \exists Ctx' \in Ctxs': Last(Ctx')
+     Ctxs'' = [ (join \bar{\phi} while {Ctx'} next {\bar{B}} except \bar{phi}) | Ctx' \in Ctxs' ]
+     allCtxs |- follow(join BBox^{1} while {\bar{B}} next {\bar{B}} except \bar{phi}) -> Ctxs'''     
+     ------------------------------------------------------------------------------------------------------------(FollowWhile1)
+     allCtxs |- follow(join \bar{\phi} while {Ctx} next {\bar{B}} except \bar{phi}) ->
+      Ctxs'' \cup {join BBox^{1} while {\bar{B}} next {\bar{B}} except \bar{phi}} \cup Ctxs'''
+     */
+
+    /*
+     allWhileCtxs = [ Ctx | (join \bar{\phi} while {Ctx} next {\bar{B}} except \bar{phi}) <- aenv ]
+     allWhileCtxs |- follow(Ctx) -> Ctxs'
+     \forall Ctx' \in Ctxs': not(Last(Ctx'))
+     Ctxs'' = [ (join \bar{\phi} while {Ctx'} next {\bar{B}} except \bar{phi}) | Ctx' \in Ctxs' ]
+     ------------------------------------------------------------------------------------------------------------(FollowWhile2)
+     allCtxs |- follow(join \bar{\phi} while {Ctx} next {\bar{B}} except \bar{phi}) -> Ctxs''
+     */
 
     case TWhile(c) => {
-      val daenv = appDec(unTWhile, aenv) 
-      follow(c, daenv) match {
-        case Some(n) => Some(TWhile(n))
-        case None => None 
+      val daenv = appDec(unTWhile, aenv)
+      val ctxsp = follow(c, daenv)
+      if (ctxsp.exists(isLast(_))) {
+        ctxsp.map(TWhile(_)) ++ List(TWhileJoin(1)) ++ follow(TWhileJoin(1), aenv)
+      } else {
+        ctxsp.map(TWhile(_))
       }
     }
-    case TWhilePrePhi(_) => None  
-    // nothing follows at this level, 
-    // if there exists some following statment, 
-    // it would be THead(TWhilePrePhi(_)), hence there must be some TTail generated from the 
-    // parent level.
+
+    /*
+     allNextCtxs = [ Ctx | (join \bar{\phi} while {\bar{B}} next {Ctx} except \bar{phi}) <- allCtxs ]
+     allNextCtxs |- follow(Ctx) -> Ctxs'
+     Ctxs'' = [ (join \bar{\phi} while {\bar{B}} next {Ctx'} except \bar{phi}) | Ctx' \in Ctxs' ]
+     ------------------------------------------------------------------------------------------------------------(FollowWhileNext)
+     allCtxs |- follow(join \bar{\phi} while {\bar{B}} next {Ctx} except \bar{phi}) -> Ctxs''
+     */
+      
+    case TWhileNext(c) => {
+      val daenv = appDec(unTWhileNext, aenv)
+      follow(c, daenv).map(TWhileNext(_))
+    }
+    case TWhileExcept => Nil
+
+
+    /*
+     allCtxs |- follow(attempt E.m(E) as x next {Box}) -> Ctxs'' 
+     ------------------------------------------------------------------------------------------------------------(FollowAttempt)
+     allCtxs |- follow(attempt BBox next {\bar{B}}) -> {attempt E.m(E) as x next {Box}} \cup Ctxs''     
+    */
+    case TAttempt => TAttemptNext(TBox)::follow(TAttemptNext(TBox), aenv)
+
+    /*
+     allNextCtxs = [ Ctx | (attempt E.m(E) as x next {Ctx}) <- allCtxs ]
+     allNextCtxs |- follow(Ctx) -> Ctxs'
+     Ctxs'' = [ (attempt E.m(E) as x next {Ctx'}) | Ctx' \in Ctxs' ]
+     ------------------------------------------------------------------------------------------------------------(FollowAttempt)
+     allCtxs |- follow(attempt E.m(E) as x next {Ctx}) -> \cup Ctxs''     
+    */
+
+    case TAttemptNext(c) => {
+      val daenv = appDec(unTAttemptNext, aenv)
+      follow(c, daenv).map(TAttemptNext(_))      
+    }
+
+    case TThrow => Nil
   } 
-  */
 
   // list of extractors
 
@@ -1240,7 +1454,9 @@ object MinSSA {
         }
 
         // CtxOrdSeq
-        case (THead(_), TTail(_)) if !(eenv.contains(x)) => -1.0
+        // CTX;\bar{B} contains no exception
+        // otherwise, we would have use attempt 
+        case (THead(_), TTail(_))  => -1.0 
 
         // CtxOrdInd specialized for TTail
         case (TTail(ctx1), TTail(ctx2)) =>  {
@@ -1266,14 +1482,12 @@ object MinSSA {
         // case (TThen(c), TIfJoin) if isLast(c, appDec(unTThen, aenv)) && (eenv.contains(x)) => Double.NaN
         
         case (TThen(c), TIfJoin) if isLast(c) => -1.0
-        // if not last, we need to apply the transtivity
-        case (TThen(c), TIfJoin) => follow(c, appDec(unTThen, aenv)) match {
-          case Some(n) => partialOrderTCtx(aenv, eenv).partialCompare(TThen(n), TIfJoin)
-          case None  => Double.NaN
-        }
-
         case (TThen(c), TIfJoin) if isErr(c) => Double.NaN
+// if not last, we need to apply the transtivity
+        case (TThen(c), TIfJoin) if follow(c, appDec(unTThen, aenv)).exists(isLast(_)) => -1.0
+        case (TThen(c), TIfJoin) => Double.NaN
 
+        
         // CtxOrdInd specialized for TElse
         case (TElse(ctx1), TElse(ctx2)) => {
           val daenv = appDec(unTElse, aenv)
@@ -1486,9 +1700,9 @@ object MinSSA {
         })
         val lbl = TBox
         for {
-          _ <- setVM(vm)
+          _ <- setVarMap(vm)
           blocks <- kBlock(block, SBox) 
-          _ <- addAEnv(TBox)
+          _ <- addToAEnv(TBox)
           // lbl <- toLbl(TBox) 
           varDeclsStmts <- genVarDecls 
           /*
@@ -1547,11 +1761,11 @@ object MinSSA {
   def kblkStmts(blkStmts:List[BlockStmt], ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, List[SSABlock]] = blkStmts match {
     case Nil => m.pure(Nil)
     case (bstmt::Nil) => for {
-      _ <- addAEnv(kctx(ctx))
+      _ <- addToAEnv(kctx(ctx))
       b <- kblkStmt(bstmt,putSCtx(ctx, SLast(SBox)))
     } yield List(b)
     case (bstmt::rest) => for {
-      _ <- addAEnv(kctx(ctx))
+      _ <- addToAEnv(kctx(ctx))
       b <- kblkStmt(bstmt,putSCtx(ctx, SHead(SBox)))
       bs <- kblkStmts(rest, putSCtx(ctx, STail(SBox)))
     } yield (b::bs)
@@ -1775,10 +1989,10 @@ object MinSSA {
     val lbl = tctx
     stmt match {
       case Assert(exp, msg) => for {
-        _    <- addAEnv(tctx)
+        _    <- addToAEnv(tctx)
         exp1 <- kexp(exp, tctx)
         msg1 <- msg.traverse( m => kexp(m, tctx))
-        _    <- setECtx(tctx)
+        _    <- setOkCtx(tctx)
       } yield SSABlock(lbl, List(SSAAssert(exp1, msg1)))
 
       case BasicFor(init, loop_cond, post_update, stmt) => m.raiseError("SSA construction failed, BasicFor should have been desugared.")
@@ -1818,14 +2032,14 @@ object MinSSA {
       case Do(stmt, exp) => m.raiseError("SSA construction failed, Do should have been desguared.")
 
       case Empty => for {
-        _    <- addAEnv(tctx)
-        _   <- setECtx(tctx)
+        _    <- addToAEnv(tctx)
+        _   <- setOkCtx(tctx)
       } yield (SSABlock(lbl, List(SSAEmpty)))
 
       case ExpStmt(Assign(lhs, op, rhs)) => lhs match {
         case NameLhs(x) => for {
           st <- get
-          _  <- addAEnv(tctx)
+          _  <- addToAEnv(tctx)
           b <- st match {
             case State(vm, eCtx, aenv, eenv, nDecls, methInvs, srcLblEnv, conf) => for {
               rhs1 <- kexp(rhs, tctx)
@@ -1834,37 +2048,37 @@ object MinSSA {
                 case None => vm + (x -> Map(tctx -> (ctx, xlbl)))
                 case Some(im) => vm + (x -> (im + (tctx -> (ctx, xlbl))))
               })
-              _ <- setVM(vm1)
+              _ <- setVarMap(vm1)
             } yield SSABlock(lbl, List(SSAAssignments(List(ExpStmt(Assign(NameLhs(xlbl), op, rhs1))))))
           }
-          _    <- setECtx(tctx)        
+          _    <- setOkCtx(tctx)        
         } yield b
 
         case FieldLhs(fa) => fa match {
           case PrimaryFieldAccess(e1, id) => for {
-            _  <- addAEnv(tctx)
+            _  <- addToAEnv(tctx)
             rhs1 <- kexp(rhs, tctx)
             e2  <- kexp(e1, tctx)
-            _    <- setECtx(tctx)
+            _    <- setOkCtx(tctx)
           } yield SSABlock(lbl, List(SSAAssignments(List(ExpStmt(Assign(FieldLhs(PrimaryFieldAccess(e2, id)), op, rhs1))))))
           case SuperFieldAccess(id) => for {
-            _  <- addAEnv(tctx)
+            _  <- addToAEnv(tctx)
             rhs1 <- kexp(rhs, tctx)
-            _    <- setECtx(tctx)
+            _    <- setOkCtx(tctx)
           } yield SSABlock(lbl, List(SSAAssignments(List(ExpStmt(Assign(FieldLhs(SuperFieldAccess(id)), op, rhs1))))))
           case ClassFieldAccess(name, id) => for {
-            _  <- addAEnv(tctx)
+            _  <- addToAEnv(tctx)
             rhs1 <- kexp(rhs, tctx)
-            _    <- setECtx(tctx)
+            _    <- setOkCtx(tctx)
           } yield SSABlock(lbl, List(SSAAssignments(List(ExpStmt(Assign(FieldLhs(ClassFieldAccess(name,id)), op, rhs1))))))
         }
 
         case ArrayLhs(ArrayIndex(e,es)) => for {
-          _  <- addAEnv(tctx)
+          _  <- addToAEnv(tctx)
           rhs1 <- kexp(rhs, tctx)
           e1   <- kexp(e, tctx)
           es1 <- es.traverse( e => kexp(e, tctx))
-          _    <- setECtx(tctx)
+          _    <- setOkCtx(tctx)
         } yield SSABlock(lbl, List(SSAAssignments(List(ExpStmt(Assign(ArrayLhs(ArrayIndex(e1,es1)), op, rhs1))))))
         
       }
@@ -1901,16 +2115,16 @@ object MinSSA {
       }*/
 
       case ExpStmt(exp) => for {
-        _  <- addAEnv(tctx)
+        _  <- addToAEnv(tctx)
         exp1 <- kexp(exp, tctx)
-        _    <- setECtx(tctx)
+        _    <- setOkCtx(tctx)
       } yield SSABlock(lbl, List(SSAExps(List(ExpStmt(exp1)))))
 
       case IfThen(exp, stmt) => m.raiseError("SSA construction failed, If then statment should have been desugared.")
 
       
       case IfThenElse(exp, then_stmt, else_stmt) => for {
-        _  <- addAEnv(tctx)
+        _  <- addToAEnv(tctx)
         exp1       <- kexp(exp, tctx)
         // reset the eenv in the state 
         st         <- get
@@ -1936,7 +2150,7 @@ object MinSSA {
 
         phis       <- mkPhi(st, stThenOut, stElseOut, lbl2)
         _          <- extendVarsWithContextAndLabel(phis.map( ph => ph match {case Phi(n, renamed, m) => n }), ctx, tctx2, lbl2) 
-        _          <- setECtx(tctx2)
+        _          <- setOkCtx(tctx2)
       } yield SSABlock(lbl, List(SSAIf(exp1, then_stmts, else_stmts, phis)))
       
       case Labeled(id, stmt) => for {
@@ -1946,16 +2160,16 @@ object MinSSA {
 
       case Return(oexp) => oexp match {
         case Some(exp) => for {
-          _  <- addAEnv(tctx)
+          _  <- addToAEnv(tctx)
           // lbl  <- m.pure(tctx)
           exp1 <- kexp(exp,tctx) 
-          _    <- setECtx(tctx)
+          _    <- setOkCtx(tctx)
 
         } yield SSABlock(lbl, List(SSAReturn(Some(exp1))))
         case None => for {
-          _  <- addAEnv(tctx)
+          _  <- addToAEnv(tctx)
           // lbl  <- m.pure(tctx)
-          _    <- setECtx(tctx)
+          _    <- setOkCtx(tctx)
         } yield SSABlock(lbl, List(SSAReturn(None)))
       }
 
@@ -1965,18 +2179,18 @@ object MinSSA {
       case Synchronized(exp, blk) => m.raiseError("SSA construction failed, Synchronized statement is not supported.") // todo
 
       case Throw(exp) => for {
-        _  <- addAEnv(tctx)
+        _  <- addToAEnv(tctx)
         // lbl  <- toLbl(tctx)
         exp1 <- kexp(exp, tctx)
-        _    <- addEEnv(tctx)
-        _    <- setECtx(tctx)
+        _    <- addToEEnv(tctx)
+        _    <- setOkCtx(tctx)
       } yield SSABlock(lbl, List(SSAThrow(exp1)))
 
       /* TODO fix me
       case Try(try_blk, Catch(param, catch_blk)::Nil, finally_blk) => finally_blk match {
         case Some(b) => m.raiseError("SSA construction failed, Try catch finally should be desugared to Try catch.")
         case None    => for {
-          _         <- addAEnv(tctx)
+          _         <- addToAEnv(tctx)
           // lbl       <- toLbl(tctx)
           st        <- get
 
@@ -2016,14 +2230,14 @@ object MinSSA {
 
           phis_post <- mkPhi(stTryOut, stCatchOut, lbl3)
           _         <- extendAllVarsWithContextAndLabel(ctx, tctx3, lbl3)
-          _         <- setECtx(tctx)
-          _         <- eenvFromState(st).traverse( ctx => addEEnv(ctx))
+          _         <- setOkCtx(tctx)
+          _         <- eenvFromState(st).traverse( ctx => addToEEnv(ctx))
         } yield SSABlock(lbl, List(SSATry(try_stmts, phis_peri, param, catch_stmts, phis_post)))
       } */
       case Try(_, Nil, _) => m.raiseError("SSA construction failed, there is no catch in a try statement")
       case Try(_, _::_, _) => m.raiseError("SSA construction failed, Multiple catch clauses encountered, which should have been merged.")
       case While(exp, stmt) => for {
-        _  <- addAEnv(tctx)
+        _  <- addToAEnv(tctx)
         // lbl <- toLbl(tctx)
         st  <- get
         lbl0  <- m.pure(eCtxFromState(st))
