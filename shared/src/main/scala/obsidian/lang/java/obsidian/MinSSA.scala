@@ -1076,7 +1076,7 @@ object MinSSA {
    * @param - tctx, the input context
    * @param - aenv, the list of known contexts in the same lexical scope as tctx
    * 
-   * @return - a list of context
+   * @return - a list of contexts
    *    
    * */
 
@@ -1483,7 +1483,7 @@ object MinSSA {
         
         case (TThen(c), TIfJoin) if isLast(c) => -1.0
         case (TThen(c), TIfJoin) if isErr(c) => Double.NaN
-// if not last, we need to apply the transtivity
+        // if not last, we need to apply the transtivity
         case (TThen(c), TIfJoin) if follow(c, appDec(unTThen, aenv)).exists(isLast(_)) => -1.0
         case (TThen(c), TIfJoin) => Double.NaN
 
@@ -1496,35 +1496,26 @@ object MinSSA {
         }
         
         // CtxOrdElse 
-        case (TElse(c), TIfPostPhi) if isLast(c, appDec(unTElse, aenv)) && !(eenv.contains(x)) => -1.0
-        case (TElse(c), TIfPostPhi) if isLast(c, appDec(unTElse, aenv)) && (eenv.contains(x)) => Double.NaN
-        // if not last, we need to apply the transtivity until we find the last
-        case (TElse(c), TIfPostPhi) if !isLast(c, appDec(unTElse, aenv)) && !(eenv.contains(x)) => follow(c, appDec(unTElse, aenv)) match {
-          case Some(n) => partialOrderTCtx(aenv, eenv).partialCompare(TElse(n), TIfPostPhi)
-          case None  => Double.NaN
-        }
-        case (TElse(c), TIfPostPhi) if !isLast(c, appDec(unTElse, aenv)) && (eenv.contains(x)) => Double.NaN
+        case (TElse(c), TIfJoin) if isLast(c) => -1.0
+        case (TElse(c), TIfJoin) if isErr(c) => Double.NaN
+        // if not last, we need to apply the transtivity
+        case (TElse(c), TIfJoin) if follow(c, appDec(unTElse, aenv)).exists(isLast(_)) => -1.0
+        case (TElse(c), TIfJoin) => Double.NaN
 
         // CtxOrdThen - dual 
-        case (TIfPostPhi, TThen(c)) => -partialCompare(y,x) 
+        case (TIfJoin, TThen(c)) => -partialCompare(y,x) 
         // CtxOrdElse - dual 
-        case (TIfPostPhi, TElse(c)) => -partialCompare(y,x) 
+        case (TIfJoin, TElse(c)) => -partialCompare(y,x) 
 
         // CtxOrdWhileEntry1 
-        case (TWhilePrePhi(0), TWhile(_)) => -1.0 // _ or Box? todo: check!!
+        case (TWhileJoin(0), TWhile(_)) => -1.0 
+        case (TWhile(_), TWhileJoin(0)) => 1.0
 
         // CtxOrdWhileEntry2
-        case (TWhile(c), TWhilePrePhi(1)) if isLast(c, appDec(unTWhile, aenv)) && !(eenv.contains(x)) => -1.0
-        case (TWhile(c), TWhilePrePhi(1)) if isLast(c, appDec(unTWhile, aenv)) && (eenv.contains(x)) => Double.NaN
-        case (TWhile(c), TWhilePrePhi(1)) if isLast(c, appDec(unTWhile, aenv)) => Double.NaN   
-        // if not last, we need to apply the transtivity
-        case (TWhile(c), TWhilePrePhi(1)) if !isLast(c, appDec(unTWhile, aenv)) && !(eenv.contains(x)) => follow(c, appDec(unTWhile, aenv)) match {
-          case Some(n) => partialOrderTCtx(aenv, eenv).partialCompare(TWhile(n), TWhilePrePhi(1))
-          case None  => Double.NaN
-        }
-        case (TWhile(c), TWhilePrePhi(1)) if !isLast(c, appDec(unTWhile, aenv)) && (eenv.contains(x)) => Double.NaN // is this possible?
-        case (TWhile(c), TWhilePrePhi(1)) if !isLast(c, appDec(unTWhile, aenv)) => Double.NaN // is this possible?
-
+        case (TWhile(c), TWhileJoin(1)) if isLast(c) => -1.0
+        case (TWhile(c), TWhileJoin(1)) if isErr(c)  => Double.NaN
+        case (TWhile(c), TWhileJoin(1)) if follow(c, appDec(unTWhile, aenv)).exists(isLast(_)) => -1.0
+        case (TWhile(c), TWhileJoin(1)) => Double.NaN 
 
         // CtxOrdInd specialized for TWhile
         case (TWhile(ctx1), TWhile(ctx2)) => {
@@ -1533,7 +1524,7 @@ object MinSSA {
           partialOrderTCtx(daenv, deenv).partialCompare(ctx1,ctx2)
         }
 
-
+        case (TWhileJoin(1), TWhile(c)) => -partialCompare(y,x) 
 
 
         // CtxOrdInd specialized for TTry
@@ -1542,58 +1533,54 @@ object MinSSA {
           val deenv = appDec(unTTry, eenv)
           partialOrderTCtx(daenv, deenv).partialCompare(ctx1,ctx2)
         } 
-        case (TTry(c), TTryPeriPhi) if eenv.contains(x) => -1.0 // (CtxOrdTry1)
+        // we don't need to handle this in the ok flow, right?
+        // case (TTry(c), TCatch) if isErr(c) => -1.0 // (CtxOrdTry1)
 
-        // apply transtivity until we can fire (CtxOrdTry1) or fail at the last 
-        case (TTry(c), TTryPeriPhi) if !isLast(c, appDec(unTTry, aenv)) => follow(c, appDec(unTTry, aenv)) match {
-          case Some(n) => partialOrderTCtx(aenv, eenv).partialCompare(TTry(n), TTryPeriPhi)
-          case None  => Double.NaN
+        case (TTry(c), TTryJoin) if isLast(c) => -1.0
+        case (TTry(c), TTryJoin) if isErr(c) => Double.NaN 
+        case (TTry(c), TTryJoin) if follow(c, appDec(unTTry, aenv)).exists(isLast(_)) => -1.0 
+        case (TTry(c), TTryJoin) => Double.NaN 
+        case (TTryJoin, TTry(c)) => -partialCompare(y,x) 
+
+        case (TTry(ctx1), TTryNext(ctx2)) => partialCompare(TTry(ctx1), TTryJoin)
+        case (TTryNext(ctx1), TTry(ctx2)) => -partialCompare(y,x) 
+
+        case (TCatch, TCatchHandle(_)) => -1.0 
+        case (TCatchHandle(_), TCatch) => 1.0
+        case (TCatch, TTryJoin) => partialCompare(TCatchHandle(TBox), TTryJoin)
+        case (TTryJoin, TCatch) => -partialCompare(y,x)
+        case (TCatch, TTryNext(ctxt))  => partialCompare(TCatchHandle(TBox), TTryNext(ctxt))
+        case (TTryNext(ctxt), TCatch)  => -partialCompare(y,x)
+
+        case (TCatchHandle(ctx1), TCatchHandle(ctx2)) => {
+          val daenv = appDec(unTCatchHandle, aenv)
+          val deenv = appDec(unTCatchHandle, eenv)
+          partialOrderTCtx(daenv, deenv).partialCompare(ctx1,ctx2)
         }
-        // c must be the last
-        case (TTry(c), TTryPeriPhi) => Double.NaN
 
-        case (TTry(c1), TCatch(c2)) if eenv.contains(x) => -1.0 // (CtxOrdTry1) and (CtxOrdCatch1) with transitivity
-        // apply transtivity until we can fire previous case or fail at the last 
-        case (TTry(c1), TCatch(c2)) if !isLast(c1, appDec(unTTry, aenv)) => follow(c1, appDec(unTTry, aenv)) match {
-          case Some(n1) => partialOrderTCtx(aenv, eenv).partialCompare(TTry(n1), TCatch(c2))
-          case None => Double.NaN
-        }
-        // c1 must be the last
-        case (TTry(c1), TCatch(c2)) => Double.NaN 
+        case (TCatchHandle(c), TTryJoin) if isLast(c) => -1.0 
+        case (TCatchHandle(c), TTryJoin) if isErr(c) => Double.NaN
+        case (TCatchHandle(c), TTryJoin) if follow(c, appDec(unTTry, aenv)).exists(isLast(_)) => -1.0 
+        case (TCatchHandle(c), TTryJoin) => Double.NaN
+        case (TTryJoin, TCatchHandle(c)) => -partialCompare(y,x)
 
-        // (CtxOrdTry2), we don't check x is contained in eenv, because even if it is in eenv, we apply transtivity to get the same result
-        case (TTry(c), TTryPostPhi) => Double.NaN
+        case (TCatchHandle(ctx1), TTryNext(ctx2)) => partialCompare(TCatchHandle(ctx1), TTryJoin) 
+        case (TTryNext(ctx1), TCatchHandle(ctx2)) => -partialCompare(y,x)
 
-        // dual of the above
-        case (TTryPeriPhi, TTry(_)) => -partialCompare(y,x)
-
-        // (CtxOrdCatch1) 
-        case (TTryPeriPhi, TCatch(_)) => -1.0
-        // (CtxOrdCatch1) and transivitiy, no throw in the catch block
-        case (TTryPeriPhi, TTryPostPhi) => partialCompare(TCatch(TBox), TTryPostPhi) // we still need to step through the catch block to ensure no break or continue
-
-        // dual of the above
-        case (TCatch(_), TTry(_)) => -partialCompare(y,x)
-        case (TCatch(_), TTryPeriPhi) => -partialCompare(y,x)
-
-        // CtxOrdInd specialized for TCatch
-
-        case (TCatch(ctx1), TCatch(ctx2)) => {
-          val daenv = appDec(unTCatch, aenv)
-          val deenv = appDec(unTCatch, eenv)
+        case (TTryNext(ctx1), TTryNext(ctx2)) => {
+          val daenv = appDec(unTTryNext, aenv)
+          val deenv = appDec(unTTryNext, eenv)
           partialOrderTCtx(daenv, deenv).partialCompare(ctx1,ctx2)
         } 
-        case (TCatch(c), TTryPostPhi) if isLast(c, appDec(unTCatch, aenv)) && !(eenv.contains(x)) => -1.0 // (CtxOrdCatch2)
-        // apply transtivity until we can fire previous case or fail at the last 
-        case (TCatch(c), TTryPostPhi) if !isLast(c, appDec(unTCatch, aenv)) && !(eenv.contains(x)) => follow(c, appDec(unTCatch, aenv)) match {
-          case Some(n) => partialOrderTCtx(aenv, eenv).partialCompare(TCatch(n), TTryPostPhi)
-          case None => Double.NaN
-        }
-        case (TCatch(c), TTryPostPhi) => Double.NaN
-        // dual of the above
-        case (TTryPostPhi, TTry(_)) => -partialCompare(y,x)
-        case (TTryPostPhi, TTryPeriPhi) => -partialCompare(y,x)
-        case (TTryPostPhi, TCatch(_)) => -partialCompare(y,x)
+
+        case (TAttempt, TAttemptNext(c)) => -1.0
+        case (TAttemptNext(c), TAttempt) => 1.0
+
+        case (TAttemptNext(ctx1), TAttemptNext(ctx2)) => {
+          val daenv = appDec(unTAttemptNext, aenv)
+          val deenv = appDec(unTAttemptNext, eenv)
+          partialOrderTCtx(daenv, deenv).partialCompare(ctx1,ctx2)
+        } 
 
         case _ => Double.NaN
       }
@@ -1660,7 +1647,7 @@ object MinSSA {
     case None => Nil
     case Some(trs) => {
       val tcvs = for { 
-        (tctx, (sctx, tx)) <- trs.toList
+        (tctx, tx) <- trs.toList
         if (cmp(tctx, ctx))
       } yield (tctx, tx)
 
@@ -1696,7 +1683,7 @@ object MinSSA {
       case MethodBody(None) => m.pure(SSAMethodDecl(modifiers, type_params, return_ty, fname, formal_params, ex_types, exp, SSAMethodBody(Nil)))
       case MethodBody(Some(block)) => {
         val vm = formal_params.foldLeft(Map():VarMap)((vm, param) => {
-          vm + ((paramIdtoName(param)) -> Map(TBox -> (SBox, paramIdtoName(param))))
+          vm + ((paramIdtoName(param)) -> Map(TBox -> paramIdtoName(param)))
         })
         val lbl = TBox
         for {
@@ -2045,8 +2032,8 @@ object MinSSA {
               rhs1 <- kexp(rhs, tctx)
               xlbl <- mkName(x,lbl)
               vm1 <- m.pure(vm.get(x) match {
-                case None => vm + (x -> Map(tctx -> (ctx, xlbl)))
-                case Some(im) => vm + (x -> (im + (tctx -> (ctx, xlbl))))
+                case None => vm + (x -> Map(tctx -> xlbl))
+                case Some(im) => vm + (x -> (im + (tctx -> xlbl)))
               })
               _ <- setVarMap(vm1)
             } yield SSABlock(lbl, List(SSAAssignments(List(ExpStmt(Assign(NameLhs(xlbl), op, rhs1))))))
@@ -2145,7 +2132,7 @@ object MinSSA {
         stMerged   <- m.pure(mergeState(st, stThenOut, stElseOut)) 
         _          <- put(stMerged)
 
-        tctx2      <- m.pure(putTCtx(tctx, TIfPostPhi))
+        tctx2      <- m.pure(putTCtx(tctx, TIfJoin))
         lbl2       <- m.pure(tctx2)
 
         phis       <- mkPhi(st, stThenOut, stElseOut, lbl2)
@@ -2240,9 +2227,9 @@ object MinSSA {
         _  <- addToAEnv(tctx)
         // lbl <- toLbl(tctx)
         st  <- get
-        lbl0  <- m.pure(eCtxFromState(st))
-        tctx_pre0 <- m.pure(putTCtx(tctx, TWhilePrePhi(0)))
-        tctx_pre1 <- m.pure(putTCtx(tctx, TWhilePrePhi(1)))
+        lbl0  <- m.pure(okCtxFromState(st))
+        tctx_pre0 <- m.pure(putTCtx(tctx, TWhileJoin(0)))
+        tctx_pre1 <- m.pure(putTCtx(tctx, TWhileJoin(1)))
         // lbl1_0  <- m.pure(tctx_pre0) // not in used, we use option 2
         lbl1  <- m.pure(tctx_pre1)
 
@@ -2271,7 +2258,7 @@ object MinSSA {
           } yield State(entries.foldLeft(vm0)((vm1, ent) => ent match {
             case (v, tctx2, sctx, v_lbl) => vm1.get(v) match {
               case None => vm1
-              case Some(m) => vm1 + (v -> (m + (tctx2  -> (sctx, v_lbl))))
+              case Some(m) => vm1 + (v -> (m + (tctx2  -> v_lbl)))
             }}), tctx_pre0, aenv0, eenv0,  nestedDecls0, methInvs0, srcLblEnv0, conf0)
         }
         _ <- put(stBodyIn)
@@ -2332,7 +2319,7 @@ object MinSSA {
                   } yield entries.foldLeft(vm0 ++ diffVarMap(vm2,vm1))((vm3, ent) => ent match {
                       case (v, tctx11, sctx, v_lbl) => vm3.get(v) match {
                         case None => vm3
-                        case Some(m) => vm3 + (v -> (m + (tctx11  -> (sctx, v_lbl))))
+                        case Some(m) => vm3 + (v -> (m + (tctx11  -> v_lbl)))
                       }
                   }) 
                 }
