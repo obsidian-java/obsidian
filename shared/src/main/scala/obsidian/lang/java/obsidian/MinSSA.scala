@@ -1670,6 +1670,13 @@ object MinSSA {
     }
   }
 
+  /** data type to keep track of the 
+      exception-throwing method ids
+    */
+  type PkgName = Name
+  type ClsName = Name
+  type MethodName = Ident
+  type ExceptionThrowers = Map[PkgName, Map[ClsName, MethodName]]
 
   /**
     * kmethodDecl - converts a method to SSA method declaration
@@ -1963,10 +1970,10 @@ object MinSSA {
   /**
     * kstmt - convert a statement, correspond to KS in the paper.
     *
-    * @param stmt
-    * @param ctx
-    * @param m
-    * @return
+    * @param stmt - the Java statement to be converted
+    * @param ctx  - the current SSA Context
+    * @param m    - Monad object
+    * @return     - an SSA Block
     */
   
 
@@ -1984,6 +1991,8 @@ object MinSSA {
 
       case EnhancedFor(modifiers, ty, id, exp, stmt) => m.raiseError("SSA construction failed, EnhancedFor should have been desugared.")
 
+      case Break(_) => m.raiseError("SSA construction failed, Break is not supported.")
+      case Continue(_) => m.raiseError("SSA construction failed, Continue is not supported.") 
       /* break and continue are not supported yet.
       case Break(None) => m.raiseError("SSA construction failed, Break statement is associated with no label. It should have been pre-processed.")
       case Break(Some(id)) => for {
@@ -2109,7 +2118,7 @@ object MinSSA {
 
       
       case IfThenElse(exp, then_stmt, else_stmt) => for {
-        _  <- addToAEnv(tctx)
+        _          <- addToAEnv(tctx)
         exp1       <- kexp(exp, tctx)
         // reset the eenv in the state 
         st         <- get
