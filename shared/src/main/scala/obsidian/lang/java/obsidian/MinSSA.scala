@@ -1688,7 +1688,7 @@ object MinSSA {
         val lbl = TBox
         for {
           _ <- setVarMap(vm)
-          blocks <- kBlock(block, SBox) 
+          blocks <- kBlock(block, TBox) 
           _ <- addToAEnv(TBox)
           // lbl <- toLbl(TBox) 
           varDeclsStmts <- genVarDecls 
@@ -1714,7 +1714,7 @@ object MinSSA {
     * @return
     */
   
-  def kstmtBlock(stmt:Stmt, ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,List[SSABlock]] = stmt match {
+  def kstmtBlock(stmt:Stmt, ctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,List[SSABlock]] = stmt match {
     // case StmtBlock(Block(blkStmts)) => kblkStmts(blkStmts,ctx)
     case StmtBlock(blk) => kBlock(blk,ctx)
     case _ => for {
@@ -1731,7 +1731,7 @@ object MinSSA {
     * @param m
     * @return
     */
-  def kBlock(blk:Block, ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,List[SSABlock]] = blk match {
+  def kBlock(blk:Block, ctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,List[SSABlock]] = blk match {
     case Block(blkStmts) => kblkStmts(blkStmts,ctx)
   }
 
@@ -1745,16 +1745,16 @@ object MinSSA {
     * @return
     */
 
-  def kblkStmts(blkStmts:List[BlockStmt], ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, List[SSABlock]] = blkStmts match {
+  def kblkStmts(blkStmts:List[BlockStmt], ctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, List[SSABlock]] = blkStmts match {
     case Nil => m.pure(Nil)
     case (bstmt::Nil) => for {
-      _ <- addToAEnv(kctx(ctx))
-      b <- kblkStmt(bstmt,putSCtx(ctx, SLast(SBox)))
+      _ <- addToAEnv(ctx)
+      b <- kblkStmt(bstmt,putTCtx(ctx, TNop))
     } yield List(b)
     case (bstmt::rest) => for {
-      _ <- addToAEnv(kctx(ctx))
-      b <- kblkStmt(bstmt,putSCtx(ctx, SHead(SBox)))
-      bs <- kblkStmts(rest, putSCtx(ctx, STail(SBox)))
+      _ <- addToAEnv(ctx)
+      b <- kblkStmt(bstmt,putTCtx(ctx, THead(TBox)))
+      bs <- kblkStmts(rest, putTCtx(ctx, TTail(TBox)))
     } yield (b::bs)
   }
 
@@ -1767,7 +1767,7 @@ object MinSSA {
     * @param m
     * @return
     */
-  def kblkStmt(blkStmt:BlockStmt, ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,SSABlock] = blkStmt match {
+  def kblkStmt(blkStmt:BlockStmt, ctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,SSABlock] = blkStmt match {
     case BlockStmt_(stmt) => kstmt(stmt, ctx) 
     case LocalClass(_) => m.raiseError("SSA construction failed, local class is not supported.")
     case LocalVars(mods, ty, varDecls) => kVarDecls(mods, ty, varDecls, ctx)
@@ -1784,8 +1784,7 @@ object MinSSA {
     * @param m
     * @return
     */
-  def kVarDecls(mods:List[Modifier], ty:Type, varDecls:List[VarDecl], ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, SSABlock] = for {
-    tctx <- m.pure(kctx(ctx))
+  def kVarDecls(mods:List[Modifier], ty:Type, varDecls:List[VarDecl], tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, SSABlock] = for {
     // a new case, combining KVD and KSTMT assignment
     // we first record all the variable name and type
     _ <- recordVarDecls(mods, ty, varDecls, tctx)
@@ -1971,8 +1970,7 @@ object MinSSA {
     */
   
 
-  def kstmt(stmt:Stmt, ctx:SCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, SSABlock] = {
-    val tctx = kctx(ctx)
+  def kstmt(stmt:Stmt, tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, SSABlock] = {
     val lbl = tctx
     stmt match {
       case Assert(exp, msg) => for {
@@ -2119,14 +2117,14 @@ object MinSSA {
           case State(vm, eCtx, aenv, eenv, nDecls, methInvs, srcLblEnv, conf) => m.pure(State(vm, eCtx, aenv, Nil, nDecls, methInvs, srcLblEnv, conf))
         }
         _          <- put(stThenIn)
-        then_ctx   <- m.pure(putSCtx(ctx, SThen(SBox)))
+        then_ctx   <- m.pure(putTCtx(tctx, TThen(TBox)))
         then_stmts <- kstmtBlock(then_stmt, then_ctx)
         stThenOut  <- get
         stElseIn   <- st match {
           case State(vm, eCtx, aenv, eenv, nDecls, methInvs, srcLblEnv, conf) => m.pure(State(vm, eCtx, aenv, Nil, nDecls, methInvs, srcLblEnv, conf))
         }
         _          <- put(stElseIn)
-        else_ctx   <- m.pure(putSCtx(ctx,SElse(SBox)))
+        else_ctx   <- m.pure(putTCtx(tctx,TElse(TBox)))
         else_stmts <- kstmtBlock(else_stmt, else_ctx)
         stElseOut  <- get
         stMerged   <- m.pure(mergeState(st, stThenOut, stElseOut)) 
@@ -2136,7 +2134,7 @@ object MinSSA {
         lbl2       <- m.pure(tctx2)
 
         phis       <- mkPhi(st, stThenOut, stElseOut, lbl2)
-        _          <- extendVarsWithContextAndLabel(phis.map( ph => ph match {case Phi(n, renamed, m) => n }), ctx, tctx2, lbl2) 
+        _          <- extendVarsWithContextAndLabel(phis.map( ph => ph match {case Phi(n, renamed, m) => n }), tctx2, lbl2) 
         _          <- setOkCtx(tctx2)
       } yield SSABlock(lbl, List(SSAIf(exp1, then_stmts, else_stmts, phis)))
       
