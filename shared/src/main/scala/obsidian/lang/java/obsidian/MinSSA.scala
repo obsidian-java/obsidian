@@ -131,7 +131,7 @@ object MinSSA {
   ) extends SSAStmt
 
   case class SSAAttempt( // attempt E.m(E) as x { \bar{B} }
-      exp: Exp, // E.m(E) 
+      rhs: Exp, // E.m(E) 
       lhs: Option[Lhs], // as x, optional, as there might be no lhs
       stmts: List[SSABlock]
   ) extends SSAStmt
@@ -527,6 +527,9 @@ object MinSSA {
     }
   })
 
+
+  def unionVarMaps(vms:List[VarMap]):VarMap = vms.foldLeft(Map():VarMap)( (acc, m) => unionVarMap(acc, m))
+
   def diffVarMap(vm1:VarMap, vm2:VarMap):VarMap = listToVarMap(varMapToList(vm1).toSet.diff(varMapToList(vm2).toSet).toList)
 
   def listToVarMap(l:List[(Name, (TCtx, Name))]):VarMap = l.foldLeft(Map():VarMap)( (vm, kv) => kv match {
@@ -565,9 +568,10 @@ object MinSSA {
   */
   case class State(
     exceptionThrs: ExceptionThrowers,
-    varMap: VarMap, 
-    okCtx: TCtx,
-    errCtxs: List[TCtx],
+    // commented the following, they are moved to the input/output of the function.
+    // varMap: VarMap,  
+    // okCtx: TCtx,
+    // errCtxs: List[TCtx],
     aenv: AEnv, 
     eenv: EEnv, 
     nestedDecls: List[(TCtx, Ident, Type, List[Modifier])],
@@ -580,7 +584,7 @@ object MinSSA {
    * extract the charcodes from the environment
    * */
   def getCharCodes(st:State):List[Char] = st match {
-    case State(eThrowers, varMap, okCtx, eCtxs, aenv, eenv, nestedDecls, methodInvs, srcLabelEnv, config) => 
+    case State(eThrowers, /* varMap, okCtx, eCtxs, */  aenv, eenv, nestedDecls, methodInvs, srcLabelEnv, config) => 
       config match {
         case SSAEnvConfig(ctxtAsID, charcodes) => charcodes
       }
@@ -600,21 +604,23 @@ object MinSSA {
 
   // when using the default config, ctxt as part of the variable name will be mapped to character array through charcode. 
   // the labels/contexts in the phi statement remain unchanged.
-  val initState:State = State(Map(), Map(), TBox, List(), List(), List(), List(), List(), Map(), defaultConfig)
+  val initState:State = State(Map(), /* Map(), TBox, List(), */ List(), List(), List(), List(), Map(), defaultConfig)
 
-  val debugInitState:State = State(Map(), Map(), TBox, List(), List(), List(), List(), List(), Map(), debugConfig)
+  val debugInitState:State = State(Map(), /* Map(), TBox, List(), */ List(), List(), List(), List(), Map(), debugConfig)
 
 
   def eenvFromState(st:State):EEnv = st match {
-    case State(_, _, _, _, _, eenv, _, _, _, _ ) => eenv
+    case State(_, /* _, _, _, */ _, eenv, _, _, _, _ ) => eenv
   }
 
+  /*
   def okCtxFromState(st:State):TCtx = st match {
     case State(_, _, okCtx, _,  _, _, _, _, _,_) => okCtx
   }
+  */
 
   def srcLabelEnvFromState(st:State):Map[Ident,TCtx] = st match {
-    case State(_, _, _, _, _, _, _, _, srcLblEnv,_) => srcLblEnv
+    case State(_, /* _, _, _, */ _, _, _, _, srcLblEnv,_) => srcLblEnv
   }
 
   // all Ok Contexts so far
@@ -703,6 +709,7 @@ object MinSSA {
     * @param m
     * @return
     */
+  /*
   def setOkCtx(tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get
     st1 <- m.pure(st match {
@@ -710,8 +717,19 @@ object MinSSA {
     })
     _   <- put(st1)
   } yield ()
+  */
 
-
+  /**
+    * retrieve the OkCtx from the state 
+    */
+  /*
+  def getOkCtx(using m:MonadError[SSAState, ErrorM]):SState[State, TCtx] = for {
+    st <- get
+    okCtx = st match {
+      case State(eth, vm, ctxOk, errCtxs, aenv, eenv, nestedDecls, methInvs, srcLabelEnv, conf) => ctxOk 
+    }
+  } yield okCtx
+  */
   /**
     * setErrCtxs - setting the list of error exiting contexts in the state
     *
@@ -719,6 +737,7 @@ object MinSSA {
     * @param m
     * @return
     */
+  /*
   def setErrCtxs(tctxs:List[TCtx])(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get
     st1 <- m.pure(st match {
@@ -726,10 +745,32 @@ object MinSSA {
     })
     _   <- put(st1)
   } yield ()
+   */
 
+  /**
+    * retrieve the ErrCtxs from the state 
+    */
+  /*
+  def getErrCtxs(using m:MonadError[SSAState, ErrorM]):SState[State, List[TCtx]] = for {
+    st <- get
+    errCtxs = st match {
+      case State(eth, vm, okCtx, errCtxs, aenv, eenv, nestedDecls, methInvs, srcLabelEnv, conf) => errCtxs
+    }
+  } yield errCtxs
+   */
 
-
-
+  /** 
+    * getVarMap 
+    * @  
+    */
+  /*
+  def getVarMap(using m:MonadError[SSAState, ErrorM]): SState[State, VarMap] = for {
+    st <- get
+    vm = st match {
+      case State(eThrowers, vm, okCtx, errCtxs, aenv, eenv, nestedDecls, methInvs, srcLabelEnv,conf) => vm
+    }
+  } yield vm
+   */
   /**
     * setVarMap - set the given VarMap in the state
     *
@@ -737,6 +778,7 @@ object MinSSA {
     * @param m
     * @return
     */
+  /*
   def setVarMap(vm:VarMap)(using m:MonadError[SSAState, ErrorM]): SState[State, Unit] = for {
     st <- get
     st1 <- m.pure(st match {
@@ -745,10 +787,11 @@ object MinSSA {
     })
     _   <- put(st1)
   } yield ()
-
+   */
   /**
     * remove a variable from the VarMap
     */
+  /*
   def removeVarFromVarMap(v:Name)(using m:MonadError[SSAState, ErrorM]): SState[State, Unit] = for {
     st <- get
     st1 <- m.pure(st match {
@@ -757,7 +800,7 @@ object MinSSA {
     })
     _ <- put(st1)
   } yield ()
-
+   */
   /**
     * addNestedVarDecls - add an entry to the nested var decls in the state
     *
@@ -771,9 +814,9 @@ object MinSSA {
   def addNestedVarDecls(tctx:TCtx, id:Ident, ty:Type, mods:List[Modifier])(using m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
     st <- get
     st1  <- m.pure(st match {
-      case State(eThrowers, varMap, okCtx, errCtxs, aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => {
+      case State(eThrowers, /* varMap, okCtx, errCtxs,*/ aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => {
         val nDecls1 = (nDecls.toSet + ((tctx, id, ty, mods))).toList
-        State(eThrowers, varMap, okCtx, errCtxs, aenv, eenv, nDecls1, methInvs,srcLblEnv,conf)
+        State(eThrowers, /* varMap, okCtx, errCtxs, */ aenv, eenv, nDecls1, methInvs,srcLblEnv,conf)
       }
     })
     _  <- put(st1)
@@ -790,9 +833,9 @@ object MinSSA {
   def addMethodInv(tctx:TCtx, methinv:MethodInvocation)(using m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
     st <- get 
     st1  <- m.pure(st match {
-      case State(eThrowers, varMap, okCtx, errCtxs, aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => {
+      case State(eThrowers, /* varMap, okCtx, errCtxs, */ aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => {
         val methInvs1 = (methInvs.toSet + ((tctx, methinv))).toList
-        State(eThrowers, varMap, okCtx, errCtxs, aenv, eenv, nDecls, methInvs1, srcLblEnv,conf)
+        State(eThrowers, /* varMap, okCtx, errCtxs, */ aenv, eenv, nDecls, methInvs1, srcLblEnv,conf)
       }
     })
     _  <- put(st1)
@@ -801,9 +844,9 @@ object MinSSA {
   def addSrcLabel(label:Ident, ctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get
     st1 <- m.pure(st match {
-      case State(eThrowers, varMap, okCtx, errCtxs, aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => {
+      case State(eThrowers, /* varMap, okCtx, errCtxs, */ aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => {
         val srcLblEnv1 = srcLblEnv + (label -> ctx) 
-        State(eThrowers, varMap, okCtx, errCtxs, aenv, eenv, nDecls, methInvs, srcLblEnv1,conf)
+        State(eThrowers, /* varMap, okCtx, errCtxs, */ aenv, eenv, nDecls, methInvs, srcLblEnv1,conf)
       }
     })
   } yield ()
@@ -819,9 +862,9 @@ object MinSSA {
   def addToAEnv(tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get 
     st1  <- m.pure(st match {
-      case State(eThrowers, varMap, okCtx, errCtxs, aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => {
+      case State(eThrowers, /* varMap, okCtx, errCtxs, */ aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => {
         val aenv1 = (aenv.toSet + tctx).toList
-        State(eThrowers, varMap, okCtx,  errCtxs, aenv1, eenv, nDecls, methInvs, srcLblEnv,conf)
+        State(eThrowers, /* varMap, okCtx,  errCtxs, */ aenv1, eenv, nDecls, methInvs, srcLblEnv,conf)
       }
     })
     _  <- put(st1)
@@ -840,9 +883,9 @@ object MinSSA {
   def addToEEnv(tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Unit] = for {
     st <- get 
     st1  <- m.pure(st match {
-      case State(eThrowers, varMap, okCtx, errCtxs, aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => {
+      case State(eThrowers, /* varMap, okCtx, errCtxs, */ aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => {
         val eenv1 = (eenv.toSet + tctx).toList
-        State(eThrowers, varMap, okCtx, errCtxs, aenv, eenv1, nDecls, methInvs, srcLblEnv,conf)
+        State(eThrowers, /* varMap, okCtx, errCtxs, */ aenv, eenv1, nDecls, methInvs, srcLblEnv,conf)
       }
     })
     _  <- put(st1)
@@ -857,7 +900,7 @@ object MinSSA {
   def usingCtxtAsID(using m:MonadError[SSAState, ErrorM]):SState[State, Boolean] = for {
     st <- get
   } yield st match {
-    case State(eThrowers, varMap, okCtx, errCtxs, aenv, eenv, nDecls, methInvs, srcLblEnv,SSAEnvConfig(ctxtAsID, _)) => ctxtAsID
+    case State(eThrowers, /* varMap, okCtx, errCtxs, */ aenv, eenv, nDecls, methInvs, srcLblEnv,SSAEnvConfig(ctxtAsID, _)) => ctxtAsID
   }
 
   /**
@@ -869,7 +912,7 @@ object MinSSA {
   def getCharArray(using m:MonadError[SSAState, ErrorM]):SState[State, List[Char]] = for {
     st <- get
   } yield st match {
-    case State(eThrowers, varMap, eCtx, errCtxs, aenv, eenv,  nDecls, methInvs, srcLblEnv,SSAEnvConfig(ctxtAsID, arr)) => arr
+    case State(eThrowers, /* varMap, eCtx, errCtxs, */ aenv, eenv,  nDecls, methInvs, srcLblEnv,SSAEnvConfig(ctxtAsID, arr)) => arr
   }
 
 
@@ -882,7 +925,7 @@ object MinSSA {
   def getThrowers(using m:MonadError[SSAState, ErrorM]):SState[State, ExceptionThrowers] = for {
     st <- get
   } yield st match {
-    case State(eThrowers, varMap, okCtx, errCtxs, aenv, eenv, nDecls, methInvs, srcLblEnv,SSAEnvConfig(ctxtAsID, _)) => eThrowers
+    case State(eThrowers, /* varMap, okCtx, errCtxs, */ aenv, eenv, nDecls, methInvs, srcLblEnv,SSAEnvConfig(ctxtAsID, _)) => eThrowers
   }
 
   /**
@@ -900,11 +943,11 @@ object MinSSA {
    * and union the eenv and nDecls
    * */
   def mergeState(st1:State, st2:State):State = (st1, st2) match {
-    case (State(eth1, vm1, okCtx1, errCtxs1,  aenv1, eenv1, nDecls1, methInvs1, srcLblEnv1,conf1), State(eth2, vm2, okCtx2, errCtxs2, aenv2, eenv2,  nDecls2, methInvs2, srcLblEnv2,conf2)) => 
-      State(eth1, unionVarMap(vm1, vm2), okCtx1, (errCtxs1 ++ errCtxs2).toSet.toList, (aenv1++aenv2).toSet.toList, (eenv1++eenv2).toSet.toList, (nDecls1 ++ nDecls2).toSet.toList, (methInvs1 ++ methInvs2).toSet.toList, (srcLblEnv1 ++ srcLblEnv2),conf1)
+    case (State(eth1, /* vm1, okCtx1, errCtxs1, */  aenv1, eenv1, nDecls1, methInvs1, srcLblEnv1,conf1), State(eth2, /* vm2, okCtx2, errCtxs2, */ aenv2, eenv2,  nDecls2, methInvs2, srcLblEnv2,conf2)) => 
+      State(eth1, /* unionVarMap(vm1, vm2), okCtx1, (errCtxs1 ++ errCtxs2).toSet.toList, */ (aenv1++aenv2).toSet.toList, (eenv1++eenv2).toSet.toList, (nDecls1 ++ nDecls2).toSet.toList, (methInvs1 ++ methInvs2).toSet.toList, (srcLblEnv1 ++ srcLblEnv2),conf1)
   }
 
-  
+  /* 
   def extendVarsWithContextAndLabel(vars: List[Name], tctx:TCtx, lbl:Label)(using m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
     st <- get
     st1 <- st match {
@@ -922,9 +965,12 @@ object MinSSA {
     }
     _ <- put(st1)
   } yield ()
+   */
+
 
   // do we still need this? 
   // very likely we should remove this!!! it is not in used.
+  /* 
   def extendAllVarsWithContextAndLabel(tctx:TCtx, lbl:Label)(using m:MonadError[SSAState, ErrorM]):SState[State,Unit] = for {
     st <- get
     st1 <- st match {
@@ -942,8 +988,7 @@ object MinSSA {
     }
     _ <- put(st1)
   } yield ()
-
-
+   */
 
   /**
   * mkName - create a new name from an existing name and a label.
@@ -964,6 +1009,23 @@ object MinSSA {
       } yield Name(pre++List(y))
     }
   }
+
+  /**
+    * make a new variable mapping from the updated entries from vm1 \cup vm2 but not in ref_vm
+    *  @param ctx - the context to set the varname
+    *  @param vm1 - the beta1
+    *  @param vm2 - the beta2
+    *  @parem ref_vm - the referenced beta
+    *  @return a new var map
+    */
+  def mkVarMapFromUpdated(ctx:TCtx, vm1:VarMap, vm2:VarMap, ref_vm:VarMap)(using m:MonadError[SSAState, ErrorM]):SState[State,VarMap] = for {
+    vars_j   <- m.pure((vm1.keySet ++ vm2.keySet) -- ref_vm.keySet)
+    vars_ctxs_renamed_j <- vars_j.toList.traverse(
+      x => for {
+        x_ctx <- mkName(x, ctx)
+      } yield (x, (ctx, x_ctx))
+    )
+  } yield listToVarMap(vars_ctxs_renamed_j)
   
   /**
     * convert a label (TCtxt) to a string
@@ -1664,6 +1726,9 @@ object MinSSA {
     R(aenv, eenv, ctx, vm, x, cmp)
   }
 
+  /**
+    *  R_{\leq_Ok} 
+    */
   def Rleq(aenv:AEnv, eenv:EEnv, ctx:TCtx, vm:VarMap, x:Name):List[(TCtx,Name)] = {
     def cmp(p:(TCtx,TCtx)):Boolean = p match {
         case ((tctx1, tctx2))  => { 
@@ -1673,6 +1738,21 @@ object MinSSA {
       }
     R(aenv, eenv, ctx, vm, x, cmp)
   }
+
+  /** 
+    * R_{\leq_err}: TODO: fixme
+    */ 
+  def RleqErr(aenv:AEnv, eenv:EEnv, ctx:TCtx, vm:VarMap, x:Name):List[(TCtx,Name)] = {
+    def cmp(p:(TCtx,TCtx)):Boolean = p match {
+        case ((tctx1, tctx2))  => { 
+          val pot = partialOrderTCtx(aenv, eenv)
+          ((pot.partialCompare(tctx1, tctx2) == -1.0) || (pot.partialCompare(tctx1, tctx2) == 0.0))
+        }
+      }
+    R(aenv, eenv, ctx, vm, x, cmp)
+  }
+  
+
 
   /**
     * Compute the name from the lub of all the reachable context until ctx
@@ -1736,11 +1816,11 @@ object MinSSA {
         })
         val lbl = TBox
         for {
-          _ <- setVarMap(vm)
-          blocks <- kBlock(block, TBox) 
-          _ <- addToAEnv(TBox)
+          // _        <- setVarMap(vm)
+          _           <- addToAEnv(TBox)
+          (blocks, vm1, ctxOk1, ctxErrs1) <- kBlock(vm, TBox, TBox, Nil, block)
           // lbl <- toLbl(TBox) 
-          varDeclsStmts <- genVarDecls 
+          varDeclsStmts <- genVarDecls(vm1)
           /*
           varDecls <- m.pure(varDeclsStmts match {
             case Nil => Nil
@@ -1758,40 +1838,46 @@ object MinSSA {
     *               otherwise, we call kstmt
     *
     * @param stmt
-    * @param ctx
+    * @param ctx - the current context
     * @param st
     * @return
     */
-  
-  def kstmtBlock(stmt:Stmt, ctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,List[SSABlock]] = stmt match {
+  /*
+  def kstmtBlock(Stmt:Stmt, ctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,List[SSABlock]] = stmt match {
     // case StmtBlock(Block(blkStmts)) => kblkStmts(blkStmts,ctx)
     case StmtBlock(blk) => kBlock(blk,ctx)
     case _ => for {
       b <- kstmt(stmt, ctx)
     } yield List(b)
   }
-  
+  */
 
   /**
     * kBlock - convert a block of statements
-    *
-    * @param blk
-    * @param ctx
+    * 
+    * @param vm - variable mapping 
+    * @param ctx - the current context
+    * @param ctxOk - the last ok context
+    * @param ctxErrs - the last error contexts
+    * @param blk - the java block to be converted
     * @param m
-    * @return
+    * @return a tuple of (SSAblocks, updated_variable_mapping, ok_exit_context, err_exit_contexts)
     */
-  def kBlock(blk:Block, ctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,List[SSABlock]] = blk match {
-    case Block(blkStmts) => kblkStmts(blkStmts,ctx)
+  def kBlock(vm:VarMap, ctx:TCtx, ctxOk:TCtx, ctxErrs:List[TCtx], blk:Block)(using m:MonadError[SSAState, ErrorM]):SState[State,(List[SSABlock], VarMap, TCtx, List[TCtx])] = blk match {
+    case Block(blkStmts) => kblkStmts(vm, ctx, ctxOk, ctxErrs,blkStmts)
   }
 
 
   /**
     * kblkStmts - convert a list of block stmts. It is correspondent to the \overline{KS} in the paper.
     *
-    * @param blkStmts
-    * @param ctx
+    * @param vm - variable mapping 
+    * @param ctx - the current context
+    * @param ctxOk - the last ok context
+    * @param ctxErrs - the last error contexts
+    * @param blkStmts - the java block stmts to be converted
     * @param m
-    * @return
+    * @return a tuple of (SSAblocks, updated_variable_mapping, ok_exit_context, err_exit_contexts)
     */
 
 
@@ -1799,13 +1885,13 @@ object MinSSA {
   // we need to fuse kblkStmts, kblkStmt, kVarDecls and kStmt into one
 
 
-  def kblkStmts(blkStmts:List[BlockStmt], ctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, List[SSABlock]] = for {
+  def kblkStmts(vm:VarMap, ctx:TCtx, ctxOk:TCtx, ctxErrs:List[TCtx], blkStmts:List[BlockStmt])(using m:MonadError[SSAState, ErrorM]):SState[State, (List[SSABlock], VarMap, TCtx, List[TCtx])] = for {
     _        <- addToAEnv(ctx)
     lbl      = ctx
     throwers <- getThrowers  
-    ssa      <- blkStmts match {
+    outTuple <- blkStmts match {
       /**
-        *   CtxOk' = Ctx[Nop]
+        *   CtxOk' = Ctx[Last]
         * ------------------------------------------------------------- (cNop)
         * Ctx, beta, CtxOk, CtxErrs |- [] => nop; beta, CtxOk', CtxErrs
         */
@@ -1813,55 +1899,256 @@ object MinSSA {
         ctxOkp <- m.pure(putTCtx(ctx, TLast))
         _      <- addToAEnv(ctxOkp)
         lbl = ctxOkp
-      } yield (List(SSABlock(lbl, List(SSAEmpty))))
+      } yield (List(SSABlock(lbl, List(SSAEmpty))), vm, ctxOkp, ctxErrs)
 
       case (LocalClass(_)::rest) => m.raiseError("SSA construction failed, local class is not supported.")
 
       case (LocalVars(mods, ty, varDecls)::rest) => for { // variable decl won't throw exception
-        ssablk  <- kVarDecls(mods, ty, varDecls, putTCtx(ctx, THead(TBox)))
-        ssablks <- kblkStmts(rest, putTCtx(ctx, TTail(TBox)))
-      } yield (ssablk::ssablks)
 
-      case (BlockStmt_(stmt)::rest) => stmt match {
+        // handle Head
+        ctxH                             <- m.pure(putTCtx(ctx,(THead(TBox))))
+        (ssablk, vm1, ctxOk1, ctxErrs1)  <- kVarDecls(vm, ctxH, ctx, Nil, mods, ty, varDecls)
+        // handle Tail
+        ctxT                             = putTCtx(ctx,(TTail(TBox)))
+        (ssablks,vm2, ctxOk2, ctxErrs2)  <- kblkStmts(vm1, ctxT, ctxOk1, Nil, rest)
 
-        case Assert(exp, msg) => for { // assertion should not throw exception
-          // handle the head
-          ctxH   <- m.pure(putTCtx(ctx, THead(TBox)))
-          _      <- addToAEnv(ctxH)
-          exp1   <- kexp(exp, ctxH)
-          msg1   <- msg.traverse( m => kexp(m, ctxH))
-          _      <- setOkCtx(ctxH)
-          lbl    = ctxH 
-          ssablk = SSABlock(lbl, List(SSAAssert(exp1, msg1)))
-          // handle the tail
-          ctxT   = putTCtx(ctx, TTail(TBox))
-          ssablks <- kblkStmts(rest, ctxT)
-        } yield (ssablk::ssablks)
+      } yield (ssablk::ssablks, vm2, ctxOk2, ctxErrs ++ ctxErrs1 ++ ctxErrs2)
 
-        case BasicFor(init, loop_cond, post_update, stmt) => m.raiseError("SSA construction failed, BasicFor should have been desugared.")
+      case (BlockStmt_(stmt)::rest) => for {
+        _ <- addToAEnv(ctx)
 
-        case EnhancedFor(modifiers, ty, id, exp, stmt) => m.raiseError("SSA construction failed, EnhancedFor should have been desugared.")
+        (bstmt, vmOut, ctxOkOut, ctxErrsOut) <- stmt match { // begin bstmt
 
-        case Break(_)      => m.raiseError("SSA construction failed, Break is not supported.")
-        case Continue(_)   => m.raiseError("SSA construction failed, Continue is not supported.")
-        case Do(stmt, exp) => m.raiseError("SSA construction failed, Do should have been desguared.")
+          case Assert(exp, msg)
+              if mayThrow(exp, throwers) || msg.exists( mayThrow(_, throwers) ) => {
+                m.raiseError("SSA construction failed, assertion should not throw exceptions.")
+              }
+          case Assert(exp, msg) => for { // assertion should not throw exception
+            // handle the head
+            ctxH                             <- m.pure(putTCtx(ctx, THead(TBox)))
+            _                                <- addToAEnv(ctxH)
+            exp1                             <- kexp(vm, ctxH, exp)
+            msg1                             <- msg.traverse( m => kexp(vm, ctxH, m))
+            lbl                              = ctxH
+            ssablk                           = SSABlock(lbl, List(SSAAssert(exp1, msg1)))
+            // handle the tail
+            ctxT                             = putTCtx(ctx, TTail(TBox))
+            (ssablks, vm2, ctxOk2, ctxErrs2) <- kblkStmts(vm, ctxT, ctxH, Nil, rest)
+          } yield (ssablk::ssablks, vm2, ctxOk2, ctxErrs ++ ctxErrs2)
 
-        case Empty => for { 
-          // handle the head
-          ctxH   <- m.pure(putTCtx(ctx, THead(TBox)))
-          _      <- addToAEnv(ctxH)
-          _      <- setOkCtx(ctxH)
-          lbl    = ctxH 
-          ssablk = SSABlock(lbl, List(SSAEmpty))
-          // handle the tail
-          ctxT   = putTCtx(ctx, TTail(TBox))
-          ssablks <- kblkStmts(rest, ctxT)
-        } yield (SSABlock(lbl, List(SSAEmpty)))
+          case BasicFor(init, loop_cond, post_update, stmt) =>
+            m.raiseError("SSA construction failed, BasicFor should have been desugared.")
 
+          case EnhancedFor(modifiers, ty, id, exp, stmt) =>
+            m.raiseError("SSA construction failed, EnhancedFor should have been desugared.")
+
+          case Break(_)      => m.raiseError("SSA construction failed, Break is not supported.")
+          case Continue(_)   => m.raiseError("SSA construction failed, Continue is not supported.")
+          case Do(stmt, exp) => m.raiseError("SSA construction failed, Do should have been desguared.")
+
+          case Empty => for {
+            // handle the head
+            ctxH                             <- m.pure(putTCtx(ctx, THead(TBox)))
+            _                                <- addToAEnv(ctxH)
+            lbl                              = ctxH
+            ssablk                           = SSABlock(lbl, List(SSAEmpty))
+            // handle the tail
+            ctxT                             = putTCtx(ctx, TTail(TBox))
+            (ssablks, vm2, ctxOk2, ctxErrs2) <- kblkStmts(vm, ctxT, ctxH, Nil, rest)
+          } yield (ssablk::ssablks, vm2, ctxOk2, ctxErrs ++ ctxErrs2)
+
+          case ExpStmt(Assign(NameLhs(x), op, rhs)) if mayThrow(rhs, throwers) => for {
+            // handle the attempt
+            ctxA                             <- m.pure(putTCtx(ctx, TAttempt))
+            _                                <- addToAEnv(ctxA)
+            _                                <- addToEEnv(ctxA)
+            lbl                              = ctx // not ctxA
+            rhs1                             <- kexp(vm, ctxA, rhs)
+            (x1,vm1)                         <- renameVar(vm, ctxA, x)
+            // handle the next
+            ctxN                             = putTCtx(ctx, TAttemptNext(TBox))
+            (ssablks, vm2, ctxOk2, ctxErrs2) <- kblkStmts(vm, ctxN, ctxA, Nil, rest)
+            ssablk = SSABlock(lbl, List(SSAAttempt(rhs1, Some(NameLhs(x1)), ssablks)))
+          } yield (List(ssablk), vm2, ctxOk2, ctxErrs ++ List(ctxA) ++ ctxErrs2)
+          case ExpStmt(Assign(NameLhs(x), op, rhs)) => for {
+            // handle the head
+            ctxH                             <- m.pure(putTCtx(ctx, THead(TBox)))
+            _                                <- addToAEnv(ctxH)
+            lbl                              = ctxH
+            rhs1                             <- kexp(vm, ctxH, rhs)
+            (x1,vm1)                         <- renameVar(vm, ctxH, x)
+            ssablk                           = SSABlock(lbl, List(SSAAssignments(List(ExpStmt(Assign(NameLhs(x1), op, rhs1))))))
+            // handle tail
+            ctxT                             = putTCtx(ctx, TTail(TBox))
+            (ssablks, vm2, ctxOk2, ctxErrs2) <- kblkStmts(vm1, ctxT, ctxH, Nil, rest)
+          } yield (ssablk::ssablks, vm2, ctxOk2, ctxErrs ++ ctxErrs2)
+
+          case ExpStmt(Assign(FieldLhs(fa), op, rhs)) if mayThrow(rhs, throwers) => for {
+            // handle the attempt
+            ctxA                             <- m.pure(putTCtx(ctx, TAttempt))
+            _                                <- addToAEnv(ctxA)
+            _                                <- addToEEnv(ctxA)            
+            lbl                              = ctx // not ctxA
+            rhs1                             <- kexp(vm, ctxA, rhs)
+            fa1                              <- renameFa(vm, ctxA, fa)
+            // handle the next
+            ctxN                             = putTCtx(ctx, TAttemptNext(TBox))
+            (ssablks, vm2, ctxOk2, ctxErrs2) <- kblkStmts(vm, ctxN, ctxA, Nil, rest)
+            ssablk                           = SSABlock(lbl, List(SSAAttempt(rhs1, Some(FieldLhs(fa1)), ssablks)))
+          } yield (List(ssablk), vm2, ctxOk2, ctxErrs ++ List(ctxA) ++ ctxErrs2)
+          case ExpStmt(Assign(FieldLhs(fa), op, rhs)) => for {
+            // handle the head
+            ctxH                             <- m.pure(putTCtx(ctx, THead(TBox)))
+            _                                <- addToAEnv(ctxH)
+            lbl                              = ctxH
+            rhs1                             <- kexp(vm, ctxH, rhs)
+            fa1                              <- renameFa(vm, ctxH, fa)
+            ssablk                           = SSABlock(lbl, List(SSAAssignments(List(ExpStmt(Assign(FieldLhs(fa1), op, rhs1))))))
+            // handle tail
+            ctxT                             = putTCtx(ctx, TTail(TBox))
+            (ssablks, vm2, ctxOk2, ctxErrs2) <- kblkStmts(vm, ctxT, ctxH, Nil, rest)
+          } yield (ssablk::ssablks, vm2, ctxOk2, ctxErrs ++ ctxErrs2)
+
+          case ExpStmt(Assign(ArrayLhs(ai), op, rhs)) if mayThrow(rhs, throwers) => for {
+            // handle the attempt
+            ctxA                             <- m.pure(putTCtx(ctx, TAttempt))
+            _                                <- addToAEnv(ctxA)
+            _                                <- addToEEnv(ctxA)            
+            lbl                              = ctx // not ctxA
+            rhs1                             <- kexp(vm, ctxA, rhs)
+            ai1                              <- renameAi(vm, ctxA, ai)
+            // handle the next
+            ctxN                             = putTCtx(ctx, TAttemptNext(TBox))
+            (ssablks, vm2, ctxOk2, ctxErrs2) <- kblkStmts(vm, ctxN, ctxA, Nil, rest)
+            ssablk                           = SSABlock(lbl, List(SSAAttempt(rhs1, Some(ArrayLhs(ai1)), ssablks)))
+          } yield (List(ssablk), vm2, ctxOk2, ctxErrs ++ List(ctxA) ++ ctxErrs2)
+          case ExpStmt(Assign(ArrayLhs(ai), op, rhs)) => for {
+            // handle the head
+            ctxH                             <- m.pure(putTCtx(ctx, THead(TBox)))
+            _                                <- addToAEnv(ctxH)
+            lbl                              = ctxH
+            rhs1                             <- kexp(vm, ctxH, rhs)
+            ai1                              <- renameAi(vm, ctxH, ai)
+            ssablk                           = SSABlock(lbl, List(SSAAssignments(List(ExpStmt(Assign(ArrayLhs(ai1), op, rhs1))))))
+            // handle tail
+            ctxT                             = putTCtx(ctx, TTail(TBox))
+            (ssablks, vm2, ctxOk2, ctxErrs2) <- kblkStmts(vm, ctxT, ctxH, Nil, rest)
+          } yield (ssablk::ssablks, vm2, ctxOk2, ctxErrs ++ ctxErrs2)
           
-      }
+          case ExpStmt(exp) if mayThrow(exp, throwers) => for {
+            // handle the attempt
+            ctxA                             <- m.pure(putTCtx(ctx, TAttempt))
+            _                                <- addToAEnv(ctxA)
+            _                                <- addToEEnv(ctxA)            
+            lbl                              = ctx // not ctxA
+            exp1                             <- kexp(vm, ctxA, exp)
+            // handle the next
+            ctxN                             = putTCtx(ctx, TAttemptNext(TBox))
+            (ssablks, vm2, ctxOk2, ctxErrs2) <- kblkStmts(vm, ctxN, ctxA, Nil, rest)
+            ssablk                           = SSABlock(lbl, List(SSAAttempt(exp1, None, ssablks)))
+          } yield (List(ssablk), vm2, ctxOk2, ctxErrs ++ List(ctxA) ++ ctxErrs2)
+          case ExpStmt(exp) => for {
+            // handle the head
+            ctxH                             <- m.pure(putTCtx(ctx, THead(TBox)))
+            _                                <- addToAEnv(ctxH)
+            lbl                              = ctxH
+            exp1                             <- kexp(vm, ctxH, exp)
+            ssablk                           = SSABlock(lbl, List(SSAAssignments(List(ExpStmt(exp1)))))
+            // handle tail
+            ctxT                             = putTCtx(ctx, TTail(TBox))
+            (ssablks, vm2, ctxOk2, ctxErrs2) <- kblkStmts(vm, ctxT, ctxH, Nil, rest)
+          } yield (ssablk::ssablks, vm2, ctxOk2, ctxErrs ++ ctxErrs2)
+
+          case IfThen(exp, stmt) => m.raiseError("SSA construction failed, If then statment should have been desugared.")
+
+          case IfThenElse(exp, _, _) if mayThrow(exp, throwers) => m.raiseError("SSA construction failed, If condition expression should not throw exception.")
+
+          /**
+            *  ctx1 = ctx[if E { Box } else { \bar{B} } join \bar{phi} next { \bar{B} } except \bar{phi}
+            *  ctx2 = ctx[if E { \bar{B} } else { Box } join \bar{phi} next { \bar{B} } except \bar{phi}
+            *  beta, ctxOk |- e => E 
+            *  ctx1, beta, ctxOk, [] |- \bar{s1} => \bar{B1}, beta1, ctxOk1, ctxErrs1
+            *  ctx2, beta, ctxOk, [] |- \bar{s2} => \bar{B2}, beta2, ctxOk2, ctxErrs2
+            *  ctx3 = ctx[if E { \bar{B} } else { \bar{B} } join BBox next { \bar{B} } except \bar{phi}
+            *  beta_j = { (x, ctx3, x_ctx3) | x \in (dom(beta1) \cup dom(beta2)) - dom(beta) } 
+            *  phi_j = { x_ctx3 = phi( ctxOk1: R_<=Ok (ctxOk1, beta_1, x), 
+            *                          ctxOk2: R_<=Ok (ctxOk2, beta_1, x) ) | x \in (dom(beta1) \cup dom(beta2)) - dom(beta) }
+            *  ctx4 = ctx[if E { \bar{B} } else { \bar{B} } join \bar{phi} next { Box } except \bar{phi}
+            *  ctx4, beta1 \cup beta2 \cup beta_j, ctx3, [] |-  \bar{s3} => \bar{B3}, beta3, ctxOk3, ctxErr3 
+            *  ctx5 = ctx[if E { \bar{B} } else { \bar{B} } join \bar{phi} next { \bar{B} } except BBox
+            *  phi_e = { x_ctx5 = phi(ctxErr: R_<=err (ctxErr, beta1 \cup beta2, x) | ctxErr \in (ctxErrs1 \cup  ctxErrs2) | x \in (dom(beta1) \cup dom(beta2))- dom(beta) }
+            *  beta_e = { (x, ctx5, x_ctx5) | x \in (dom(beta1) \cup dom(beta2)) - dom(beta) }
+            * ----------------------------------------------------------------------------------------------------------------------------(cIf)
+            *  ctx, beta, ctxOk, ctxErrs |- if e { \bar{s1} } else { \bar{s2} } ; \bar{s3} => 
+            *      if E { \bar{B1} } else { \bar{B2} } join \bar{\phi_j} next { \bar{B3} } except \bar{\phi_e}, beta3 \cup beta_e, ctxOk3,  ctxErrs \cup ctxErrs_3 \cup {ctx5} 
+            */
+          case IfThenElse(exp, then_stmt, else_stmt) => for {
+            exp1     <- kexp(vm, ctx, exp)
+            // Handle the then
+            ctx1     = putTCtx(ctx, TThen(TBox))
+            _        <- addToAEnv(ctx1)
+            (blks1, vm1, ctxOk1, ctxErrs1)       <- kblkStmts(vm, ctx1, ctxOk, Nil, List(BlockStmt_(then_stmt)))
+            st1      <- get
+            // handle the else
+           
+            ctx2     = putTCtx(ctx, TElse(TBox))
+            _        <- addToAEnv(ctx2)
+            (blks2, vm2, ctxOk2, ctxErrs2)       <- kblkStmts(vm, ctx2, ctxOk, Nil, List(BlockStmt_(else_stmt)))
+            st2      <- get
+            // resolve the join phi
+            ctx3     = putTCtx(ctx, TIfJoin)
+            _        <- addToAEnv(ctx3)            
+            (vm_j,phi_j) <- mkPhi(ctx3, ctxOk1, ctxOk2, vm1, vm2, vm, st1, st2)
+            // hanlde the next
+            ctx4     = putTCtx(ctx, TIfNext(TBox))
+            _        <- addToAEnv(ctx4)            
+            (blks4, vm4, ctxOk4, ctxErrs4)       <- kblkStmts(vm, ctx4, ctx3, Nil, rest)
+            // resolve the except phi
+            ctx5     = putTCtx(ctx, TIfExcept)
+            _        <- addToAEnv(ctx5)
+            _        <- addToEEnv(ctx5)                        
+            (vm_e,phi_e) <- mkPhiErrs(ctx5, ctxErrs1, ctxErrs2, vm1, vm2, vm, st1, st2)
+            ssaBlk = SSABlock(lbl, List(SSAIf(exp1, blks1, blks2, phi_j, blks4, phi_e)))
+          } yield (List(ssaBlk), unionVarMaps(List(vm1, vm2, vm_j, vm4, vm_e)), ctxOk4, ctxErrs ++ ctxErrs4 ++ List(ctx5))
+        } // end of (bstmt, vmOut, ctxOkOut, ctxErrsOut)
+      } yield (bstmt, vmOut, ctxOkOut, ctxErrsOut)
+    } // end of outTuple
+  } yield outTuple
+
+  /**
+    *  rename a variable based on the given context,
+    *   update the var map table in the environment. 
+    */
+
+  def renameVar(vm:VarMap, ctx:TCtx, x:Name)(using m:MonadError[SSAState, ErrorM]):SState[State, (Name, VarMap)] = for {
+    xlbl    <- mkName(x, ctx)
+    vm1 = vm.get(x) match {
+      case None     => vm + (x -> Map(ctx -> xlbl))
+      case Some(im) => vm + (x -> (im + (ctx -> xlbl)))
     }
-  } yield ssa
+  } yield (xlbl,vm1)
+
+  /**
+    *  rename a field access lhs 
+    */
+  def renameFa(vm:VarMap, ctx:TCtx, fa:FieldAccess)(using m:MonadError[SSAState, ErrorM]):SState[State, FieldAccess] = fa match {
+    case PrimaryFieldAccess(e, id) => for {
+      e1 <- kexp(vm, ctx, e)
+    } yield PrimaryFieldAccess(e1, id)
+    case SuperFieldAccess(id) => m.pure(fa)
+    case ClassFieldAccess(name,id) => m.pure(fa)
+  }
+
+  /**
+    *  rename an array index lhs
+    */
+  def renameAi(vm:VarMap, ctx:TCtx, ai:ArrayIndex)(using m:MonadError[SSAState, ErrorM]):SState[State, ArrayIndex] = ai match {
+    case ArrayIndex(e,es) => for {
+      e1  <- kexp(vm, ctx, e)
+      es1 <- es.traverse( e => kexp(vm, ctx, e) )
+    } yield ArrayIndex(e1, es1)
+  }
+
 
   /*
   def kblkStmts(blkStmts:List[BlockStmt], ctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, List[SSABlock]] = blkStmts match {
@@ -1878,6 +2165,7 @@ object MinSSA {
   }*/
 
 
+
   /**
     * kblkStmt - convert a block statement, it does not handle local class. LocalVars are converted into a SSAVarDecls which is not mentioned in the paper.
     *
@@ -1886,32 +2174,35 @@ object MinSSA {
     * @param m
     * @return
     */
+  /*
   def kblkStmt(blkStmt:BlockStmt, ctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,SSABlock] = blkStmt match {
     case BlockStmt_(stmt) => kstmt(stmt, ctx) 
     case LocalClass(_) => m.raiseError("SSA construction failed, local class is not supported.")
     case LocalVars(mods, ty, varDecls) => kVarDecls(mods, ty, varDecls, ctx)
   }
-
+   */
 
   /**
     * kVarDecls - converts a var declaration, we convert the initialization like other statement / expression. We also keep track of the declration in the state
-    *
+    * @param vm - variable mapping 
+    * @param ctx - the current context
+    * @param ctxOk - the last ok context
+    * @param ctxErrs - the last error contexts    *
     * @param mods
     * @param ty
     * @param varDecls
-    * @param ctx
     * @param m
-    * @return
+    * @return a tuple (SSAblock, updated_variable_mapping, ok_exit_context, err_exit_contexts)
     */
-  def kVarDecls(mods:List[Modifier], ty:Type, varDecls:List[VarDecl], tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, SSABlock] = for {
+  def kVarDecls(vm:VarMap, ctx:TCtx, ctxOk:TCtx, ctxErrs:List[TCtx], mods:List[Modifier], ty:Type, varDecls:List[VarDecl])(using m:MonadError[SSAState, ErrorM]):SState[State, (SSABlock, VarMap, TCtx, List[TCtx])] = for {
     // a new case, combining KVD and KSTMT assignment
     // we first record all the variable name and type
-    _ <- recordVarDecls(mods, ty, varDecls, tctx)
+    _ <- recordVarDecls(mods, ty, varDecls, ctx)
     // we then convert varDecls to SSAVarDecl, hm... what about array init?
     // array id should not be renamed and should not be merged in phis, we keep them inplace as 
     // lbl <- toLbl(tctx)
-    varDecls1 <- kVarDecls(varDecls, tctx)
-  } yield SSABlock(tctx, List(SSAVarDecls(mods, ty, varDecls1)))
+    varDecls1 <- kVarDecls(vm, ctx, varDecls)
+  } yield (SSABlock(ctx, List(SSAVarDecls(mods, ty, varDecls1))), vm, ctx, ctxErrs)
   
   def recordVarDecls(mods:List[Modifier], ty:Type, varDecls:List[VarDecl], tCtx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,Unit] = varDecls match {
     case Nil => m.pure(())
@@ -1925,7 +2216,7 @@ object MinSSA {
     }
   }
 
-  def kVarDecls(varDecls:List[VarDecl], tCtx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State,List[VarDecl]] = varDecls match {
+  def kVarDecls(vm:VarMap, tCtx:TCtx, varDecls:List[VarDecl])(using m:MonadError[SSAState, ErrorM]):SState[State,List[VarDecl]] = varDecls match {
     case Nil => m.pure(Nil)
     case (varDecl::rest) => varDecl match {
       case VarDecl(VarId(id), ov_init) => for {
@@ -1934,30 +2225,30 @@ object MinSSA {
         ov_init1 <- ov_init match {
           case None => m.pure(None)
           case Some(v_init) => for { 
-            vi1 <- kVarInit(v_init,tCtx)
+            vi1 <- kVarInit(vm, tCtx, v_init)
           } yield Some(vi1)
         }
-        rest1 <- kVarDecls(rest, tCtx)
+        rest1 <- kVarDecls(vm, tCtx, rest)
       } yield (VarDecl(VarId(id1), ov_init1)::rest1)
       // array init, we do not rename the lhs ID, we only convert the referenced ids on the RHS
       case VarDecl(VarDeclArray(var_decl_id), ov_init) => for {
         ov_init1 <- ov_init match {
           case None => m.pure(None)
           case Some(v_init) => for {
-            vi1 <- kVarInit(v_init, tCtx)
+            vi1 <- kVarInit(vm, tCtx, v_init)
           } yield Some(vi1)
         }
-        rest1 <- kVarDecls(rest, tCtx)
+        rest1 <- kVarDecls(vm, tCtx, rest)
       } yield (VarDecl(VarDeclArray(var_decl_id), ov_init1)::rest1)
     }
   }
 
-  def kVarInit(vInit:VarInit, tCtx:TCtx)(using m:MonadError[SSAState, ErrorM]): SState[State, VarInit] = vInit match {
+  def kVarInit(vm:VarMap, tCtx:TCtx, vInit:VarInit)(using m:MonadError[SSAState, ErrorM]): SState[State, VarInit] = vInit match {
     case InitExp(exp) => for {
-      exp1 <- kexp(exp, tCtx) 
+      exp1 <- kexp(vm, tCtx, exp) 
     } yield InitExp(exp1)
     case InitArray(ArrayInit(var_inits)) => for {
-      var_inits1 <- var_inits.traverse(vi => kVarInit(vi, tCtx))
+      var_inits1 <- var_inits.traverse(vi => kVarInit(vm, tCtx, vi))
     } yield InitArray(ArrayInit(var_inits1))
   }
 
@@ -1967,53 +2258,54 @@ object MinSSA {
   /**
     * kexp - converts an expression, correspondent to the KE function in the paper
     *
+    * @param vm - beta
+    * @param ctx - last known ok ctx, for keeping track of method invocation location. not used in resolving the most recent variable definition
     * @param e
-    * @param ctx - for keeping track of method invocation location. not used in resolving the most recent variable definition
     * @param m
     * @return
     */
 
-  def kexp(e:Exp, ctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, Exp] = e match {
+  def kexp(vm:VarMap, ctx:TCtx, e:Exp)(using m:MonadError[SSAState, ErrorM]):SState[State, Exp] = e match {
     case ArrayAccess(ArrayIndex(e, es)) => for {
-      e1 <- kexp(e, ctx)
-      es1 <- es.traverse(kexp(_, ctx))
+      e1 <- kexp(vm, ctx, e)
+      es1 <- es.traverse(kexp(vm, ctx, _))
     } yield ArrayAccess(ArrayIndex(e1, es1))
     case Cast(ty, exp) => for {
-      exp1 <- kexp(exp, ctx) 
+      exp1 <- kexp(vm, ctx, exp) 
     } yield Cast(ty,exp1)
     case ArrayCreate(ty, exps, num_dims) => for {
-      exps1 <- exps.traverse(kexp(_, ctx))
+      exps1 <- exps.traverse(kexp(vm, ctx, _))
     } yield ArrayCreate(ty, exps1, num_dims)
     
     case ArrayCreateInit(ty, size, ArrayInit(v_inits)) => for {
-      v_inits1 <- v_inits.traverse(kVarInit(_, ctx))
+      v_inits1 <- v_inits.traverse(kVarInit(vm, ctx, _))
     } yield ArrayCreateInit(ty, size, ArrayInit(v_inits1))
     case Assign(lhs, op, rhs) => m.raiseError("SSA construction failed, assignment expression should be handled in kstmt.") // might not be true, it does not work with x = (y = 1) + 1 // maybe it should have been flattened or desugared? todo: double check
     case BinOp(e1, op, e2) => for {
-      e1p <- kexp(e1, ctx)
-      e2p <- kexp(e2, ctx)
+      e1p <- kexp(vm, ctx, e1)
+      e2p <- kexp(vm, ctx, e2)
     } yield BinOp(e1p, op, e2p)
   
     case ClassLit(ty) => m.pure(e) 
     case Cond(cond, true_exp, false_exp) => for {
-      cond1 <- kexp(cond,ctx)
-      true_exp1 <- kexp(true_exp, ctx)
-      false_exp1 <- kexp(false_exp, ctx)
+      cond1 <- kexp(vm, ctx, cond)
+      true_exp1 <- kexp(vm, ctx, true_exp)
+      false_exp1 <- kexp(vm, ctx, false_exp)
     } yield Cond(cond1, true_exp1, false_exp1)
     case ExpName(name) => for {
       st <- get
       exp1 <- st match {
-        case State(eth, vm, okCtx, errCtxs, aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => Rleq(aenv, eenv, okCtx, vm, name) match {
-          case Nil => m.raiseError(s"SSA construction failed, Rlt failed to find a lub for ${name} during expression conversion. None exists. ${okCtx}, ${vm.toList}")
+        case State(eth, aenv, eenv, nDecls, methInvs, srcLblEnv,conf) => Rleq(aenv, eenv, ctx, vm, name) match {
+          case Nil => m.raiseError(s"SSA construction failed, Rlt failed to find a lub for ${name} during expression conversion. None exists. ${ctx}, ${vm.toList}")
           case (c,name1)::Nil => m.pure(ExpName(name1))
-          case _::_ => m.raiseError(s"SSA construction failed, Rlt failed to find a lub for ${name} during expression conversion. More than one candidates found. ${okCtx}, ${vm.toList}")
+          case _::_ => m.raiseError(s"SSA construction failed, Rlt failed to find a lub for ${name} during expression conversion. More than one candidates found. ${ctx}, ${vm.toList}")
         }
       }
     } yield exp1
     
     case FieldAccess_(access) => access match {
       case PrimaryFieldAccess(e, id) => for {
-        e1 <- kexp(e, ctx)
+        e1 <- kexp(vm, ctx, e)
       } yield FieldAccess_(PrimaryFieldAccess(e1, id))
       case SuperFieldAccess(id) => m.pure(e)
       case ClassFieldAccess(n, id) => m.pure(e)
@@ -2021,39 +2313,39 @@ object MinSSA {
     case InstanceCreation(type_args, type_decl, args, body) => 
      
       for {
-        args1 <- args.traverse(arg => kexp(arg, ctx))
+        args1 <- args.traverse(arg => kexp(vm, ctx, arg))
         // not modifying the body. 
       } yield InstanceCreation(type_args, type_decl, args1, body)
     case InstanceOf(e, ref_type) => for {
-      e1 <- kexp(e, ctx)
+      e1 <- kexp(vm, ctx, e)
     } yield InstanceOf(e1, ref_type) 
     case Lambda(params, body) => m.raiseError("SSA construction failed, lambda expression is not supported.")
     case Lit(lit) => m.pure(e)
     case MethodInv(methodInv) => methodInv match {
       // method name does not need to be convert
       case MethodCall(name, args) => for {
-        args1 <- args.traverse(arg => kexp(arg, ctx))
+        args1 <- args.traverse(arg => kexp(vm, ctx, arg))
         _ <- addMethodInv(ctx, MethodCall(name, args1))
       } yield MethodInv(MethodCall(name, args1))
 
       case PrimaryMethodCall(e, ref_types, id, args) => for {
-        args1 <- args.traverse(arg => kexp(arg, ctx))
-        e1 <- kexp(e, ctx)
+        args1 <- args.traverse(arg => kexp(vm, ctx, arg))
+        e1 <- kexp(vm, ctx, e)
         _ <- addMethodInv(ctx, PrimaryMethodCall(e1, ref_types, id, args1))
       } yield MethodInv(PrimaryMethodCall(e1, ref_types, id, args1))
 
       case ClassMethodCall(name, ref_types, id, args) => for {
-        args1 <- args.traverse(arg => kexp(arg, ctx))
+        args1 <- args.traverse(arg => kexp(vm, ctx, arg))
         _ <- addMethodInv(ctx, ClassMethodCall(name, ref_types, id, args1))
       } yield MethodInv(ClassMethodCall(name, ref_types, id, args1))
 
       case SuperMethodCall(ref_types, id, args) => for {
-        args1 <- args.traverse(arg => kexp(arg, ctx))
+        args1 <- args.traverse(arg => kexp(vm, ctx, arg))
         _ <- addMethodInv(ctx, SuperMethodCall(ref_types, id, args1))
       } yield MethodInv(SuperMethodCall(ref_types, id, args1))
 
       case TypeMethodCall(name, ref_types, id, args) => for {
-        args1 <- args.traverse(arg => kexp(arg, ctx))
+        args1 <- args.traverse(arg => kexp(vm, ctx, arg))
         _ <- addMethodInv(ctx, TypeMethodCall(name, ref_types, id, args1))
       } yield MethodInv(TypeMethodCall(name, ref_types, id, args1))
     }
@@ -2061,18 +2353,18 @@ object MinSSA {
     case PostDecrement(exp) => m.raiseError("SSA construction failed, PostDecrement expression should have been desugared.")
     case PostIncrement(exp) => m.raiseError("SSA construction failed, PostIncrement expression should have been desugared.")
     case PreBitCompl(exp) => for {
-      e1 <- kexp(exp, ctx) 
+      e1 <- kexp(vm, ctx, exp) 
     } yield PreBitCompl(e1) 
     case PreDecrement(exp) => m.raiseError("SSA construction failed, PreDecrement expression should have been desugared.")
     case PreIncrement(exp) => m.raiseError("SSA construction failed, PreIncrement expression should have been desugared.")
     case PreMinus(exp) => for {
-      exp1 <- kexp(exp, ctx)
+      exp1 <- kexp(vm, ctx, exp)
     } yield PreMinus(exp1) 
     case PreNot(exp) => for {
-      exp1 <- kexp(exp, ctx)
+      exp1 <- kexp(vm, ctx, exp)
     } yield PreNot(exp1) 
     case PrePlus(exp) => for {
-      exp1 <- kexp(exp, ctx)
+      exp1 <- kexp(vm, ctx, exp)
     } yield PrePlus(exp1)
     case QualInstanceCreation(exp, type_args, id, args, body) => m.raiseError("SSA construction failed, Qualified Instance creation expression is not supported.")
     case This => m.pure(e) 
@@ -2090,7 +2382,7 @@ object MinSSA {
     * @return     - an SSA Block
     */
   
-
+  /*
   def kstmt(stmt:Stmt, tctx:TCtx)(using m:MonadError[SSAState, ErrorM]):SState[State, SSABlock] = {
     val lbl = tctx
     stmt match {
@@ -2452,7 +2744,7 @@ object MinSSA {
       } yield SSABlock(lbl, List(SSAWhile(phis_pre_updated, exp1_s, body_stmts_s)))
     }
   } 
-
+   */
 
 
 
@@ -2467,40 +2759,8 @@ object MinSSA {
     * @return
     */
 
+  /*
   def mkPhi(st0:State, st1:State, st2:State, lbl:Label)(using m:MonadError[SSAState, ErrorM]):SState[State, List[Phi]] = (st0, st1, st2) match {
-    /*
-    case (State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1,  _, _, _), State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, _, _,_)) if ((eenv1 ++ dom(benv1 ++ cenv1)).contains(eCtx1)) && ((eenv2 ++ dom(benv2 ++ cenv2)).contains(eCtx2)) => for {
-      // do we still need this case? it means dead code
-      vs <- m.pure(vm1.keySet ++ vm2.keySet)
-      phis <- vs.toList.traverse( v => for {
-        vlbl <- mkName(v, lbl)
-      } yield Phi(v, vlbl, Map()))
-    } yield phis
-    case (State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1, _, _,_), State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2, _, _,_)) if !((eenv1 ++ dom(benv1 ++ cenv1)).contains(eCtx1)) && ((eenv2 ++ dom(benv2 ++ cenv2)).contains(eCtx2)) => for {
-      vs <- m.pure(vm1.keySet)
-      phis <- vs.toList.traverse( v => for {
-        vlbl <- mkName(v, lbl)
-        lbl1 <- toLbl(eCtx1)
-        name <- Rleq(aenv1, eenv1, benv1, cenv1, eCtx1, vm1, v) match {
-          case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub in mkPhi() for ${v}. None exists. ${vm1}")
-          case (c,n)::Nil => m.pure(n)
-          case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). More than one candidates found.")
-        }
-      } yield Phi(v, vlbl, Map(lbl1 -> name)))  
-    } yield phis
-    case (State(vm1, eCtx1, aenv1, eenv1, benv1, cenv1, _, _, _), State(vm2, eCtx2, aenv2, eenv2, benv2, cenv2,_, _, _)) if ((eenv1 ++ dom(benv1 ++ cenv1)).contains(eCtx1)) && !((eenv2 ++ dom(benv2 ++ cenv2)).contains(eCtx2)) => for {
-      vs <- m.pure(vm2.keySet)
-      phis <- vs.toList.traverse( v => for {
-        vlbl <- mkName(v, lbl)
-        lbl2 <- toLbl(eCtx2)
-        name <- Rleq(aenv2, eenv2, benv2, cenv2, eCtx2, vm2, v) match {
-          case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub in mkPhi() for ${v}. None exists. ${vm2}")
-          case (c,n)::Nil => m.pure(n)
-          case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). More than one candidates found.")          
-        }
-      } yield Phi(v, vlbl, Map(lbl2 -> name)))
-    } yield phis
-    */  
     case (State(eth0, vm0, okCtx0, errCtxs0, aenv0, eenv0, _, _, _, _), State(eth1, vm1, okCtx1, errCtxs1, aenv1, eenv1, _, _, _,_ ), State(eth2, vm2, okCtx2, errCtxs2, aenv2, eenv2,_, _, _, _)) => for {
       vs <- m.pure((diffVarMap(vm1,vm0) ++ diffVarMap(vm2,vm0)).keySet)
       phis <- vs.toList.traverse( v => for {
@@ -2519,9 +2779,62 @@ object MinSSA {
         }
       } yield Phi(v, vlbl, List(lbl1 -> name1, lbl2 -> name2)))
     } yield phis  
-  }
+  }*/
 
 
+  def mkPhi(ctx_new:TCtx, okCtx1:TCtx, okCtx2:TCtx, vm1:VarMap, vm2:VarMap, ref_vm:VarMap, st1:State, st2:State)(using m:MonadError[SSAState, ErrorM]):SState[State, (VarMap, List[Phi])] = for {
+    vm_new        <- mkVarMapFromUpdated(ctx_new, vm1, vm2, ref_vm) 
+    v_m            = vm_new.toList
+    v_ctx_renamed  = v_m.flatMap( (v,m) => m.toList.map( (ctx, renamed) => (v, ctx, renamed) ))
+    (aenv1, eenv1) = st1 match {
+      case State(eth, aenv, eenv, _, _, _, _) => (aenv, eenv)
+    }
+    (aenv2, eenv2) = st2 match {
+      case State(eth, aenv, eenv, _, _, _, _) => (aenv, eenv)
+    }
+    phis          <- v_ctx_renamed.traverse( (v,ctx,vlbl) => for {
+      name1 <- Rleq(aenv1, eenv1, okCtx1, vm1, v) match {
+        case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub in mkPhi() for ${v}. None exists. ${vm1}")
+        case (c,n)::Nil => m.pure(n)
+        case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). More than one candidates found.")
+      }
+      name2 <- Rleq(aenv2, eenv2, okCtx2, vm2, v) match {
+        case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub in mkPhi() for ${v}. None exists. ${vm2}")
+        case (c,n)::Nil => m.pure(n)
+        case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). More than one candidates found.")
+      }
+    } yield Phi(v, vlbl, (List(okCtx1 -> name1, okCtx2 -> name2))))
+  } yield (vm_new, phis)
+
+
+  def mkPhiErrs(ctx_new:TCtx, errCtxs1:List[TCtx], errCtxs2:List[TCtx], vm1:VarMap, vm2:VarMap, ref_vm:VarMap, st1:State, st2:State)(using m:MonadError[SSAState, ErrorM]):SState[State, (VarMap, List[Phi])] = for {
+    vm_new        <- mkVarMapFromUpdated(ctx_new, vm1, vm2, ref_vm) 
+    v_m            = vm_new.toList
+    v_ctx_renamed  = v_m.flatMap( (v,m) => m.toList.map( (ctx, renamed) => (v, ctx, renamed) ))
+    (aenv1, eenv1) = st1 match {
+      case State(eth, aenv, eenv, _, _, _, _) => (aenv, eenv)
+    }
+    (aenv2, eenv2) = st2 match {
+      case State(eth, aenv, eenv, _, _, _, _) => (aenv, eenv)
+    }
+    phis          <- v_ctx_renamed.traverse((v,ctx,vlbl) => for {
+      err_ctxs_names1 <- errCtxs1.traverse( errCtx1 => for {
+        name <- RleqErr(aenv1, eenv1, errCtx1, vm1, v) match {
+          case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub in mkPhi() for ${v}. None exists. ${vm1}")
+          case (c,n)::Nil => m.pure(n)
+          case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). More than one candidates found.")
+        }
+      } yield (errCtx1, name)) 
+
+      err_ctxs_names2 <- errCtxs2.traverse( errCtx2 => for {
+        name <- RleqErr(aenv2, eenv2, errCtx2, vm2, v) match {
+          case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub in mkPhi() for ${v}. None exists. ${vm2}")
+          case (c,n)::Nil => m.pure(n)
+          case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). More than one candidates found.")
+        }
+      } yield (errCtx2, name))
+    } yield Phi(v, vlbl, err_ctxs_names1 ++ err_ctxs_names2 ))
+  } yield (vm_new, phis)
 
   /**
     * genVarDecls - generate the list of statements from the nested declaration collected during the conversion.
@@ -2529,10 +2842,10 @@ object MinSSA {
     * @param m
     * @return
     */    
-  def genVarDecls(using m:MonadError[SSAState, ErrorM]):SState[State, List[SSAStmt]] = for {
+  def genVarDecls(vm:VarMap)(using m:MonadError[SSAState, ErrorM]):SState[State, List[SSAStmt]] = for {
     st <- get
     stmts <- st match {
-      case State(eth, vm, okCtx, errCtxs, aenv, eenv, nestedDecls, methodInvs, srcLblEnv, conf) => for {
+      case State(eth, /* vm, okCtx, errCtxs,*/  aenv, eenv, nestedDecls, methodInvs, srcLblEnv, conf) => for {
         tbl <- m.pure(mkTable(nestedDecls)) 
         ll  <- vm.toList.traverse( p => p match {
           case (x, ctxm) => tbl.get(x) match {
@@ -2598,14 +2911,15 @@ object MinSSA {
 
   def kctx(ctx:SCtx):TCtx = ctx match {
     case SBox => TBox
-    case SLast(ctx1) => TLast(kctx(ctx1))
+    // TODO: get rid of SLast
+    // case SLast(ctx1) => TLast(kctx(ctx1))
     case SHead(ctx1) => THead(kctx(ctx1))
     case STail(ctx1) => TTail(kctx(ctx1))
     case SThen(ctx1) => TThen(kctx(ctx1))
     case SElse(ctx1) => TElse(kctx(ctx1))
     case SWhile(ctx1) => TWhile(kctx(ctx1))
     case STry(ctx1) => TTry(kctx(ctx1))
-    case SCatch(ctx1) => TCatch(kctx(ctx1))
+    case SCatch(ctx1) => TCatchHandle(kctx(ctx1))
   } 
 
   /**
@@ -2632,16 +2946,17 @@ object MinSSA {
 
   /**
     * make substitution for while conversion
-    *
+    * @param okCtx0 - the input ok context to the entire statement
     * @param st0 - input state to the entire statement
-    * @param st1 - input state to the while body
-    * @param st2 - output state from the while body
-    * @param lbl1 - preWhilePhi^0 
+    * @param vm0 - input varmap to the entire statement
+    * @param vm1 - input varmap the while body
+    * @param vm2 - output varmap from the while body
+    * @param whileJoin1 - WhileJoin^0 
     * @param m
     * @return
     */
 
-  def mkSubstFromStates(st0:State, st1:State, st2:State, lbl1:Label)(using m:MonadError[SSAState,ErrorM]):SState[State,Map[Name,Name]] = {
+  def mkSubstFromStates(okCtx0:TCtx, st0:State, vm0:VarMap, vm1:VarMap, vm2:VarMap, whileJoin1:Label)(using m:MonadError[SSAState,ErrorM]):SState[State,Map[Name,Name]] = {
     
     def go(vs:List[Name], aenv:AEnv, eenv:EEnv, okCtx:TCtx, vm:VarMap, lbl:Label)(using m:MonadError[SSAState, ErrorM]):SState[State,List[(Name,Name)]] = vs.traverse(v => for {
           v_lbl1 <- mkName(v,lbl) // the v_l1 to be renamed back to the original
@@ -2652,20 +2967,17 @@ object MinSSA {
           }
         } yield (v_lbl1, v_ori))
           
-    (st0, st1, st2) match { 
+    st0 match { 
     // todo check the case for break and continue // no need?
     // 
-      case (State(eth0, vm0, okCtx0, errCtxs0, aenv0, eenv0, nestedDecls0, methInvs0, srcLblEnv0, conf0),
-            State(eth1, vm1, okCtx1, errCtxs1, aenv1, eenv1, nestedDecls1, methInvs1, srcLblEnv1, conf1),
-            State(eth2, vm2, okCtx2, errCtxs2, aenv2, eenv2, nestedDecls2, methInvs2, srcLblEnv2, conf2)) => {
-              val vs = diffVarMap(vm2, vm1).keySet // dom3(vm2 - vm1)
-              val no_update = vm0.keySet -- vs
-              for {
-                ls <- go(no_update.toList, aenv0, eenv0, okCtx0, vm0, lbl1)
-              } yield ls.foldLeft(Map():Map[Name,Name])((m:Map[Name,Name],p:(Name,Name)) => (m + (p._1 -> p._2)))
-            }
+      case State(eth0, aenv0, eenv0, nestedDecls0, methInvs0, srcLblEnv0, conf0) => {
+        val vs = diffVarMap(vm2, vm1).keySet // dom3(vm2 - vm1)
+        val no_update = vm0.keySet -- vs
+        for {
+          ls <- go(no_update.toList, aenv0, eenv0, okCtx0, vm0, whileJoin1)
+        } yield ls.foldLeft(Map():Map[Name,Name])((m:Map[Name,Name],p:(Name,Name)) => (m + (p._1 -> p._2)))
+      }
     }
-  
   }
     
 
