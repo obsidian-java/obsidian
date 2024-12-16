@@ -1916,9 +1916,7 @@ object MinSSA {
 
       case (BlockStmt_(stmt)::rest) => for {
         _ <- addToAEnv(ctx)
-
         (bstmt, vmOut, ctxOkOut, ctxErrsOut) <- stmt match { // begin bstmt
-
           case Assert(exp, msg)
               if mayThrow(exp, throwers) || msg.exists( mayThrow(_, throwers) ) => {
                 m.raiseError("SSA construction failed, assertion should not throw exceptions.")
@@ -2069,18 +2067,18 @@ object MinSSA {
             *  beta, ctxOk |- e => E 
             *  ctx1, beta, ctxOk, [] |- \bar{s1} => \bar{B1}, beta1, ctxOk1, ctxErrs1
             *  ctx2, beta, ctxOk, [] |- \bar{s2} => \bar{B2}, beta2, ctxOk2, ctxErrs2
-            *  ctx3 = ctx[if E { \bar{B} } else { \bar{B} } join BBox next { \bar{B} } except \bar{phi}
-            *  beta_j = { (x, ctx3, x_ctx3) | x \in (dom(beta1) \cup dom(beta2)) - dom(beta) } 
-            *  phi_j = { x_ctx3 = phi( ctxOk1: R_<=Ok (ctxOk1, beta_1, x), 
-            *                          ctxOk2: R_<=Ok (ctxOk2, beta_1, x) ) | x \in (dom(beta1) \cup dom(beta2)) - dom(beta) }
-            *  ctx4 = ctx[if E { \bar{B} } else { \bar{B} } join \bar{phi} next { Box } except \bar{phi}
-            *  ctx4, beta1 \cup beta2 \cup beta_j, ctx3, [] |-  \bar{s3} => \bar{B3}, beta3, ctxOk3, ctxErr3 
-            *  ctx5 = ctx[if E { \bar{B} } else { \bar{B} } join \bar{phi} next { \bar{B} } except BBox
-            *  phi_e = { x_ctx5 = phi(ctxErr: R_<=err (ctxErr, beta1 \cup beta2, x) | ctxErr \in (ctxErrs1 \cup  ctxErrs2) | x \in (dom(beta1) \cup dom(beta2))- dom(beta) }
-            *  beta_e = { (x, ctx5, x_ctx5) | x \in (dom(beta1) \cup dom(beta2)) - dom(beta) }
+            *  ctx_j = ctx[if E { \bar{B} } else { \bar{B} } join BBox next { \bar{B} } except \bar{phi}
+            *  beta_j = { (x, ctx_j, x_ctx_j) | x \in (dom(beta1) \cup dom(beta2)) - dom(beta) } 
+            *  phi_j = { x_ctx_j = phi( ctxOk1: R_<=Ok (ctxOk1, beta_1, x), 
+            *                           ctxOk2: R_<=Ok (ctxOk2, beta_1, x) ) | x \in (dom(beta1) \cup dom(beta2)) - dom(beta) }
+            *  ctx3 = ctx[if E { \bar{B} } else { \bar{B} } join \bar{phi} next { Box } except \bar{phi}
+            *  ctx3, beta1 \cup beta2 \cup beta_j, ctx_j, [] |-  \bar{s3} => \bar{B3}, beta3, ctxOk3, ctxErr3 
+            *  ctx_e = ctx[if E { \bar{B} } else { \bar{B} } join \bar{phi} next { \bar{B} } except BBox
+            *  phi_e = { x_ctx_e = phi(ctxErr: R_<=err (ctxErr, beta1 \cup beta2, x) | ctxErr \in (ctxErrs1 \cup  ctxErrs2) | x \in (dom(beta1) \cup dom(beta2))- dom(beta) }
+            *  beta_e = { (x, ctx_e, x_ctx_e) | x \in (dom(beta1) \cup dom(beta2)) - dom(beta) }
             * ----------------------------------------------------------------------------------------------------------------------------(cIf)
             *  ctx, beta, ctxOk, ctxErrs |- if e { \bar{s1} } else { \bar{s2} } ; \bar{s3} => 
-            *      if E { \bar{B1} } else { \bar{B2} } join \bar{\phi_j} next { \bar{B3} } except \bar{\phi_e}, beta3 \cup beta_e, ctxOk3,  ctxErrs \cup ctxErrs_3 \cup {ctx5} 
+            *      if E { \bar{B1} } else { \bar{B2} } join \bar{\phi_j} next { \bar{B3} } except \bar{\phi_e}, beta3 \cup beta_e, ctxOk3,  ctxErrs \cup ctxErrs_3 \cup {ctx_e} 
             */
           case IfThenElse(exp, then_stmt, else_stmt) => for {
             exp1     <- kexp(vm, ctx, exp)
@@ -2096,20 +2094,44 @@ object MinSSA {
             (blks2, vm2, ctxOk2, ctxErrs2)       <- kblkStmts(vm, ctx2, ctxOk, Nil, List(BlockStmt_(else_stmt)))
             st2      <- get
             // resolve the join phi
-            ctx3     = putTCtx(ctx, TIfJoin)
-            _        <- addToAEnv(ctx3)            
-            (vm_j,phi_j) <- mkPhi(ctx3, ctxOk1, ctxOk2, vm1, vm2, vm, st1, st2)
+            ctx_j    = putTCtx(ctx, TIfJoin)
+            _        <- addToAEnv(ctx_j)            
+            (vm_j,phi_j) <- mkPhi(ctx_j, ctxOk1, ctxOk2, vm1, vm2, vm, st1, st2)
             // hanlde the next
-            ctx4     = putTCtx(ctx, TIfNext(TBox))
-            _        <- addToAEnv(ctx4)            
-            (blks4, vm4, ctxOk4, ctxErrs4)       <- kblkStmts(vm, ctx4, ctx3, Nil, rest)
+            ctx3     = putTCtx(ctx, TIfNext(TBox))
+            _        <- addToAEnv(ctx3)            
+            (blks3, vm3, ctxOk3, ctxErrs3)       <- kblkStmts(vm, ctx3, ctx_j, Nil, rest)
             // resolve the except phi
-            ctx5     = putTCtx(ctx, TIfExcept)
-            _        <- addToAEnv(ctx5)
-            _        <- addToEEnv(ctx5)                        
-            (vm_e,phi_e) <- mkPhiErrs(ctx5, ctxErrs1, ctxErrs2, vm1, vm2, vm, st1, st2)
-            ssaBlk = SSABlock(lbl, List(SSAIf(exp1, blks1, blks2, phi_j, blks4, phi_e)))
-          } yield (List(ssaBlk), unionVarMaps(List(vm1, vm2, vm_j, vm4, vm_e)), ctxOk4, ctxErrs ++ ctxErrs4 ++ List(ctx5))
+            ctx_e    = putTCtx(ctx, TIfExcept)
+            _        <- addToAEnv(ctx_e)
+            _        <- addToEEnv(ctx_e)                        
+            (vm_e,phi_e) <- mkPhiErrs(ctx_e, ctxErrs1, ctxErrs2, vm1, vm2, vm, st1, st2)
+            ssaBlk = SSABlock(lbl, List(SSAIf(exp1, blks1, blks2, phi_j, blks3, phi_e)))
+          } yield (List(ssaBlk), unionVarMaps(List(vm1, vm2, vm_j, vm3, vm_e)), ctxOk3, ctxErrs ++ ctxErrs3 ++ List(ctx_e))
+
+          case Try(try_blk, Catch(param, catch_blk)::Nil, Some(finally_blk)) =>
+            m.raiseError("SSA construction failed, Try catch finally should be desugared to Try catch.")
+          /**
+            * 
+            *  ctx1 = ctx[try {Box} catch ex \bar{phi} handle {\bar{B}} join \bar{phi} next {\bar{B}} except \bar{phi}
+            *  ctx_c = ctx[try {\bar{B}} catch ex BBox handle {\bar{B}} join \bar{phi} next {\bar{B}} except \bar{phi}
+            *  ctx2 = ctx[try {\bar{B}} catch ex \bar{phi} handle {Box} join \bar{phi} next {\bar{B}} except \bar{phi}
+            *  ctx_j = ctx[try {\bar{B}} catch ex \bar{phi} handle {\bar{B}} join BBox next {\bar{B}} except \bar{phi}
+            *  ctx3 = ctx[try {\bar{B}} catch ex \bar{phi} handle {\bar{B}} join \bar{phi} next {Box} except \bar{phi}
+            *  ctx_e = ctx[try {\bar{B}} catch ex \bar{phi} handle {\bar{B}} join \bar{phi} next {\bar{B}} except BBox
+            *  ctx1, beta, ctx, [] |- \bar{s1}, vm1, ctxOk1, ctxErrs1 
+            *  \bar{phi_c} = { x_ctx_c = phi (ctx_err : R_leq_err(ctxErr, beta1, x) | ctxErr \in ctxErrs)  } | x \in dom(beta1) - dom(beta) } 
+            *  beta_c = { (x, ctx_c, x_ctx_c) | x \in dom(beta1) - dom(beta) } 
+            *  ctx2, beta \cup beta_c, ctx_c, [] |- \bar{s2} => \bar{B2}, beta2, ctxOk2, ctxErrs2 
+            *  \bar{phi_j} = { x_ctx_j = phi (ctxOk1: R_<=Ok(ctxOk1, beta1, x), ctxOk2: R_<=Ok(ctxOk2, beta2, x)) | x \in dom(beta1) \cup dom(beta2) - dom(beta) 
+            * ---------------------------------------------------------------------------------
+            * ctx, beta, ctxOk, ctxErrs |- try {\bar{s1}} catch ex { \bar{s2} } ; \bar{s3} =>
+            *    try { \bar{B1} } catch ex \bar{phi_c} handle { \bar{B2} } 
+            *                         join \bar{phi_j} next { \bar{B3} }
+            *                         except \bar{phi_e}
+            */ 
+          case Try(try_blk, Catch(param, catch_blk)::Nil, None) => 
+
         } // end of (bstmt, vmOut, ctxOkOut, ctxErrsOut)
       } yield (bstmt, vmOut, ctxOkOut, ctxErrsOut)
     } // end of outTuple
