@@ -1013,15 +1013,14 @@ object MinSSA {
   /**
     * make a new variable mapping from the updated entries from vm1 \cup vm2 but not in ref_vm
     *  @param ctx - the context to set the varname
-    *  @param vm1 - the beta1
-    *  @param vm2 - the beta2
+    *  @param vms - the list of vm1, vm2, ... 
     *  @parem ref_vm - the referenced beta
     *  @return a new var map
     */
-  def mkVarMapFromUpdated(ctx:TCtx, vm1:VarMap, vm2:VarMap, ref_vm:VarMap)(using m:MonadError[SSAState, ErrorM]):SState[State,VarMap] = for {
-    vars_j   <- m.pure((vm1.keySet ++ vm2.keySet) -- ref_vm.keySet)
+  def mkVarMapFromUpdated(ctx:TCtx, vms:List[VarMap], ref_vm:VarMap)(using m:MonadError[SSAState, ErrorM]):SState[State,VarMap] = for {
+    vars_j   <- m.pure((vms.foldLeft(Set[Name]())((acc, vm) => acc ++ vm.keySet)) -- ref_vm.keySet)
     vars_ctxs_renamed_j <- vars_j.toList.traverse(
-      x => for {
+      (x:Name) => for {
         x_ctx <- mkName(x, ctx)
       } yield (x, (ctx, x_ctx))
     )
@@ -2082,12 +2081,12 @@ object MinSSA {
             */
           case IfThenElse(exp, then_stmt, else_stmt) => for {
             exp1     <- kexp(vm, ctx, exp)
-            // Handle the then
+            // process the then statements
             ctx1     = putTCtx(ctx, TThen(TBox))
             _        <- addToAEnv(ctx1)
             (blks1, vm1, ctxOk1, ctxErrs1)       <- kblkStmts(vm, ctx1, ctxOk, Nil, List(BlockStmt_(then_stmt)))
             st1      <- get
-            // handle the else
+            // process the else statements
            
             ctx2     = putTCtx(ctx, TElse(TBox))
             _        <- addToAEnv(ctx2)
@@ -2097,7 +2096,7 @@ object MinSSA {
             ctx_j    = putTCtx(ctx, TIfJoin)
             _        <- addToAEnv(ctx_j)            
             (vm_j,phi_j) <- mkPhi(ctx_j, ctxOk1, ctxOk2, vm1, vm2, vm, st1, st2)
-            // hanlde the next
+            // process the next statements
             ctx3     = putTCtx(ctx, TIfNext(TBox))
             _        <- addToAEnv(ctx3)            
             (blks3, vm3, ctxOk3, ctxErrs3)       <- kblkStmts(vm, ctx3, ctx_j, Nil, rest)
@@ -2105,7 +2104,7 @@ object MinSSA {
             ctx_e    = putTCtx(ctx, TIfExcept)
             _        <- addToAEnv(ctx_e)
             _        <- addToEEnv(ctx_e)                        
-            (vm_e,phi_e) <- mkPhiErrs(ctx_e, ctxErrs1, ctxErrs2, vm1, vm2, vm, st1, st2)
+            (vm_e,phi_e) <- mkPhiErrs(ctx_e, ctxErrs1 ++ ctxErrs2, vm1 ++ vm2, vm, st2)
             ssaBlk = SSABlock(lbl, List(SSAIf(exp1, blks1, blks2, phi_j, blks3, phi_e)))
           } yield (List(ssaBlk), unionVarMaps(List(vm1, vm2, vm_j, vm3, vm_e)), ctxOk3, ctxErrs ++ ctxErrs3 ++ List(ctx_e))
 
@@ -2119,21 +2118,56 @@ object MinSSA {
             *  ctx_j = ctx[try {\bar{B}} catch ex \bar{phi} handle {\bar{B}} join BBox next {\bar{B}} except \bar{phi}
             *  ctx3 = ctx[try {\bar{B}} catch ex \bar{phi} handle {\bar{B}} join \bar{phi} next {Box} except \bar{phi}
             *  ctx_e = ctx[try {\bar{B}} catch ex \bar{phi} handle {\bar{B}} join \bar{phi} next {\bar{B}} except BBox
-            *  ctx1, beta, ctx, [] |- \bar{s1}, vm1, ctxOk1, ctxErrs1 
+            *  ctx1, beta, ctx, [] |- \bar{s1}, beta1, ctxOk1, ctxErrs1 
             *  \bar{phi_c} = { x_ctx_c = phi (ctx_err : R_leq_err(ctxErr, beta1, x) | ctxErr \in ctxErrs)  } | x \in dom(beta1) - dom(beta) } 
             *  beta_c = { (x, ctx_c, x_ctx_c) | x \in dom(beta1) - dom(beta) } 
-            *  ctx2, beta \cup beta_c, ctx_c, [] |- \bar{s2} => \bar{B2}, beta2, ctxOk2, ctxErrs2 
-            *  \bar{phi_j} = { x_ctx_j = phi (ctxOk1: R_<=Ok(ctxOk1, beta1, x), ctxOk2: R_<=Ok(ctxOk2, beta2, x)) | x \in dom(beta1) \cup dom(beta2) - dom(beta) 
-            * ---------------------------------------------------------------------------------
+            *  ctx2, beta1 \cup beta_c, ctx_c, [] |- \bar{s2} => \bar{B2}, beta2, ctxOk2, ctxErrs2 
+            *  \bar{phi_j} = { x_ctx_j = phi (ctxOk1: R_<=Ok(ctxOk1, beta1, x), ctxOk2: R_<=Ok(ctxOk2, beta2, x)) | x \in dom(beta1) \cup dom(beta2) - dom(beta)
+            *  beta_j = { (x, ctx_j, x_ctx_j) | x \in dom(beta1) \cup dom(beta_2) - dom(beta)
+            *  ctx3, beta1 \cup beta_c \cup beta2 \cup beta_j, ctx_j [] |- \bar{s3} => \bar{B3}, beta3, ctxOk3, ctxErr3
+            *  \bar{phi_e} = { x_ctx_e = phi (ctxErr: R_<=Err(ctxErr, beta2, x) | ctxErr \in ctxErr2 ) | x \in dom(beta2) - (dom(beta) \cup dom(beta_c)) }
+            *  beta_e = { (x, ctx_e, x_ctx_e) | x \in dom(beta2) - (dom(beta) \cup dom(beta_c)) }
+            *  beta4 = beta3 \cup beta_e
+            * ---------------------------------------------------------------------------------------------------------
             * ctx, beta, ctxOk, ctxErrs |- try {\bar{s1}} catch ex { \bar{s2} } ; \bar{s3} =>
             *    try { \bar{B1} } catch ex \bar{phi_c} handle { \bar{B2} } 
             *                         join \bar{phi_j} next { \bar{B3} }
-            *                         except \bar{phi_e}
-            */ 
-          case Try(try_blk, Catch(param, catch_blk)::Nil, None) => 
-
+            *                         except \bar{phi_e}, beta4, ctxOk3, ctxErrs ++ {ctx_e} ++ ctxErr3
+            */
+          case Try(Block(try_stmts), Catch(param, Block(catch_stmts))::Nil, None) => for {
+            // process the try statements
+            ctx1                           <- m.pure(putTCtx(ctx, TTry(TBox)))
+            _                              <- addToAEnv(ctx1)
+            (blks1, vm1, ctxOk1, ctxErrs1) <- kblkStmts(vm, ctx1, ctxOk, Nil, try_stmts)
+            st1                            <- get
+            // resolve the catch phi
+            ctx_c                          = putTCtx(ctx, TCatch)
+            _                              <- addToAEnv(ctx_c)
+            (vm_c, phi_c)                  <- mkPhiErrs(ctx_c, ctxErrs1, vm1, vm, st1) 
+            // process the catch handle statements
+            ctx2                           = putTCtx(ctx, TCatchHandle(TBox))
+            _                              <- addToAEnv(ctx2)
+            (blks2, vm2, ctxOk2, ctxErrs2) <- kblkStmts(unionVarMaps(List(vm1, vm_c)), ctx2, ctx_c, Nil, catch_stmts)
+            st2                            <- get
+            // resolve the join phi
+            ctx_j                          = putTCtx(ctx, TTryJoin)
+            _                              <- addToAEnv(ctx_j)
+            (vm_j, phi_j)                  <- mkPhi(ctx_j, ctxOk1, ctxOk2, vm1, vm2, vm, st1, st2)
+            // process the next statements
+            ctx3                           = putTCtx(ctx, TTryNext(TBox))
+            _                              <- addToAEnv(ctx3)
+            (blks3, vm3, ctxOk3, ctxErrs3) <- kblkStmts(unionVarMaps(List(vm1, vm_c, vm2, vm_j)), ctx3, ctx_c, Nil, rest)
+            st3                            <- get
+            // resolve the except phi
+            ctx_e                          = putTCtx(ctx, TTryExcept)
+            _                              <- addToAEnv(ctx_e)
+            _                              <- addToEEnv(ctx_e)
+            (vm_e, phi_e)                  <- mkPhiErrs(ctx_j, ctxErrs2, vm2, unionVarMaps(List(vm, vm_c)), st2)
+            ssaBlk = SSABlock(lbl, List(SSATry(blks1, param, phi_c, blks2, phi_j, blks3, phi_e)))            
+          } yield (List(ssaBlk), unionVarMaps(List(vm1, vm_c, vm2, vm_j, vm3, vm_e)), ctxOk3, ctxErrs ++ ctxErrs3 ++ List(ctx_e))
         } // end of (bstmt, vmOut, ctxOkOut, ctxErrsOut)
       } yield (bstmt, vmOut, ctxOkOut, ctxErrsOut)
+      // TODO: throw, attempt
     } // end of outTuple
   } yield outTuple
 
@@ -2804,8 +2838,10 @@ object MinSSA {
   }*/
 
 
+
+
   def mkPhi(ctx_new:TCtx, okCtx1:TCtx, okCtx2:TCtx, vm1:VarMap, vm2:VarMap, ref_vm:VarMap, st1:State, st2:State)(using m:MonadError[SSAState, ErrorM]):SState[State, (VarMap, List[Phi])] = for {
-    vm_new        <- mkVarMapFromUpdated(ctx_new, vm1, vm2, ref_vm) 
+    vm_new        <- mkVarMapFromUpdated(ctx_new, List(vm1, vm2), ref_vm) 
     v_m            = vm_new.toList
     v_ctx_renamed  = v_m.flatMap( (v,m) => m.toList.map( (ctx, renamed) => (v, ctx, renamed) ))
     (aenv1, eenv1) = st1 match {
@@ -2829,33 +2865,22 @@ object MinSSA {
   } yield (vm_new, phis)
 
 
-  def mkPhiErrs(ctx_new:TCtx, errCtxs1:List[TCtx], errCtxs2:List[TCtx], vm1:VarMap, vm2:VarMap, ref_vm:VarMap, st1:State, st2:State)(using m:MonadError[SSAState, ErrorM]):SState[State, (VarMap, List[Phi])] = for {
-    vm_new        <- mkVarMapFromUpdated(ctx_new, vm1, vm2, ref_vm) 
+  def mkPhiErrs(ctx_new:TCtx, errCtxs:List[TCtx], vm:VarMap, ref_vm:VarMap, st:State)(using m:MonadError[SSAState, ErrorM]):SState[State, (VarMap, List[Phi])] = for {
+    vm_new        <- mkVarMapFromUpdated(ctx_new, List(vm), ref_vm) 
     v_m            = vm_new.toList
     v_ctx_renamed  = v_m.flatMap( (v,m) => m.toList.map( (ctx, renamed) => (v, ctx, renamed) ))
-    (aenv1, eenv1) = st1 match {
-      case State(eth, aenv, eenv, _, _, _, _) => (aenv, eenv)
-    }
-    (aenv2, eenv2) = st2 match {
+    (aenv, eenv) = st match {
       case State(eth, aenv, eenv, _, _, _, _) => (aenv, eenv)
     }
     phis          <- v_ctx_renamed.traverse((v,ctx,vlbl) => for {
-      err_ctxs_names1 <- errCtxs1.traverse( errCtx1 => for {
-        name <- RleqErr(aenv1, eenv1, errCtx1, vm1, v) match {
-          case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub in mkPhi() for ${v}. None exists. ${vm1}")
+      err_ctxs_names <- errCtxs.traverse( errCtx => for {
+        name <- RleqErr(aenv, eenv, errCtx, vm, v) match {
+          case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub in mkPhi() for ${v}. None exists. ${vm}")
           case (c,n)::Nil => m.pure(n)
           case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). More than one candidates found.")
         }
-      } yield (errCtx1, name)) 
-
-      err_ctxs_names2 <- errCtxs2.traverse( errCtx2 => for {
-        name <- RleqErr(aenv2, eenv2, errCtx2, vm2, v) match {
-          case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub in mkPhi() for ${v}. None exists. ${vm2}")
-          case (c,n)::Nil => m.pure(n)
-          case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). More than one candidates found.")
-        }
-      } yield (errCtx2, name))
-    } yield Phi(v, vlbl, err_ctxs_names1 ++ err_ctxs_names2 ))
+      } yield (errCtx, name)) 
+    } yield Phi(v, vlbl, err_ctxs_names))
   } yield (vm_new, phis)
 
   /**
