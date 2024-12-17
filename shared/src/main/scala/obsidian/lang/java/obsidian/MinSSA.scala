@@ -623,7 +623,7 @@ object MinSSA {
     case State(_, /* _, _, _, */ _, _, _, _, srcLblEnv,_) => srcLblEnv
   }
 
-  // all Ok Contexts so far
+  // all Ok Contexts so far (or all context actually?)
   type AEnv = List[TCtx] // TODO: give a better type name to this environment
   // all Error Contexts so far
   type EEnv = List[TCtx] // TODO: give a better type name to this environment
@@ -2102,7 +2102,7 @@ object MinSSA {
             (blks3, vm3, ctxOk3, ctxErrs3)       <- kblkStmts(vm, ctx3, ctx_j, Nil, rest)
             // resolve the except phi
             ctx_e    = putTCtx(ctx, TIfExcept)
-            _        <- addToAEnv(ctx_e)
+            // _        <- addToAEnv(ctx_e) // not an Ok ctx
             _        <- addToEEnv(ctx_e)                        
             (vm_e,phi_e) <- mkPhiErrs(ctx_e, ctxErrs1 ++ ctxErrs2, vm1 ++ vm2, vm, st2)
             ssaBlk = SSABlock(lbl, List(SSAIf(exp1, blks1, blks2, phi_j, blks3, phi_e)))
@@ -2160,7 +2160,7 @@ object MinSSA {
             st3                            <- get
             // resolve the except phi
             ctx_e                          = putTCtx(ctx, TTryExcept)
-            _                              <- addToAEnv(ctx_e)
+            // _                              <- addToAEnv(ctx_e) // not an Ok ctx
             _                              <- addToEEnv(ctx_e)
             (vm_e, phi_e)                  <- mkPhiErrs(ctx_j, ctxErrs2, vm2, unionVarMaps(List(vm, vm_c)), st2)
             ssaBlk = SSABlock(lbl, List(SSATry(blks1, param, phi_c, blks2, phi_j, blks3, phi_e)))            
