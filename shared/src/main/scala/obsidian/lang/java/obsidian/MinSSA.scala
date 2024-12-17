@@ -2165,9 +2165,34 @@ object MinSSA {
             (vm_e, phi_e)                  <- mkPhiErrs(ctx_j, ctxErrs2, vm2, unionVarMaps(List(vm, vm_c)), st2)
             ssaBlk = SSABlock(lbl, List(SSATry(blks1, param, phi_c, blks2, phi_j, blks3, phi_e)))            
           } yield (List(ssaBlk), unionVarMaps(List(vm1, vm_c, vm2, vm_j, vm3, vm_e)), ctxOk3, ctxErrs ++ ctxErrs3 ++ List(ctx_e))
+
+          case Labeled(id, stmt) => for {
+            _ <- addSrcLabel(id, ctx)
+            r <- kblkStmts(vm, ctx, ctxOk, ctxErrs, BlockStmt_(stmt)::rest)
+          } yield r
+
+          case StmtBlock(blk) =>
+            m.raiseError("SSA construction failed, Statement Block should not be handled here.") // todo
+          case Switch(exp, blocks) =>
+            m.raiseError("SSA construction failed, Switch statement is not supported.") // todo
+          case Synchronized(exp, blk) =>
+            m.raiseError("SSA construction failed, Synchronized statement is not supported.") // todo
+
+          /**
+            * ctx, beta |- e => E    
+            * ------------------------------------------------------------------------------- (cThrow)
+            *  ctx, beta, ctxOk, ctxErrs |- throw e => throw E, vm, ctxOk, ctxErrs + {ctxErr}
+            */ 
+          case Throw(exp) => for {
+            ctxErr <- m.pure(putTCtx(ctx, TThrow))
+            exp1   <- kexp(vm, ctx, exp)
+            _      <- addToEEnv(ctxErr)
+            ssaBlk = SSABlock(lbl, List(SSAThrow(exp1)))
+          } yield (List(ssaBlk), vm, ctxOk, ctxErrs ++ List(ctxErr))
+          // TODO: while, return 
         } // end of (bstmt, vmOut, ctxOkOut, ctxErrsOut)
       } yield (bstmt, vmOut, ctxOkOut, ctxErrsOut)
-      // TODO: throw, attempt
+
     } // end of outTuple
   } yield outTuple
 
