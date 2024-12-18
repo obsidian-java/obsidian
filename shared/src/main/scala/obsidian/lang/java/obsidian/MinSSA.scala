@@ -2190,6 +2190,44 @@ object MinSSA {
             ssaBlk = SSABlock(lbl, List(SSAThrow(exp1)))
           } yield (List(ssaBlk), vm, ctxOk, ctxErrs ++ List(ctxErr))
           // TODO: while, return, homework 5
+          /**
+           * ctx, beta, ctxOk, ctxErrs |- while e { \overline{S1} } ; { \overline{S2} } =>
+           *     join \overline{\phi_j} while E { \overline{B1} } next { \overline{B2} } except \overline{\phi_e},  // idk what these do beta, ctxOk, ctxErrs
+           * phi_j <-> join
+           * phi_e <-> except
+           */
+          case While(exp, stmt) => for { // modelling with IfThenElse
+            // while condition - indep of join i think
+            exp1 <- kexp(vm, ctx, exp)
+
+            // while body
+            ctx1 = putTCtx(ctx, TWhileBody(TBox))
+            _    <- addToAEnv(ctx1)
+            (blks1, vm1, ctxOk1, ctxErrs1) <- kblkStmts(vm, ctx1, ctxOk, Nil, List(BlockStmt_(stmt)))
+            st1 <- get
+
+            // join
+            ctx_j = putTCtx(ctx, TWhileJoin)
+            _     <- addToAEnv(ctx_j)
+            (vm_j, phi_j) <- mkPhi(ctx_j, ctxOk1, vm, vm1, st1)
+
+            // next statements
+            ctx2 = putTCtx(ctx, TWhileNext(TBox))
+            _   <- addToAEnv(ctx2)
+            (blks2, vm2, ctxOk2, ctxErrs2) <- kblkStmts(vm, ctx2, ctx_j, Nil, rest)
+
+            // resolve except phi
+            ctx_e = putTCtx(ctx, TWhileExcept)
+            _     <- addToEEnv(ctx_e)
+            (vm_e, phi_e) <- mkPhiErrs(ctx_j, ctxErrs1, vm1, vm, st1)
+            ssaBlk = SSABlock(lbl, List(SSAWhile(phi_j, exp1, blks1, blks2, phi_e))) // following default ctr for SSAWhile
+          } yield (List(ssaBlk), unionVarMaps(List(vm1, vm_j, vm2, vm_e)), ctxOk2, ctxErrs ++ ctxErrs2 ++ List(ctx_e))
+          // ctx, beta, ctxOk, ctxErrs |- return e  => return E // any other stuff?
+          case Return(optional_exp) => for {
+            case Some(exp) => for {
+              exp1   <- kexp(vm, ctx, exp)
+            } yield List(SSABlock(lbl, List(SSAReturn(Some(exp1))))
+            case None => for {} yield List(SSABlock(lbl, List(SSAReturn(None))))
         } // end of (bstmt, vmOut, ctxOkOut, ctxErrsOut)
       } yield (bstmt, vmOut, ctxOkOut, ctxErrsOut)
 
