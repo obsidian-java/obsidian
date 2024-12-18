@@ -1739,7 +1739,7 @@ object MinSSA {
   }
 
   /** 
-    * R_{\leq_err}: TODO: fixme
+    * R_{\leq_err}: TODO: homework 4, probably need to define a separate partial order for the Err Flow
     */ 
   def RleqErr(aenv:AEnv, eenv:EEnv, ctx:TCtx, vm:VarMap, x:Name):List[(TCtx,Name)] = {
     def cmp(p:(TCtx,TCtx)):Boolean = p match {
@@ -2189,7 +2189,7 @@ object MinSSA {
             _      <- addToEEnv(ctxErr)
             ssaBlk = SSABlock(lbl, List(SSAThrow(exp1)))
           } yield (List(ssaBlk), vm, ctxOk, ctxErrs ++ List(ctxErr))
-          // TODO: while, return 
+          // TODO: while, return, homework 5
         } // end of (bstmt, vmOut, ctxOkOut, ctxErrsOut)
       } yield (bstmt, vmOut, ctxOkOut, ctxErrsOut)
 
@@ -2974,9 +2974,10 @@ object MinSSA {
   }
 
 
+  // TODO: do we still need this function?
   /**
     * kctx - converts a source program context into a target program context
-    *
+    * 
     * @param ctx
     * @return
     */
