@@ -325,14 +325,25 @@ object CPS {
      * */
     def cpsblk(blks:List[SSABlock], phiK:List[Phi], phiR:List[Phi])(using m:MonadError[CPSState, ErrorM]):SState[State, (List[VarDecl], Exp)] = blks match {
         case List(SSABlock(lbl, stmts)) => stmts match {
-            case List(SSAIf(e, blksp, blkspp, phi)) => for {
+            //case List(SSAIf(e, blksp, blkspp, phi)) => for {
+            case List(SSAIf(e, thenStmts@blksp, elseStmts@blkspp, joinPhis@phi, joinStmts, exceptPhis)) => for {
                 (declp, expp)     <- cpsblk(blksp, phi, phiR)
                 (declpp, exppp)   <- cpsblk(blkspp, phi, phiR)
                 exp               <- cpsexp(e)
                 (declppp, expppp) <- cpsk(phiK, lbl)
                 classpf           <- getCtxtClassIdPrefix
+                /*exp <- cpsexp(e)
+                (declThen, expThen) <- cpsblk(thenStmts, joinPhis, phiR)
+                (declElse, expElse) <- cpsblk(elseStmts, joinPhis, phiR)
+                (declAPhi, expAPhi) <- cpsk(phiK, lbl)
+                (declJoin, expJoin) <- cpsblk(joinStmts, joinPhis, phiR)
+                (declEPhi, expEPhi) <- cpsr(phiR, lbl) // implement this function
+                classpf <- getCtxtClassIdPrefix*/
+            // change ifelse definition in line 561 first
             } yield ((declp ++ declpp ++ declppp, seq(ifelse( exp, expp, exppp, classpf), expppp, classpf)))
-            case List(SSAWhile(phi_pre, e, blks)) => for {
+            //} yield ((declThen ++ declElse ++ declAPhi ++ declJoin ++ declEPhi, seq(ifelse( exp, expThen, expElse, expJoin, classpf), expAPhi, expEPhi, classpf)))
+            //case List(SSAWhile(phi_pre, e, blks)) => for {
+            case List(SSAWhile(phi_pre, e, blks, joinStmts, exceptPhi)) => for {
                 lbl2              <- minlabel(phi_pre)
                 (decl, exp)       <- cpsk(phi_pre, lbl2)
                 expp              <- cpsexp(e)
@@ -380,8 +391,12 @@ object CPS {
                 classpf       <- getCtxtClassIdPrefix
             } yield (List(decl) ++ declp, seq(ExpName(Name(List(ml))), expp, classpf))
             
+            // the old pattern maching case 
 
-            case List(MinSSA.SSATry(blks, phiRp, catchparams, blksp, phiKp)) => for {
+            // case List(MinSSA.SSATry(blks, phiRp, catchparams, blksp, phiKp)) => for {
+
+            // TODO: we still need to fix the pattern body.s
+            case List(MinSSA.SSATry(blks, catchParams, catchPhis@phiRp, catchStmts@blksp, joinPhis@phiKp, joinStmts, exceptPhiss)) => for {
                 (decl, exp)       <- cpsblk(blks, phiKp, phiRp)
                 (declp, expp)     <- cpsblk(blksp, phiKp, phiR)
                 mods              <- m.pure(List())
@@ -397,14 +412,16 @@ object CPS {
             
         }
         case SSABlock(lbl, stmts)::blksppp => stmts match {
-            case List(SSAIf(e, blksp, blkspp, phi)) => for {
+            //case List(SSAIf(e, blksp, blkspp, phi)) => for {
+            case List(SSAIf(e, thenStmts@blksp, elseStmts@blkspp, joinPhis@phi, joinStmts, exceptPhis)) => for {
                 (declp, expp)     <- cpsblk(blksp, phi, phiR)
                 (declpp, exppp)   <- cpsblk(blkspp, phi, phiR)
                 exp               <- cpsexp(e)
                 (declppp, expppp) <- cpsblk(blksppp, phiK, phiR)
                 classpf           <- getCtxtClassIdPrefix
             } yield ((declp ++ declpp ++ declppp, seq(ifelse( exp, expp, exppp, classpf), expppp, classpf)))
-            case List(SSAWhile(phi_pre, e, blks)) => for {
+            //case List(SSAWhile(phi_pre, e, blks)) => for {
+            case List(SSAWhile(phi_pre, e, blks, joinStmts, exceptPhi)) => for {
                 lbl2              <- minlabel(phi_pre)
                 (decl, exp)       <- cpsk(phi_pre, lbl2)
                 expp              <- cpsexp(e)
@@ -429,7 +446,8 @@ object CPS {
             } yield (List(decl) ++ declp, seq(ExpName(Name(List(ml))), expp, classpf))
 
 
-            case List(MinSSA.SSATry(blks, phiRp, catchparams, blksp, phiKp)) => for {
+            //case List(MinSSA.SSATry(blks, phiRp, catchparams, blksp, phiKp)) => for {
+            case List(MinSSA.SSATry(blks, catchParams, catchPhis@phiRp, catchStmts@blksp, joinPhis@phiKp, joinStmts, exceptPhiss)) => for {
                 (decl, exp)       <- cpsblk(blks, phiKp, phiRp)
                 (declp, expp)     <- cpsblk(blksp, phiKp, phiR)
                 mods              <- m.pure(List())

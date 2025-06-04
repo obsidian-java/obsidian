@@ -1184,22 +1184,22 @@ object MinSSA {
    * */
 
 
-  def follow(tctx:TCtx, aenv:AEnv):List[TCtx] = tctx match {
+  def follow(tctx:TCtx, aenv:AEnv, eenv: EEnv): List[TCtx] = tctx match {
     /*
      since allCtxs are in the same scope as Box
      and Box <_ok Ctx for any Ctx
      -------------------------------(FollowBox)
      allCtxs |- follow(Box) -> allCtxs
     */
-    case TBox => aenv
+    case TBox => aenv ++ eenv
 
-    case TLast => Nil 
+    case TLast => Nil
     /*
      allCtxs |- follow(B;Box) -> Ctxs
      --------------------------------------------(FollowHead)
      allCtxs |- follow(Ctx;\bar{B}) -> {B;Box} \cup Ctxs
      */
-    case THead(c) => TTail(TBox)::follow(TTail(TBox), aenv) // building the closure
+    case THead(c) => TTail(TBox)::follow(TTail(TBox), aenv, eenv) ++ follow_err(TTail(TBox), eenv) // building the closure
     /*
      allTailCtxs = [ Ctx | (B;Ctx) <- allCtxs ]
      allTailCtxs |- follow(Ctx) -> Ctxs'
@@ -1209,7 +1209,7 @@ object MinSSA {
      */
     case TTail(c) => {
       val daenv = appDec(unTTail, aenv)
-      follow(c, daenv).map(TTail(_)) 
+      follow(c, daenv, eenv).map(TTail(_)) ++ follow_err(TTail(TBox), eenv)
     }
     /*
      allThenCtxs =  [ Ctx | if E {Ctx} else {\bar{B}} join \bar{phi} next {\bar{B}} except \bar{phi} <- allCtxs ]
@@ -1233,21 +1233,21 @@ object MinSSA {
 
     case TThen(c) => {
       val daenv = appDec(unTThen, aenv)
-      val ctxsp = follow(c, daenv)
+      val ctxsp = follow(c, daenv, eenv)
       if (ctxsp.exists(isLast(_))) {
-        ctxsp.map(TThen(_)) ++ List(TIfNext(TBox)) ++ follow(TIfNext(TBox), aenv)
+        ctxsp.map(TThen(_)) ++ List(TIfNext(TBox)) ++ follow(TIfNext(TBox), aenv, eenv)
       } else {
-        ctxsp.map(TThen(_))
+        ctxsp.map(TThen(_)) ++ follow_err(tctx, eenv)
       }
     }
     // deduction rules omitted, similar to the Then cases.
     case TElse(c) => {
       val daenv = appDec(unTElse, aenv)
-      val ctxsp = follow(c, daenv)
+      val ctxsp = follow(c, daenv, eenv)
       if (ctxsp.exists(isLast(_))) {
-        ctxsp.map(TElse(_)) ++ List(TIfNext(TBox)) ++ follow(TIfNext(TBox), aenv)
+        ctxsp.map(TElse(_)) ++ List(TIfNext(TBox)) ++ follow(TIfNext(TBox), aenv, eenv)
       } else {
-        ctxsp.map(TElse(_))
+        ctxsp.map(TElse(_)) ++ follow_err(tctx, eenv)
       }
     }
      /*
@@ -1256,7 +1256,7 @@ object MinSSA {
      allCtxs |- follow(if E {\bar{B}} else {\bar{B}} join BBox next {\bar{B}} except \bar{phi}) ->
                  {if E {\bar{B}} else {\bar{B}} join \bar{phi} next {Box} except \bar{phi} } \cup Ctxs 
     */   
-    case TIfJoin => TIfNext(TBox)::follow(TIfNext(TBox), aenv) // building the closure
+    case TIfJoin => TIfNext(TBox)::follow(TIfNext(TBox), aenv, eenv) // building the closure
 
     /*
      allNextCtxs = [ Ctx | (if E {\bar{B}} else {\bar{B}} join \bar{phi} next {Ctx} except \bar{phi}) <- allCtxs ]
@@ -1268,10 +1268,10 @@ object MinSSA {
 
     case TIfNext(c) => {
       val daenv = appDec(unTIfNext, aenv)
-      follow(c, daenv).map(TIfNext(_))
+      follow(c, daenv, eenv).map(TIfNext(_)) ++ follow_err(tctx, eenv)
     }
 
-    case TIfExcept => Nil
+    case TIfExcept => follow_err(tctx, eenv)
 
 
 
@@ -1297,11 +1297,11 @@ object MinSSA {
       
     case TTry(c) => {
       val daenv = appDec(unTTry, aenv)
-      val ctxsp = follow(c, daenv)
+      val ctxsp = follow(c, daenv, eenv)
       if (ctxsp.exists(isLast(_))) {
-        ctxsp.map(TTry(_)) ++ List(TTryNext(TBox)) ++ follow(TTryNext(TBox), aenv)
+        ctxsp.map(TTry(_)) ++ List(TTryNext(TBox)) ++ follow(TTryNext(TBox), aenv, eenv)
       } else {
-        ctxsp.map(TTry(_))
+        ctxsp.map(TTry(_)) ++ follow_err(TTryNext(TBox), eenv)
       }
     }
 
@@ -1311,7 +1311,7 @@ object MinSSA {
      allCtxs |- follow(try {\bar{B}} catch (ex) BBox handle {\bar{B}} join \bar{phi} next {\bar{B}} except \bar{phi} ) ->
       {try {\bar{B}} catch (ex) \bar{phi} handle {Box} join \bar{phi} next {\bar{B}} except \bar{phi} } \cup Ctxs'
      */
-    case TCatch => TCatchHandle(TBox)::follow(TCatchHandle(TBox), aenv) // building the closure
+    case TCatch => TCatchHandle(TBox)::follow(TCatchHandle(TBox), aenv, eenv) // building the closure
 
 
 
@@ -1338,11 +1338,11 @@ object MinSSA {
 
     case TCatchHandle(c) => {
       val daenv = appDec(unTCatchHandle, aenv)
-      val ctxsp = follow(c, daenv)
+      val ctxsp = follow(c, daenv, eenv)
       if (ctxsp.exists(isLast(_))) {
-        ctxsp.map(TCatchHandle(_)) ++ List(TTryNext(TBox)) ++ follow(TTryNext(TBox), aenv)
+        ctxsp.map(TCatchHandle(_)) ++ List(TTryNext(TBox)) ++ follow(TTryNext(TBox), aenv, eenv)
       } else {
-        ctxsp.map(TCatchHandle(_))
+        ctxsp.map(TCatchHandle(_)) ++ follow_err(tctx, eenv)
       }
     }
 
@@ -1352,7 +1352,7 @@ object MinSSA {
      allCtxs |- follow(try {\bar{B}} catch (ex) \bar{phi} handle {\bar{B}} join BBox next {\bar{B}} except \bar{phi} ) ->
       {try {\bar{B}} catch (ex) \bar{phi} handle {\bar{phi}} join \bar{phi} next {Box} except \bar{phi} } \cup Ctxs'
      */      
-    case TTryJoin => TTryNext(TBox)::follow(TTryNext(TBox), aenv) // building the closure
+    case TTryJoin => TTryNext(TBox)::follow(TTryNext(TBox), aenv, eenv) // building the closure
 
 
     /*
@@ -1366,10 +1366,10 @@ object MinSSA {
 
     case TTryNext(c) => {
       val daenv = appDec(unTTryNext, aenv)
-      follow(c, daenv).map(TTryNext(_))
+      follow(c, daenv, eenv).map(TTryNext(_)) ++ follow_err(tctx, eenv)
     }
 
-    case TTryExcept => Nil
+    case TTryExcept => follow_err(tctx, eenv)
 
 
 
@@ -1387,9 +1387,9 @@ object MinSSA {
      } \cup  Ctxs'
      */
     case TWhileJoin(b) if b == 0 =>
-      TWhile(TBox)::follow(TWhile(TBox), aenv)
+      TWhile(TBox)::follow(TWhile(TBox), aenv, eenv)
     case TWhileJoin(b) =>
-      TWhileNext(TBox)::follow(TWhileNext(TBox), aenv)
+      TWhileNext(TBox)::follow(TWhileNext(TBox), aenv, eenv)
 
 
     /*
@@ -1414,11 +1414,11 @@ object MinSSA {
 
     case TWhile(c) => {
       val daenv = appDec(unTWhile, aenv)
-      val ctxsp = follow(c, daenv)
+      val ctxsp = follow(c, daenv, eenv)
       if (ctxsp.exists(isLast(_))) {
-        ctxsp.map(TWhile(_)) ++ List(TWhileJoin(1)) ++ follow(TWhileJoin(1), aenv)
+        ctxsp.map(TWhile(_)) ++ List(TWhileJoin(1)) ++ follow(TWhileJoin(1), aenv, eenv)
       } else {
-        ctxsp.map(TWhile(_))
+        ctxsp.map(TWhile(_)) ++ follow_err(TWhile(TBox), eenv)
       }
     }
 
@@ -1432,17 +1432,17 @@ object MinSSA {
       
     case TWhileNext(c) => {
       val daenv = appDec(unTWhileNext, aenv)
-      follow(c, daenv).map(TWhileNext(_))
+      follow(c, daenv, eenv).map(TWhileNext(_)) ++ follow_err(tctx, eenv)
     }
-    case TWhileExcept => Nil
+    case TWhileExcept => follow_err(tctx, eenv)
 
 
     /*
      allCtxs |- follow(attempt E.m(E) as x next {Box}) -> Ctxs'' 
      ------------------------------------------------------------------------------------------------------------(FollowAttempt)
-     allCtxs |- follow(attempt BBox next {\bar{B}}) -> {attempt E.m(E) as x next {Box}} \cup Ctxs''     
+     allCtxs |- follow(attempt BBox next {\bar{B}}) -> {attempt E.m(E) as x next {Box}} \cup Ctxs'' \cup follow_err(T)     
     */
-    case TAttempt => TAttemptNext(TBox)::follow(TAttemptNext(TBox), aenv)
+    case TAttempt => TAttemptNext(TBox)::follow(TAttemptNext(TBox), aenv, eenv) ++ follow_err(tctx, eenv)
 
     /*
      allNextCtxs = [ Ctx | (attempt E.m(E) as x next {Ctx}) <- allCtxs ]
@@ -1454,11 +1454,134 @@ object MinSSA {
 
     case TAttemptNext(c) => {
       val daenv = appDec(unTAttemptNext, aenv)
-      follow(c, daenv).map(TAttemptNext(_))      
+      follow(c, daenv, eenv).map(TAttemptNext(_)) ++ follow_err(tctx, eenv)
     }
 
-    case TThrow => Nil
+    case TThrow => follow_err(tctx, eenv)
   } 
+
+  def follow_err(tctx:TCtx, eenv:EEnv):List[TCtx] = tctx match {
+    case THead(c) => { 
+      val daenv = appDec(unTHead, eenv)
+      val ctxsp = follow(c, daenv, eenv)
+      if (ctxsp.exists(isErr(_))) {
+        ctxsp.map(THead(_)) ++ follow_err(THead(TBox), eenv)
+      } else {
+        Nil
+      }
+    }
+
+    case TTail(c) => { 
+      val daenv = appDec(unTTail, eenv)
+      val ctxsp = follow(c, daenv, eenv)
+      if (ctxsp.exists(isErr(_))) {
+        ctxsp.map(TTail(_)) ++ follow_err(TTail(TBox), eenv)
+      } else {
+        Nil
+      }
+    }
+
+    case TThen(c) => { 
+      val daenv = appDec(unTThen, eenv)
+      val ctxsp = follow(c, daenv, eenv)
+      if (ctxsp.exists(isErr(_))) { 
+        ctxsp.map(TThen(_)) ++ follow_err(TThen(TBox), eenv)
+      } else {
+        Nil
+      }
+    }
+
+    case TElse(c) => { 
+      val daenv = appDec(unTElse, eenv)
+      val ctxsp = follow(c, daenv, eenv)
+      if (ctxsp.exists(isErr(_))) {
+        ctxsp.map(TElse(_)) ++ follow_err(TElse(TBox), eenv)
+      } else {
+        Nil
+      }
+    }
+
+    case TIfNext(c) => { 
+      val daenv = appDec(unTIfNext, eenv)
+      val ctxsp = follow(c, daenv, eenv)
+      if (ctxsp.exists(isErr(_))) {
+        ctxsp.map(TIfNext(_)) ++ follow_err(TIfNext(TBox), eenv)
+      } else {
+        Nil
+      }
+    }
+
+    case TWhile(c) => { 
+      val daenv = appDec(unTWhile, eenv)
+      val ctxsp = follow(c, daenv, eenv)
+      if (ctxsp.exists(isErr(_))) {
+        ctxsp.map(TWhile(_)) ++ follow_err(TWhile(TBox), eenv)
+      } else {
+        Nil
+      }
+    }
+
+    case TWhileNext(c) => { 
+      val daenv = appDec(unTWhileNext, eenv)
+      val ctxsp = follow(c, daenv, eenv)
+      if (ctxsp.exists(isErr(_))) {
+        ctxsp.map(TWhileNext(_)) ++ follow_err(TWhileNext(TBox), eenv)
+      } else {
+        Nil
+      }
+    }
+
+    case TTry(c) => { 
+      // find all the contexts are under the same TTry header, ctxsp
+      // call follow(c, ctxsp) = ctxspp
+      // if there exists an exception context in ctxspp 
+      // then TCatch will be in the result of follow_err 
+      val daenv = appDec(unTTry, eenv)
+      val ctxsp = follow(c, daenv, eenv)
+      if (ctxsp.exists(isErr(_))) {
+        ctxsp.map(TTry(_)) ++ follow_err(TTry(TBox), eenv)
+      } else {
+        Nil
+      }
+    }
+
+    case TCatchHandle(c) => { 
+      val daenv = appDec(unTCatchHandle, eenv)
+      val ctxsp = follow(c, daenv, eenv)
+      if (ctxsp.exists(isErr(_))) {
+        ctxsp.map(TCatchHandle(_)) ++ follow_err(TCatchHandle(TBox), eenv)
+      } else {
+        Nil
+      }
+    }
+
+    case TTryNext(c) => { 
+      val daenv = appDec(unTTryNext, eenv)
+      val ctxsp = follow(c, daenv, eenv)
+      if (ctxsp.exists(isErr(_))) {
+        ctxsp.map(TTryNext(_)) ++ follow_err(TTryNext(TBox), eenv)
+      } else {
+        Nil
+      }
+    }
+
+    case TAttemptNext(c) => { 
+      val daenv = appDec(unTAttemptNext, eenv)
+      val ctxsp = follow(c, daenv, eenv)
+      if (ctxsp.exists(isErr(_))) {
+        ctxsp.map(TAttemptNext(_)) ++ follow_err(TAttemptNext(TBox), eenv)
+      } else {
+        Nil
+      }
+    }
+
+    case TIfExcept => Nil
+    case TCatch => follow_err(TCatchHandle(TBox), eenv) ++ follow_err(TTryExcept, eenv) //follow_err(TTry(TBox), eenv)
+    case TTryExcept => Nil
+    case TWhileExcept => Nil
+    case TAttempt => Nil // last context reachable in the current scope
+    case TThrow => Nil // last context reachable in the current scope
+    }
 
   // list of extractors
 
@@ -1587,7 +1710,7 @@ object MinSSA {
         case (TThen(c), TIfJoin) if isLast(c) => -1.0
         case (TThen(c), TIfJoin) if isErr(c) => Double.NaN
         // if not last, we need to apply the transtivity
-        case (TThen(c), TIfJoin) if follow(c, appDec(unTThen, aenv)).exists(isLast(_)) => -1.0
+        case (TThen(c), TIfJoin) if follow(c, appDec(unTThen, aenv), eenv).exists(isLast(_)) => -1.0
         case (TThen(c), TIfJoin) => Double.NaN
 
         
@@ -1602,7 +1725,7 @@ object MinSSA {
         case (TElse(c), TIfJoin) if isLast(c) => -1.0
         case (TElse(c), TIfJoin) if isErr(c) => Double.NaN
         // if not last, we need to apply the transtivity
-        case (TElse(c), TIfJoin) if follow(c, appDec(unTElse, aenv)).exists(isLast(_)) => -1.0
+        case (TElse(c), TIfJoin) if follow(c, appDec(unTElse, aenv), eenv).exists(isLast(_)) => -1.0
         case (TElse(c), TIfJoin) => Double.NaN
 
         // CtxOrdThen - dual 
@@ -1617,7 +1740,7 @@ object MinSSA {
         // CtxOrdWhileEntry2
         case (TWhile(c), TWhileJoin(1)) if isLast(c) => -1.0
         case (TWhile(c), TWhileJoin(1)) if isErr(c)  => Double.NaN
-        case (TWhile(c), TWhileJoin(1)) if follow(c, appDec(unTWhile, aenv)).exists(isLast(_)) => -1.0
+        case (TWhile(c), TWhileJoin(1)) if follow(c, appDec(unTWhile, aenv), eenv).exists(isLast(_)) => -1.0
         case (TWhile(c), TWhileJoin(1)) => Double.NaN 
 
         // CtxOrdInd specialized for TWhile
@@ -1641,7 +1764,7 @@ object MinSSA {
 
         case (TTry(c), TTryJoin) if isLast(c) => -1.0
         case (TTry(c), TTryJoin) if isErr(c) => Double.NaN 
-        case (TTry(c), TTryJoin) if follow(c, appDec(unTTry, aenv)).exists(isLast(_)) => -1.0 
+        case (TTry(c), TTryJoin) if follow(c, appDec(unTTry, aenv), eenv).exists(isLast(_)) => -1.0 
         case (TTry(c), TTryJoin) => Double.NaN 
         case (TTryJoin, TTry(c)) => -partialCompare(y,x) 
 
@@ -1663,7 +1786,7 @@ object MinSSA {
 
         case (TCatchHandle(c), TTryJoin) if isLast(c) => -1.0 
         case (TCatchHandle(c), TTryJoin) if isErr(c) => Double.NaN
-        case (TCatchHandle(c), TTryJoin) if follow(c, appDec(unTTry, aenv)).exists(isLast(_)) => -1.0 
+        case (TCatchHandle(c), TTryJoin) if follow(c, appDec(unTTry, aenv), eenv).exists(isLast(_)) => -1.0 
         case (TCatchHandle(c), TTryJoin) => Double.NaN
         case (TTryJoin, TCatchHandle(c)) => -partialCompare(y,x)
 
@@ -2190,11 +2313,142 @@ object MinSSA {
             ssaBlk = SSABlock(lbl, List(SSAThrow(exp1)))
           } yield (List(ssaBlk), vm, ctxOk, ctxErrs ++ List(ctxErr))
           // TODO: while, return, homework 5
-        } // end of (bstmt, vmOut, ctxOkOut, ctxErrsOut)
-      } yield (bstmt, vmOut, ctxOkOut, ctxErrsOut)
 
-    } // end of outTuple
-  } yield outTuple
+          case While(exp, stmt) => for {
+            _  <- addToAEnv(tctx)
+            // lbl <- toLbl(tctx)
+            st  <- get
+            lbl0  <- m.pure(okCtxFromState(st))
+            tctx_pre0 <- m.pure(putTCtx(tctx, TWhileJoin(0)))
+            tctx_pre1 <- m.pure(putTCtx(tctx, TWhileJoin(1)))
+            // lbl1_0  <- m.pure(tctx_pre0) // not in used, we use option 2
+            lbl1  <- m.pure(tctx_pre1)
+
+            phis_pre  <- st match { // phi_bar
+              case State(eth0, vm0, okCtx0, errCtxs0, aenv0, eenv0,  nestedDecls0, methInvs0, srcLblEnv0, conf0) 
+              if (eenv0.contains(okCtx0)) => // is this still possible? it means the while statement is dead code
+                vm0.keySet.toList.traverse( v => for {
+                  v_lbl <- mkName(v, lbl1)
+                } yield Phi(v, v_lbl, List()))
+              case State(eth0, vm0, okCtx0, errCtxs0, aenv0, eenv0, nestedDecls0, methInvs0, srcLblEnv0, conf0) => 
+                vm0.keySet.toList.traverse( v => for {
+                  v_lbl <- mkName(v, lbl1)
+                  rhs <- Rleq(aenv0, eenv0, okCtx0, vm0, v) match {
+                    case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub for the operand of ${v} in the phi-asssignment in the while stmt conversion. None found.")
+                    case (c,n)::Nil => m.pure(List((lbl0 -> n)))
+                    case _::_ => m.raiseError(s"SSA construction failed, Rleq failed to find a lub for the operand of ${v} in the phi-asssignment during the while stmt conversion. More than one candidates found.")
+                  }
+                } yield Phi(v, v_lbl, rhs))
+            }
+
+            stBodyIn <- st match { // creating vm1
+              case State(eth0, vm0, eCtx0, errCtxs0, aenv0, eenv0, nestedDecls0, methInvs0, srcLblEnv0, conf0) => for {
+                entries <- vm0.keySet.toList.traverse( v => for {
+                  v_lbl <- mkName(v, lbl1)
+                } yield (v, tctx_pre0, v_lbl))
+              } yield State(eth0, entries.foldLeft(vm0)((vm1, ent) => ent match {
+                case (v, tctx2, v_lbl) => vm1.get(v) match {
+                  case None => vm1
+                  case Some(m) => vm1 + (v -> (m + (tctx2  -> v_lbl)))
+                }}), tctx_pre0, errCtxs0,  aenv0, eenv0,  nestedDecls0, methInvs0, srcLblEnv0, conf0)
+            }
+            _ <- put(stBodyIn)
+            exp1 <- kexp(exp, tctx)
+            body_ctx <- m.pure(putTCtx(tctx, TWhile(TBox)))
+            body_stmts <- kstmtBlock(stmt, body_ctx)
+            stBodyOut <- get
+
+            phis_pre_updated <- (st, stBodyIn, stBodyOut) match { // phi_bar'
+              // todo check the case for break and continue
+              // commented as we don't handle continue and break here
+              // case (State(vm0, eCtx0, aenv0, eenv0, nestedDecls0, methInvs0, srcLblEnv0, conf0),
+              //     State(vm1, eCtx1, aenv1, eenv1, nestedDecls1, methInvs1, srcLblEnv1, conf1), 
+              //     State(vm2, eCtx2, aenv2, eenv2,  nestedDecls2, methInvs2, srcLblEnv2, conf2)) if (eenv2.contains(eCtx2)) => for { // why eenv2 contains eCtx2? something wrong here.
+              //  phis_pre2 <- phis_pre.traverse( phi => updatePhiFromCEnv(phi, stBodyOut, tctx)) // we don't need to set the lower bound for the Ctx, since we have 0 bit set in the vm environment, but what about the nested one?
+              // } yield phis_pre2
+              // the third case from the tech report.
+              case (State(eth0, vm0, okCtx0, errCtxs0, aenv0, eenv0, nestedDecls0, methInvs0, srcLblEnv0, conf0),
+                    State(eth1, vm1, okCtx1, errCtxs1, aenv1, eenv1, nestedDecls1, methInvs1, srcLblEnv1, conf1),
+                    State(eth2, vm2, okCtx2, errCtxs2, aenv2, eenv2, nestedDecls2, methInvs2, srcLblEnv2, conf2)) => {
+                val vs = diffVarMap(vm2,vm1).keySet // dom3(vm2- vm1) // TODO: do we need to exclude those in benv and cenv?
+                for {
+                  phis <- vs.toList.traverse (v => for { 
+                    v_lbl <- mkName(v, lbl1)
+                    lbl0  <- m.pure(okCtx0)
+                    lbl2  <- m.pure(okCtx2)
+                    name0 <- Rleq(aenv0, eenv0, okCtx0, vm0, v) match {
+                      case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub for the first operand of ${v} in the updated phi-asssignment during the while stmt conversion.")
+                      case (c,n)::Nil => m.pure(n)
+                      case _::_ => m.raiseError(s"SSA construction failed, Rleq failed to find a lub for the first operand of ${v} in the updated phi-asssignment during the while stmt conversion. More than one candidates found.")          
+                    }
+                    name2 <- Rleq(aenv2, eenv2, okCtx2, vm2, v) match {
+                      case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub for the second operand of ${v} in the updated  phi-asssignment during the while stmt conversion.")
+                      case (c,n)::Nil => m.pure(n)
+                      case _::_ => m.raiseError(s"SSA construction failed, Rleq failed to find a lub for the second operand of ${v} in the updated phi-asssignment during the while stmt conversion. More than one candidates found.")            
+                    }
+                  } yield Phi(v, v_lbl, List(lbl0 -> name0, lbl2 -> name2)))
+                  // phis2 <- phis.traverse( phi => updatePhiFromCEnv(phi, stBodyOut, tctx))
+                } yield phis //  phis2
+              }
+            }
+            subst <- mkSubstFromStates(st, stBodyIn, stBodyOut, lbl1) // theta
+
+            body_stmts_s <- m.pure(snOps.appSubst(subst, body_stmts)) // theta(B)
+            exp1_s <- m.pure(snOps.appSubst(subst, exp1)) // theta(E)
+
+
+            // vm3 // todo what about cenv and benv and eenv
+            vm3 <- (st, stBodyIn, stBodyOut) match { // vm3 
+                case (State(eth0, vm0, okCtx0, errCtxs0, aenv0, eenv0, nestedDecls0, methInvs0, srcLblEnv0, conf0),
+                    State(eth1, vm1, okCtx1, errCtxs1, aenv1, eenv1,  nestedDecls1, methInvs1, srcLblEnv1, conf1),
+                    State(eth2, vm2, okCtx2, errCtxs2, aenv2, eenv2,  nestedDecls2, methInvs2, srcLblEnv2, conf2)) => {
+                      val vs = (diffVarMap(vm2,vm1)).keySet // dom3(vm2 - vm1)
+                      for {
+                        entries <- vs.toList.traverse( v => for {
+                          v_lbl <- mkName(v, lbl1)
+                        } yield (v, tctx_pre1, v_lbl))
+                      } yield entries.foldLeft(vm0 ++ diffVarMap(vm2,vm1))((vm3, ent) => ent match {
+                          case (v, tctx11, v_lbl) => vm3.get(v) match {
+                            case None => vm3
+                            case Some(m) => vm3 + (v -> (m + (tctx11  -> v_lbl)))
+                          }
+                      }) 
+                    }
+            }
+            /*
+            _ <- m.pure(println("hello"))
+            _ <- m.pure(println(vm3))
+            */
+            ctx_e    = putTCtx(ctx, TWhileExcept)
+            _        <- addToEEnv(ctx_e)                     
+            (vm_e,phi_e) <- (st, stBodyIn, stBodyOut) match { // vm3 
+                case (State(eth0, vm0, okCtx0, errCtxs0, aenv0, eenv0, nestedDecls0, methInvs0, srcLblEnv0, conf0),
+                    State(eth1, vm1, okCtx1, errCtxs1, aenv1, eenv1,  nestedDecls1, methInvs1, srcLblEnv1, conf1),
+                    State(eth2, vm2, okCtx2, errCtxs2, aenv2, eenv2,  nestedDecls2, methInvs2, srcLblEnv2, conf2)) => {
+                      mkPhiErrs(ctx_e, errCtxs1 ++ errCtxs2, vm1 ++ vm2, vm0, stBodyOut)   
+                    }
+            }
+          } yield SSABlock(lbl, List(SSAWhile(phis_pre_updated, exp1_s, body_stmts_s, , phi_e)))
+          case Return(oexp) => oexp match {
+            case Some(exp) => for {
+              _  <- addToAEnv(tctx)
+              // lbl  <- m.pure(tctx)
+              exp1 <- kexp(exp,tctx) 
+              _    <- setOkCtx(tctx)
+
+            } yield SSABlock(lbl, List(SSAReturn(Some(exp1))))
+            case None => for {
+              _  <- addToAEnv(tctx)
+              // lbl  <- m.pure(tctx)
+              _    <- setOkCtx(tctx)
+            } yield SSABlock(lbl, List(SSAReturn(None)))
+          }
+        }
+      } // end of (bstmt, vmOut, ctxOkOut, ctxErrsOut)
+    } yield (bstmt, vmOut, ctxOkOut, ctxErrsOut)
+
+  } // end of outTuple
+} yield outTuple
 
   /**
     *  rename a variable based on the given context,
