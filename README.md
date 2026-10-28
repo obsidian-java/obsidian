@@ -161,13 +161,27 @@ is disabled at the CPS stage:
    this order, without it `Rleq` failed for the statements following a control-flow node.
 4. Implemented the missing cReturn rule. (Flatten appends `return;` to every method, so the 
    absence of the rule crashed the conversion with a MatchError.)
+5. `mkPhi` (the join phis of cIf/cTry): a join phi is now built for any variable whose value at 
+   the two exits of the control statement differs, including variables that were defined before 
+   the control statement and re-assigned in the branches. The previous restriction to variables 
+   first defined inside the branches (`dom(beta1) union dom(beta2) - dom(beta)`) silently read 
+   the pre-control-statement value after the join (a correctness bug: `x=1; if(..){x=2;}else{x=3;}` 
+   still yielded 1). An exit of a branch that does not re-define the variable resolves, via `R_leq`, 
+   to the value the variable carries into the branch.
 
 ## Validation
 
 The obfuscation pipeline (Flatten -> Desugar -> MinSSA -> CPS) was run on if-else and 
 throw samples; the generated Java compiles with javac and preserves the semantics 
 (the join phi for the if-merged variable is read correctly; a `throw` unwinds via `raise` 
-to `idHandler` and the method completes, which is the intended identity-exception behaviour).
+to `idHandler` and the method completes, which is the intended identity-exception behaviour). 
+This is covered by unit tests: `TestMinSSA.scala` (renaming, join phis for predefined and 
+branch-only variables, if-without-else, throw, return, and the CtxOrd context ordering) and 
+`TestCPS.scala` (the `raise -> k ->` shape, `seq`/`ifelse` combinators, phi assignments at 
+the branch exits, the `idHandler` entry, and the try-catch rejection) under 
+`jvm/src/test/scala/obsidian/lang/java/obsidian/`; `sbt test` passes. The expectations of the 
+old TestMinSSA1-5 (while loops written against the previous SSA AST) are kept in 
+`jvm/src/test/deprecated/TestMinSSA.scala` until the while construction is implemented.
 
 ## Known remaining work
 
@@ -179,8 +193,10 @@ to `idHandler` and the method completes, which is the intended identity-exceptio
 - While is not implemented in `kblkStmts` yet (the CPS case above is ready scaffolding).
 - Latent codegen issues in `cpsmethoddecl`: curried lambda parameters shadow the formal 
   parameters (a Java error), and `return ctxt.res;` is emitted for void methods.
-- The test sources (TestMinSSA etc.) are still written against the old SSA AST and do not 
-  compile.
+- The old TestMinSSA1-5 expectations were written against the previous SSA AST and are kept 
+  (not compiled) in `jvm/src/test/deprecated/`; they should be rewritten for the current AST 
+  (join/next/except, `SSAEmpty` terminators) when while is implemented. The `ignore`d tests in 
+  TestMinSSAGaps/TestCPSGaps mark the try-catch and while gaps.
 
 # TODOS:
 

@@ -1,424 +1,262 @@
 package obsidian.lang.java.obsidian
 
-
 import org.scalatest.{funsuite, matchers}
 
-import obsidian.lang.java.scalangj.Lexer
-import obsidian.lang.java.scalangj.Parser.*
 import obsidian.lang.java.scalangj.Syntax.*
-import obsidian.lang.java.scalangj.Pretty.*
-import obsidian.lang.java.obsidian.*
-import obsidian.lang.java.obsidian.Flatten.*
 import obsidian.lang.java.obsidian.MinSSA.*
+import obsidian.lang.java.obsidian.PipelineTestSupport.*
 
+/**
+  * Unit tests for the SSA construction (MinSSA.kmethodDecl) over the currently supported 
+  * statements: sequences, if-else (with/without else branch), throw, return. 
+  *
+  * The old TestMinSSA1-5 (while loops, written against the previous SSA AST) are kept as 
+  * documentation in jvm/src/test/deprecated/TestMinSSA.scala. 
+  * */
 
-class TestMinSSA1 extends funsuite.AnyFunSuite with matchers.should.Matchers {
-    val METHODSTR = """
-public static void main(String [] args) {
-	int x; 
-    int s;
+class TestMinSSASeq extends funsuite.AnyFunSuite with matchers.should.Matchers {
+    // each assignment to a variable must be renamed to a distinct variable (the SSA property), 
+    // and the following uses must read the most recent definition. 
+    val SRC = """
+public static int seqRenames() {
+    int x;
+    x = 1;
+    x = x + 1;
+    return x;
+}
+"""
+    test("assignments are renamed to distinct variables, uses read the latest definition") {
+        runSSA(SRC) match {
+            case Left(msg) => fail(msg)
+            case Right((_, ssa)) => {
+                val assigns = allStmts(ssa.body).collect({ case SSAAssignments(as) => as }).flatten
+                assigns.length shouldBe 2
+                val lhs1 = lhsName(assigns(0)).get
+                val lhs2 = lhsName(assigns(1)).get
+                lhs1 should not equal lhs2
+                // the rhs of the second assignment reads the first definition
+                val rhs2 = assigns(1) match { case ExpStmt(Assign(_, _, e)) => readNames(e) }
+                rhs2 shouldBe List(lhs1)
+                // the return reads the second (latest) definition
+                val rets = findStmts(ssa.body)({ case r@SSAReturn(Some(e)) => r })
+                rets.length shouldBe 1
+                val reads = rets.head match { case SSAReturn(Some(e)) => readNames(e) }
+                reads shouldBe List(lhs2)
+            }
+        }
+    }
+
+    test("all local variable declarations are hoisted to the first block") {
+        runSSA(SRC) match {
+            case Left(msg) => fail(msg)
+            case Right((_, ssa)) => {
+                val decls = allBlocks(ssa.body).filter(_.stmts.exists({ case SSAVarDecls(_, _, _) => true; case _ => false }))
+                decls.length shouldBe 1
+                decls.head.label shouldBe ssa.body.blocks.head.label
+            }
+        }
+    }
+}
+
+class TestMinSSAIfJoin extends funsuite.AnyFunSuite with matchers.should.Matchers {
+    // a variable defined before the if and re-defined in both branches must get a join phi 
+    // (this was a correctness bug: the statements after the if read the pre-if value). 
+    val SRC = """
+public static int joinPredefined() {
+    int x;
+    x = 1;
+    if (x > 0) { x = 2; } else { x = 3; }
+    return x;
+}
+"""
+    test("a join phi is built for a variable re-defined in both branches") {
+        runSSA(SRC) match {
+            case Left(msg) => fail(msg)
+            case Right((_, ssa)) => {
+                val ifs = findStmts(ssa.body)({ case i: SSAIf => i })
+                ifs.length shouldBe 1
+                val SSAIf(_, thBlks, elBlks, joinPhis, nextBlks, _) = ifs.head
+                // each branch sequence ends with an SSAEmpty block labelled by the exit of the branch
+                thBlks.last.stmts shouldBe List(SSAEmpty)
+                elBlks.last.stmts shouldBe List(SSAEmpty)
+                // one join phi for x, its rhs entries are keyed by the two branch exits
+                joinPhis.length shouldBe 1
+                val Phi(srcVar, renVar, rhs) = joinPhis.head
+                srcVar shouldBe Name(List(Ident("x")))
+                rhs.map(_._1).toSet shouldBe Set(thBlks.last.label, elBlks.last.label)
+                // the rhs of the then/else entries are the names assigned in the branches
+                val rhsMap = rhs.toMap
+                val thenVal = nameId(rhsMap(thBlks.last.label)).get
+                val elseVal = nameId(rhsMap(elBlks.last.label)).get
+                lhsNamesOf(thBlks) should contain (thenVal)
+                lhsNamesOf(elBlks) should contain (elseVal)
+                // the next statements read the renamed join variable, not the pre-if one
+                val rets = nextBlks.flatMap(_.stmts).collect({ case r@SSAReturn(Some(_)) => r })
+                rets.length shouldBe 1
+                val reads = rets.head match { case SSAReturn(Some(e)) => readNames(e) }
+                reads shouldBe List(nameId(renVar).get)
+            }
+        }
+    }
+
+    def lhsNamesOf(blks: List[SSABlock]): List[String] =
+        blks.flatMap(_.stmts).collect({ case SSAAssignments(as) => as }).flatten.flatMap(lhsName)
+}
+
+class TestMinSSAIfNoElse extends funsuite.AnyFunSuite with matchers.should.Matchers {
+    // an if without an else branch (desugared to an empty else): the value at the empty else 
+    // exit is the value the variable carries into the branch, it must appear in the join phi. 
+    val SRC = """
+public static int joinIfNoElse() {
+    int x;
+    x = 1;
+    if (x > 0) { x = 2; }
+    return x;
+}
+"""
+    test("the join phi resolves the empty else branch to the inherited value") {
+        runSSA(SRC) match {
+            case Left(msg) => fail(msg)
+            case Right((_, ssa)) => {
+                val ifs = findStmts(ssa.body)({ case i: SSAIf => i })
+                ifs.length shouldBe 1
+                val SSAIf(_, thBlks, elBlks, joinPhis, _, _) = ifs.head
+                thBlks.last.stmts shouldBe List(SSAEmpty)
+                elBlks.exists(_.stmts.contains(SSAEmpty)) shouldBe true
+                joinPhis.length shouldBe 1
+                val Phi(_, _, rhs) = joinPhis.head
+                rhs.length shouldBe 2
+                // the pre-if definition
+                val preIf = lhsNamesOf(ssa.body.blocks.takeWhile(!_.label.isInstanceOf[TThen]))
+                preIf should not be empty
+                val values = rhs.map(p => nameId(p._2).get).toSet
+                // one entry is the value assigned in the then branch, the other is the inherited value
+                values.subsetOf((lhsNamesOf(thBlks) ++ preIf).toSet) shouldBe true
+                values.size shouldBe 2
+            }
+        }
+    }
+
+    def lhsNamesOf(blks: List[SSABlock]): List[String] =
+        blks.flatMap(_.stmts).collect({ case SSAAssignments(as) => as }).flatten.flatMap(lhsName)
+}
+
+class TestMinSSAThrow extends funsuite.AnyFunSuite with matchers.should.Matchers {
+    val SRC = """
+public static int thrower() {
+    throw new RuntimeException("boom");
+}
+"""
+    test("a throw statement is converted to an SSAThrow") {
+        runSSA(SRC) match {
+            case Left(msg) => fail(msg)
+            case Right((_, ssa)) => {
+                findStmts(ssa.body)({ case t: SSAThrow => t }).length shouldBe 1
+            }
+        }
+    }
+}
+
+class TestMinSSAReturn extends funsuite.AnyFunSuite with matchers.should.Matchers {
+    // Flatten appends `return;` to a void method, the cReturn rule must handle it. 
+    val SRC = """
+public static void voidish() {
+    int x;
+    x = 1;
+}
+"""
+    test("the implicit return of a void method is converted (cReturn)") {
+        runSSA(SRC) match {
+            case Left(msg) => fail(msg)
+            case Right((_, ssa)) => {
+                allBlocks(ssa.body).exists(_.stmts.exists({ case SSAReturn(None) => true; case _ => false })) shouldBe true
+            }
+        }
+    }
+
+    val RETSRC = """
+public static int retval() {
+    return 5;
+}
+"""
+    test("a return with a value is converted to SSAReturn(Some _)") {
+        runSSA(RETSRC) match {
+            case Left(msg) => fail(msg)
+            case Right((_, ssa)) => {
+                findStmts(ssa.body)({ case r@SSAReturn(Some(_)) => r }).length shouldBe 1
+            }
+        }
+    }
+}
+
+class TestMinSSACtxOrd extends funsuite.AnyFunSuite with matchers.should.Matchers {
+    // the partial order on target contexts (CtxOrd): the join context precedes the next context 
+    // of the same control statement (required by Rleq in the statements after a control-flow node). 
+    val po = MinSSA.partialOrderTCtx(List(), List())
+
+    test("a context is comparable to itself") {
+        for (c <- List(TBox, TIfJoin, TIfNext(THead(TBox)), TTryJoin, TTryNext(TBox), TThen(TBox))) {
+            po.partialCompare(c, c) shouldBe 0.0
+        }
+    }
+
+    test("TBox is below any other context") {
+        for (c <- List(TIfJoin, TIfNext(TBox), TTryJoin, TTryNext(TBox), THead(TBox))) {
+            po.partialCompare(TBox, c) shouldBe -1.0
+            po.partialCompare(c, TBox) shouldBe 1.0
+        }
+    }
+
+    test("THead is below TTail (CtxOrdSeq)") {
+        po.partialCompare(THead(TBox), TTail(TBox)) shouldBe -1.0
+        po.partialCompare(TTail(TBox), THead(TBox)) shouldBe 1.0
+        po.partialCompare(TThen(THead(TBox)), TThen(TTail(TLast))) shouldBe -1.0
+    }
+
+    test("TIfJoin is below TIfNext") {
+        po.partialCompare(TIfJoin, TIfNext(THead(TBox))) shouldBe -1.0
+        po.partialCompare(TIfNext(THead(TBox)), TIfJoin) shouldBe 1.0
+        // and the order propagates through a context hole
+        po.partialCompare(TTail(TTail(TIfJoin)), TTail(TTail(TIfNext(TBox)))) shouldBe -1.0
+    }
+
+    test("TTryJoin is below TTryNext") {
+        po.partialCompare(TTryJoin, TTryNext(THead(TBox))) shouldBe -1.0
+        po.partialCompare(TTryNext(THead(TBox)), TTryJoin) shouldBe 1.0
+        po.partialCompare(TTail(TTryJoin), TTail(TTryNext(TBox))) shouldBe -1.0
+    }
+}
+
+class TestMinSSAGaps extends funsuite.AnyFunSuite with matchers.should.Matchers {
+    // the try-catch SSA construction has open bugs (see README, "Known remaining work"): 
+    // the catch parameter is not registered in beta by the cTry rule. 
+    ignore("try-catch: the catch parameter is not registered in beta (Rleq fails on the catch body)") {
+        val src = """
+public static int trycatch() {
+    int x;
+    try { x = 1; } catch (Exception e) { x = 2; }
+    return x;
+}
+"""
+        runSSA(src) match {
+            case Left(msg) => fail("expected the try-catch construction to work, got: " + msg)
+            case Right(_)  => succeed
+        }
+    }
+
+    // while is not implemented in kblkStmts yet (the CPS scaffolding for SSAWhile is ready). 
+    ignore("while: not implemented in kblkStmts yet") {
+        val src = """
+public static int whileloop() {
+    int x;
     x = 0;
-    s = 0;
-    while (x < 10) {
-        s = x + s;
-    }
+    while (x < 10) { x = x + 1; }
+    return x;
 }
-    """
-    val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
-    
-    val ssa = SSAMethodDecl(List(Public, Static),List(),None,Ident("main"),
-                List(FormalParam(List(),RefType_(ArrayType(RefType_(ClassRefType(ClassType(List((Ident("String"),List()))))))),false,VarId(Ident("args")))),List(),None,
-                SSAMethodBody(List(
-                    SSABlock(THead(TBox),
-                        List(SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TBox)))")),None))), 
-                            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1))))))")),None))), 
-                            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_TTail(TTail(TTail(THead(TBox))))")),None))), 
-                            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1))))))")),None))), 
-                            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox)))))))")),None))), 
-                            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_THead(TBox)")),None))))), 
-                    SSABlock(TTail(THead(TBox)),
-                        List(SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_TTail(THead(TBox))")),None))))), 
-                    SSABlock(TTail(TTail(THead(TBox))),
-                        List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_TTail(TTail(THead(TBox)))")))),EqualA,Lit(IntLit(0)))))))), 
-                    SSABlock(TTail(TTail(TTail(THead(TBox)))),
-                        List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("s_TTail(TTail(TTail(THead(TBox))))")))),EqualA,Lit(IntLit(0)))))))), 
-                    SSABlock(TTail(TTail(TTail(TTail(THead(TBox))))),
-                        List(SSAWhile(
-                            List(Phi(Name(List(Ident("s"))),Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1))))))"))) // phi assignment
-                                    ,List((TTail(TTail(TTail(THead(TBox)))),Name(List(Ident("s_TTail(TTail(TTail(THead(TBox))))")))), 
-                                          (TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox))))))),Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox)))))))"))))))),
-                            BinOp(ExpName(Name(List(Ident("x_TTail(TTail(THead(TBox)))")))),LThan,Lit(IntLit(10))),
-                            List(
-                                SSABlock(TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox))))))),
-                                    List(
-                                        SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox)))))))")))),EqualA,
-                                                            BinOp(ExpName(Name(List(Ident("x_TTail(TTail(THead(TBox)))")))),Add,
-                                                             ExpName(Name(List(Ident("s_TTail(TTail(TTail(TTail(THead(TWhilePrePhi(1))))))"))))))))))))))), 
-                                SSABlock(TTail(TTail(TTail(TTail(TTail(TLast(TBox)))))),List(SSAReturn(None))))))
-    import FlatResult.*
-    import SSAResult.*
-    test("TestMinSSA1") {
-        methoddecl match {
-            case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
-                Flatten.flatMethodDecl(methodDecl).run(Flatten.initStateInfo) match {
-                    case FlatError(message) => fail(message)
-                    case FlatOk((st, f_methodDecl)) => {
-                        val d_methodDecl = Desugar.dsgOps.desugar(f_methodDecl)
-                        MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.debugInitState) match {
-                            case SSAError(message) => fail(message)
-                            case SSAOk((st, ssa_methodDecl)) => { 
-                                // println(ssa_methodDecl)
-                                assert(ssa == ssa_methodDecl)
-                            }
-                        }
-                  }
-              }
-            }
-            case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")           
-        }
-    }
-}
-
-
-/* v should not be in the phi list */
-
-
-class TestMinSSA2 extends funsuite.AnyFunSuite with matchers.should.Matchers { // todo, declaration with init does not work yet!
-    val METHODSTR = """
-public static boolean add(int v) {
-    int [] nvals; 
-    int i; 
-    boolean res;
-    nvals = null;
-    i=0;
-    res=false;
-    if (this.cap < 1){res = false;}
-    else {
-        if (this.size < this.cap) {
-            this.vals[this.size] = v; this.size = this.size + 1;
-        } else {
-            nvals = new int[this.cap];
-            i = 0;
-            while (i < this.cap-1) {
-            nvals[i] = this.vals[i+1];
-            i = i + 1;
-            }
-            nvals[this.cap-1] = v;
-            this.vals = nvals;
-        }
-        res = true;
-    }
-    return res;
-}
-    """
-    val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
-    val ssa = SSAMethodDecl(List(Public, Static),List(),Some(PrimType_(BooleanT)),Ident("add"),List(FormalParam(List(),PrimType_(IntT),false,VarId(Ident("v")))),List(),None,
-        SSAMethodBody(
-            List(
-                SSABlock(THead(TBox),List(SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(VarDecl(VarId(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))")),None))), 
-                                          SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(VarDecl(VarId(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))")),None))), 
-                                          SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(VarDecl(VarId(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(THead(TBox)))))))))))")),None))), 
-                                          SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(VarDecl(VarId(Ident("nvals_TTail(TTail(TTail(THead(TBox))))")),None))), 
-                                          SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(VarDecl(VarId(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")),None))), 
-                                          SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(THead(TBox))))))))))))")),None))), 
-                                          SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))")),None))), 
-                                          SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox))))))))))))))))")),None))), 
-                                          SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")),None))), 
-                                          SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(TTail(TTail(TTail(THead(TBox)))))")),None))), 
-                                          SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))")),None))), 
-                                          SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))")),None))), 
-                                          SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))")),None))), 
-                                          SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident("res_TTail(TTail(TTail(TTail(TTail(THead(TBox))))))")),None))), 
-                                          SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")),None))), 
-                                          SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox)))))))))")),None))), 
-                                          SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox))))))))))")),None))), 
-                                          SSAVarDecls(List(),RefType_(ArrayType(PrimType_(IntT))),List(VarDecl(VarId(Ident("nvals_THead(TBox)")),None))))), 
-                SSABlock(TTail(THead(TBox)),List(SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("i_TTail(THead(TBox))")),None))))), 
-                SSABlock(TTail(TTail(THead(TBox))),List(SSAVarDecls(List(),PrimType_(BooleanT),List(VarDecl(VarId(Ident("res_TTail(TTail(THead(TBox)))")),None))))), 
-                SSABlock(TTail(TTail(TTail(THead(TBox)))),List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("nvals_TTail(TTail(TTail(THead(TBox))))")))),EqualA,Lit(NullLit))))))), 
-                SSABlock(TTail(TTail(TTail(TTail(THead(TBox))))),List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("i_TTail(TTail(TTail(TTail(THead(TBox)))))")))),EqualA,Lit(IntLit(0)))))))), 
-                SSABlock(TTail(TTail(TTail(TTail(TTail(THead(TBox)))))),List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(THead(TBox))))))")))),EqualA,Lit(BooleanLit(false)))))))), 
-                SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TBox))))))),
-                    List(SSAIf(BinOp(FieldAccess_(PrimaryFieldAccess(This,Ident("cap"))),LThan,Lit(IntLit(1))),
-                        List(SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))), // then
-                            List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox)))))))))")))),EqualA,Lit(BooleanLit(false))))))))),
-                        List(SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TBox))))))))), // else 
-                            List(SSAIf(BinOp(FieldAccess_(PrimaryFieldAccess(This,Ident("size"))),LThan,FieldAccess_(PrimaryFieldAccess(This,Ident("cap")))),
-                                List(SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TThen(THead(TBox))))))))))), // then
-                                        List(SSAAssignments(List(ExpStmt(Assign(ArrayLhs(ArrayIndex(FieldAccess_(PrimaryFieldAccess(This,Ident("vals"))),List(FieldAccess_(PrimaryFieldAccess(This,Ident("size")))))),EqualA,ExpName(Name(List(Ident("v")))))))))), 
-                                    SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TThen(TTail(TLast(TBox)))))))))))),
-                                        List(SSAAssignments(List(ExpStmt(Assign(FieldLhs(PrimaryFieldAccess(This,Ident("size"))),EqualA,BinOp(FieldAccess_(PrimaryFieldAccess(This,Ident("size"))),Add,Lit(IntLit(1)))))))))),
-                                List(SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(THead(TBox))))))))))), // else 
-                                    List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(THead(TBox)))))))))))")))),EqualA,ArrayCreate(PrimType_(IntT),List(FieldAccess_(PrimaryFieldAccess(This,Ident("cap")))),0))))))), 
-                                    SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(THead(TBox)))))))))))),
-                                        List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(THead(TBox))))))))))))")))),EqualA,Lit(IntLit(0)))))))), 
-                                    SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TBox))))))))))))),
-                                        List(SSAWhile(
-                                            List(Phi(Name(List(Ident("i"))),Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))"))), // while phi
-                                                    List((TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(THead(TBox)))))))))))),Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(THead(TBox))))))))))))")))), 
-                                                         (TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox)))))))))))))))),Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox))))))))))))))))"))))))),
-                                            BinOp(BinOp(ExpName(Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")))),LThan,FieldAccess_(PrimaryFieldAccess(This,Ident("cap")))),Sub,Lit(IntLit(1))),
-                                            List(SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(THead(TBox))))))))))))))),
-                                                    List(SSAAssignments(List(ExpStmt(Assign(ArrayLhs(ArrayIndex(ExpName(Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(THead(TBox)))))))))))")))),List(ExpName(Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))"))))))),
-                                                        EqualA,ArrayAccess(ArrayIndex(FieldAccess_(PrimaryFieldAccess(This,Ident("vals"))),List(BinOp(ExpName(Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")))),Add,Lit(IntLit(1)))))))))))), 
-                                                SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox)))))))))))))))),
-                                                    List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox))))))))))))))))")))),EqualA,BinOp(ExpName(Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")))),Add,Lit(IntLit(1))))))))))))), 
-                                                SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(TTail(THead(TBox)))))))))))))),
-                                                    List(SSAAssignments(List(ExpStmt(Assign(ArrayLhs(ArrayIndex(ExpName(Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")))),List(BinOp(FieldAccess_(PrimaryFieldAccess(This,Ident("cap"))),Sub,Lit(IntLit(1)))))),EqualA,
-                                                        ExpName(Name(List(Ident("v_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")))))))))), 
-                                                SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(TTail(TTail(TLast(TBox))))))))))))))),
-                                                    List(SSAAssignments(List(ExpStmt(Assign(FieldLhs(PrimaryFieldAccess(This,Ident("vals"))),EqualA,ExpName(Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))"))))))))))),
-                                List(Phi(Name(List(Ident("i"))),Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))"))), // end if phi
-                                    List((TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TThen(TTail(TLast(TBox)))))))))))),Name(List(Ident("i_TTail(TTail(TTail(TTail(THead(TBox)))))")))), 
-                                         (TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(TTail(TTail(TLast(TBox))))))))))))))),Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhile(TTail(TLast(TBox))))))))))))))))")))))), 
-                                    Phi(Name(List(Ident("nvals"))),Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))"))),
-                                    List((TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TThen(TTail(TLast(TBox)))))))))))),Name(List(Ident("nvals_TTail(TTail(TTail(THead(TBox))))")))), 
-                                         (TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(TTail(TTail(TLast(TBox))))))))))))))),Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")))))), 
-                                    Phi(Name(List(Ident("v"))),Name(List(Ident("v_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))"))),
-                                    List((TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TThen(TTail(TLast(TBox)))))))))))),Name(List(Ident("v")))), 
-                                         (TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(TTail(TTail(TLast(TBox))))))))))))))),Name(List(Ident("v_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")))))), 
-                                    Phi(Name(List(Ident("res"))),Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))"))),
-                                    List((TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TThen(TTail(TLast(TBox)))))))))))),Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(THead(TBox))))))")))), 
-                                        (TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(TTail(TTail(TLast(TBox))))))))))))))),Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TElse(TTail(TTail(THead(TWhilePrePhi(1))))))))))))))")))))))))), 
-                            SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox)))))))))),
-                                List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox))))))))))")))),EqualA,Lit(BooleanLit(true))))))))),
-                    List(Phi(Name(List(Ident("res"))),Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))"))), // end if phi
-                        List((TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))),Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox)))))))))")))), 
-                            (TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox)))))))))),Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox))))))))))")))))), 
-                        Phi(Name(List(Ident("i"))),Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))"))),
-                            List((TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))),Name(List(Ident("i_TTail(TTail(TTail(TTail(THead(TBox)))))")))), 
-                                 (TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox)))))))))),Name(List(Ident("i_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))")))))), 
-                        Phi(Name(List(Ident("nvals"))),Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))"))),
-                            List((TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))),Name(List(Ident("nvals_TTail(TTail(TTail(THead(TBox))))")))), 
-                                 (TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox)))))))))),Name(List(Ident("nvals_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))")))))), 
-                        Phi(Name(List(Ident("v"))),Name(List(Ident("v_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))"))),
-                            List((TTail(TTail(TTail(TTail(TTail(TTail(THead(TThen(TLast(TBox))))))))),Name(List(Ident("v")))), (TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(TTail(TLast(TBox)))))))))),
-                                Name(List(Ident("v_TTail(TTail(TTail(TTail(TTail(TTail(THead(TElse(THead(TIfPostPhi)))))))))")))))))))), 
-                SSABlock(TTail(TTail(TTail(TTail(TTail(TTail(TTail(TLast(TBox)))))))),
-                    List(SSAReturn(Some(ExpName(Name(List(Ident("res_TTail(TTail(TTail(TTail(TTail(TTail(THead(TIfPostPhi)))))))")))))))))))
-    import FlatResult.*
-    import SSAResult.*
-
-    test("TestMinSSA2") {
-        methoddecl match {
-            case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
-                Flatten.flatMethodDecl(methodDecl).run(Flatten.initStateInfo) match {
-                    case FlatError(message) => fail(message)
-                    case FlatOk((st, f_methodDecl)) => {
-                        val d_methodDecl = Desugar.dsgOps.desugar(f_methodDecl)
-                        MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.debugInitState) match {
-                            case SSAError(message) => fail(message)
-                            case SSAOk((st, ssa_methodDecl)) => { 
-                                // println(ssa_methodDecl)
-                                assert(ssa == ssa_methodDecl)
-                            }
-                        }
-                  }
-              }
-            }
-            case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")           
-        }
-    }
-}
-
-
-
-
-class TestMinSSA3 extends funsuite.AnyFunSuite with matchers.should.Matchers {
-    val METHODSTR = """
-public static void f(int v) {
-	int x; 
-    x = 0;
-    while (x > v) {
-        x = x - v;
-    }
-}
-    """
-    val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
-    val ssa = SSAMethodDecl(List(Public, Static),List(),None,Ident("f"),List(FormalParam(List(),PrimType_(IntT),false,VarId(Ident("v")))),List(),None,
-        SSAMethodBody(
-            List(SSABlock(THead(TBox),
-                    List(SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(THead(TBox))")),None))), 
-                    SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TWhilePrePhi(1))))")),None))), 
-                    SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TWhile(TLast(TBox)))))")),None))), 
-                    SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_THead(TBox)")),None))))), 
-                SSABlock(TTail(THead(TBox)),
-                    List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_TTail(THead(TBox))")))),EqualA,Lit(IntLit(0)))))))), 
-                SSABlock(TTail(TTail(THead(TBox))),
-                    List(SSAWhile(
-                        List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_TTail(TTail(THead(TWhilePrePhi(1))))"))),
-                            List((TTail(THead(TBox)),Name(List(Ident("x_TTail(THead(TBox))")))), 
-                                (TTail(TTail(THead(TWhile(TLast(TBox))))),Name(List(Ident("x_TTail(TTail(THead(TWhile(TLast(TBox)))))"))))))),
-                        BinOp(ExpName(Name(List(Ident("x_TTail(TTail(THead(TWhilePrePhi(1))))")))),GThan,ExpName(Name(List(Ident("v"))))),
-                        List(SSABlock(TTail(TTail(THead(TWhile(TLast(TBox))))),
-                                List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_TTail(TTail(THead(TWhile(TLast(TBox)))))")))),EqualA,BinOp(ExpName(Name(List(Ident("x_TTail(TTail(THead(TWhilePrePhi(1))))")))),Sub,ExpName(Name(List(Ident("v"))))))))))))))), 
-                SSABlock(TTail(TTail(TTail(TLast(TBox)))),List(SSAReturn(None))))))
-    import FlatResult.*
-    import SSAResult.*
-
-    test("TestMinSSA3") {
-        methoddecl match {
-            case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
-                Flatten.flatMethodDecl(methodDecl).run(Flatten.initStateInfo) match {
-                    case FlatError(message) => fail(message)
-                    case FlatOk((st, f_methodDecl)) => {
-                        val d_methodDecl = Desugar.dsgOps.desugar(f_methodDecl)
-                        MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.debugInitState) match {
-                            case SSAError(message) => fail(message)
-                            case SSAOk((st, ssa_methodDecl)) => { 
-                                // println(ssa_methodDecl)
-                                assert(ssa == ssa_methodDecl)
-                            }
-                        }
-                  }
-              }
-            }
-            case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")           
-        }
-    }
-}
-
-
-/*
-public static void f(int v) {
-	int x; 
-    x = 0;
-    if (x < 10) {
-        x = x + 1;
-    } else {
-        while (x > v) {
-            x = x - v;
-        }
-    }
-}
-*/
-
-
-class TestMinSSA4 extends funsuite.AnyFunSuite with matchers.should.Matchers {
-    val METHODSTR = """
-public static void f(int v) {
-	int x; 
-    x = 0;
-    if (x < 10) {
-        x = x + 1;
-    } else {
-        while (x > v) {
-            x = x - v;
-        }
-    }
-}    """
-    val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
-    
-    val ssa = SSAMethodDecl(List(Public, Static),List(),None,Ident("f"),List(FormalParam(List(),PrimType_(IntT),false,VarId(Ident("v")))),List(),None,
-        SSAMethodBody(List(
-        SSABlock(THead(TBox),List(
-            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TIfPostPhi)))")),None))), 
-            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TElse(TLast(TWhile(TLast(TBox)))))))")),None))), 
-            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePrePhi(1))))))")),None))), 
-            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(THead(TBox))")),None))), 
-            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_TTail(TTail(THead(TThen(TLast(TBox)))))")),None))), 
-            SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_THead(TBox)")),None))))), 
-        SSABlock(TTail(THead(TBox)),List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_TTail(THead(TBox))")))),EqualA,Lit(IntLit(0)))))))), 
-        SSABlock(TTail(TTail(THead(TBox))),List(SSAIf(BinOp(ExpName(Name(List(Ident("x_TTail(THead(TBox))")))),LThan,Lit(IntLit(10))),
-            List(SSABlock(TTail(TTail(THead(TThen(TLast(TBox))))), // then
-                List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_TTail(TTail(THead(TThen(TLast(TBox)))))")))),EqualA,BinOp(ExpName(Name(List(Ident("x_TTail(THead(TBox))")))),Add,Lit(IntLit(1)))))))))),
-            List(SSABlock(TTail(TTail(THead(TElse(TLast(TBox))))), // else 
-                List(SSAWhile(
-                    List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePrePhi(1))))))"))),
-                        List((TTail(THead(TBox)),Name(List(Ident("x_TTail(THead(TBox))")))), 
-                         (TTail(TTail(THead(TElse(TLast(TWhile(TLast(TBox))))))),Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhile(TLast(TBox)))))))"))))))),BinOp(ExpName(Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePrePhi(1))))))")))),GThan,ExpName(Name(List(Ident("v"))))),
-                    List(SSABlock(TTail(TTail(THead(TElse(TLast(TWhile(TLast(TBox))))))),
-                        List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhile(TLast(TBox)))))))")))),EqualA,BinOp(ExpName(Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhilePrePhi(1))))))")))),Sub,ExpName(Name(List(Ident("v")))))))))))))))),
-            List(Phi(Name(List(Ident("x"))),Name(List(Ident("x_TTail(TTail(THead(TIfPostPhi)))"))),
-                List((TTail(TTail(THead(TThen(TLast(TBox))))),Name(List(Ident("x_TTail(TTail(THead(TThen(TLast(TBox)))))")))), 
-                     (TTail(TTail(THead(TElse(TLast(TWhile(TLast(TBox))))))),Name(List(Ident("x_TTail(TTail(THead(TElse(TLast(TWhile(TLast(TBox)))))))")))))), 
-                Phi(Name(List(Ident("v"))),Name(List(Ident("v_TTail(TTail(THead(TIfPostPhi)))"))),
-                List((TTail(TTail(THead(TThen(TLast(TBox))))),Name(List(Ident("v")))), 
-                     (TTail(TTail(THead(TElse(TLast(TWhile(TLast(TBox))))))),Name(List(Ident("v_TTail(TTail(THead(TElse(TLast(TWhilePrePhi(1))))))")))))))))), 
-        SSABlock(TTail(TTail(TTail(TLast(TBox)))),List(SSAReturn(None))))))
-
-    import FlatResult.*
-    import SSAResult.*
-
-    test("TestMinSSA4") {
-        methoddecl match {
-            case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
-                Flatten.flatMethodDecl(methodDecl).run(Flatten.initStateInfo) match {
-                    case FlatError(message) => fail(message)
-                    case FlatOk((st, f_methodDecl)) => {
-                        val d_methodDecl = Desugar.dsgOps.desugar(f_methodDecl)
-                        MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.debugInitState) match {
-                            case SSAError(message) => fail(message)
-                            case SSAOk((st, ssa_methodDecl)) => { 
-                                // println(ssa_methodDecl)
-                                assert(ssa == ssa_methodDecl)
-                            }
-                        }
-                  }
-              }
-            }
-            case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")           
-        }
-    }
-}
-
-
-class TestMinSSA5 extends funsuite.AnyFunSuite with matchers.should.Matchers { // same as TestMinSSA1 with default state config
-    val METHODSTR = """
-public static void main(String [] args) {
-	int x; 
-    int s;
-    x = 0;
-    s = 0;
-    while (x < 10) {
-        s = x + s;
-    }
-}
-    """
-    val methoddecl:Decl = classBodyStatement.apply(new Lexer.Scanner(METHODSTR)).get.get
-    
-    val ssa = SSAMethodDecl(List(Public, Static),List(),None,Ident("main"),List(FormalParam(List(),RefType_(ArrayType(RefType_(ClassRefType(ClassType(List((Ident("String"),List()))))))),false,VarId(Ident("args")))),List(),None,
-        SSAMethodBody(List(SSABlock(THead(TBox),
-            List(SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_3320")),None))), 
-                 SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_333327")),None))), 
-                 SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_33320")),None))), 
-                 SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_333327")),None))), 
-                 SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_33332810")),None))), 
-                 SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("x_20")),None))))), 
-            SSABlock(TTail(THead(TBox)),List(SSAVarDecls(List(),PrimType_(IntT),List(VarDecl(VarId(Ident("s_320")),None))))), 
-            SSABlock(TTail(TTail(THead(TBox))),List(
-                SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("x_3320")))),EqualA,Lit(IntLit(0)))))))), 
-            SSABlock(TTail(TTail(TTail(THead(TBox)))),List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("s_33320")))),EqualA,Lit(IntLit(0)))))))), 
-            SSABlock(TTail(TTail(TTail(TTail(THead(TBox))))),
-                List(SSAWhile(
-                    List(Phi(Name(List(Ident("s"))),Name(List(Ident("s_333327"))),
-                        List((TTail(TTail(TTail(THead(TBox)))),Name(List(Ident("s_33320")))), 
-                            (TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox))))))),Name(List(Ident("s_33332810"))))))),
-                    BinOp(ExpName(Name(List(Ident("x_3320")))),LThan,Lit(IntLit(10))),
-                    List(SSABlock(TTail(TTail(TTail(TTail(THead(TWhile(TLast(TBox))))))),
-                        List(SSAAssignments(List(ExpStmt(Assign(NameLhs(Name(List(Ident("s_33332810")))),EqualA,BinOp(ExpName(Name(List(Ident("x_3320")))),Add,ExpName(Name(List(Ident("s_333327"))))))))))))))), 
-            SSABlock(TTail(TTail(TTail(TTail(TTail(TLast(TBox)))))),List(SSAReturn(None))))))
-    import FlatResult.*
-    import SSAResult.*
-
-    test("TestMinSSA5") {
-        methoddecl match {
-            case MemberDecl_(methodDecl@MethodDecl(_,_,_,_,_,_,_,_)) => {
-                Flatten.flatMethodDecl(methodDecl).run(Flatten.initStateInfo) match {
-                    case FlatError(message) => fail(message)
-                    case FlatOk((st, f_methodDecl)) => {
-                        val d_methodDecl = Desugar.dsgOps.desugar(f_methodDecl)
-                        MinSSA.kmethodDecl(d_methodDecl).run(MinSSA.initState) match {
-                            case SSAError(message) => fail(message)
-                            case SSAOk((st, ssa_methodDecl)) => { 
-                                // println(ssa_methodDecl)
-                                assert(ssa == ssa_methodDecl)
-                            }
-                        }
-                  }
-              }
-            }
-            case _ => fail("It is supposed to be a MethodDecl member, but some other type is encountered.")           
+"""
+        runSSA(src) match {
+            case Left(msg) => fail("expected the while construction to work, got: " + msg)
+            case Right(_)  => succeed
         }
     }
 }

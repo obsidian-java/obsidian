@@ -2898,28 +2898,39 @@ object MinSSA {
 
 
 
+  /**
+    * mkPhi - construct the join phis at the join context ctx_new of a control statement (if-else / try-catch). 
+    *
+    * A phi is needed for a variable x when its value at the two exits of the control statement differ:
+    *   x_ctx_new = phi (ctxOk1 : R_leq(ctxOk1, beta1, x), ctxOk2 : R_leq(ctxOk2, beta2, x))
+    * Note that this includes the variables that were defined before the control statement and re-defined
+    * in one (or both) of the branches (those variables are in dom(beta1) intersect dom(beta) too), the 
+    * value at an exit of a branch that does not re-define the variable is the value it carries into the 
+    * branch (resolved by R_leq). 
+    * A variable that is undefined at one of the exits (e.g. defined only in one branch, and never read 
+    * after the join) does not get a phi. 
+    */
   def mkPhi(ctx_new:TCtx, okCtx1:TCtx, okCtx2:TCtx, vm1:VarMap, vm2:VarMap, ref_vm:VarMap, st1:State, st2:State)(using m:MonadError[SSAState, ErrorM]):SState[State, (VarMap, List[Phi])] = for {
-    vm_new        <- mkVarMapFromUpdated(ctx_new, List(vm1, vm2), ref_vm) 
-    v_m            = vm_new.toList
-    v_ctx_renamed  = v_m.flatMap( (v,m) => m.toList.map( (ctx, renamed) => (v, ctx, renamed) ))
+    vars        <- m.pure((vm1.keySet ++ vm2.keySet).toList)
     (aenv1, eenv1) = st1 match {
       case State(eth, aenv, eenv, _, _, _, _) => (aenv, eenv)
     }
     (aenv2, eenv2) = st2 match {
       case State(eth, aenv, eenv, _, _, _, _) => (aenv, eenv)
     }
-    phis          <- v_ctx_renamed.traverse( (v,ctx,vlbl) => for {
-      name1 <- Rleq(aenv1, eenv1, okCtx1, vm1, v) match {
-        case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub in mkPhi() for ${v}. None exists. ${vm1}")
-        case (c,n)::Nil => m.pure(n)
-        case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). More than one candidates found.")
+    joined      <- vars.traverse( (v:Name) => {
+      (Rleq(aenv1, eenv1, okCtx1, vm1, v), Rleq(aenv2, eenv2, okCtx2, vm2, v)) match {
+        case (Nil, _)      => m.pure(None) // v is not defined at the exit of the first branch, no join phi. 
+        case (_, Nil)      => m.pure(None) // v is not defined at the exit of the second branch, no join phi. 
+        case (c1::Nil, c2::Nil) if c1._2 == c2._2 => m.pure(None) // v has the same value at both exits, no join phi. 
+        case (c1::Nil, c2::Nil) => for {
+          vlbl <- mkName(v, ctx_new)
+        } yield Some((Phi(v, vlbl, List(okCtx1 -> c1._2, okCtx2 -> c2._2)), (v, (ctx_new, vlbl))))
+        case _ => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). More than one candidates found.")
       }
-      name2 <- Rleq(aenv2, eenv2, okCtx2, vm2, v) match {
-        case Nil => m.raiseError(s"SSA construction failed, Rleq failed to find a lub in mkPhi() for ${v}. None exists. ${vm2}")
-        case (c,n)::Nil => m.pure(n)
-        case _::_ => m.raiseError("SSA construction failed, Rleq failed to find a lub in mkPhi(). More than one candidates found.")
-      }
-    } yield Phi(v, vlbl, (List(okCtx1 -> name1, okCtx2 -> name2))))
+    })
+    phis        = joined.flatten.map(_._1)
+    vm_new      = listToVarMap(joined.flatten.map(_._2))
   } yield (vm_new, phis)
 
 
