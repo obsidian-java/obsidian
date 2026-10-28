@@ -238,7 +238,7 @@ object CPS {
                         // convert the non variable declaration block statement
                         for {
                             _ <- setLocalVarsMap(localVarsMap)
-                            (decs, exp) <- cpsblk(notVarDecls, Nil, Nil)
+                            (decs, exp) <- cpsblk(notVarDecls, Nil)
                         } yield (localVarDecls, decs, 
                             Lambda(LambdaSingleParam(raiseIdent), LambdaExpression_(
                                 Lambda(LambdaSingleParam(kIdent), LambdaExpression_(
@@ -311,140 +311,161 @@ object CPS {
 
     def cpsbody(body:MinSSA.SSAMethodBody)(using m:MonadError[CPSState,ErrorM]):SState[State, MethodBody] = body match {
         case MinSSA.SSAMethodBody(blks) => for {
-            (decls, exp) <- cpsblk(blks, Nil, Nil)
+            (decls, exp) <- cpsblk(blks, Nil)
             blkStmts     <- m.pure(decls ++ List(BlockStmt_(ExpStmt(exp))))
         } yield MethodBody(Some(Block(blkStmts)))
     }
 
     /**
-     * convert a non variable declaration statement block into CPS
-     *  @param blks - the block 
-     *  @param phiK - the normal flow phi accumulated
-     *  @param phiR - the exception flow phi accmulated 
-     *  @return a CPS expression
+     * convert a non variable declaration sequence of SSA blocks into CPS.
+     *  @param blks - the sequence of blocks
+     *  @param phiK - the phi assignments (beta) for the normal flow at the exit of the sequence, 
+     *               they are applied at the last block of the sequence (which is labelled by the exit context), 
+     *               or passed into the nested continuation (the next blocks) of a control flow statement.
+     *  @return a CPS expression of the type raise -> k -> Void
+     * 
+     * note. the exception flow phis (the exceptPhis of SSAIf/SSAWhile/SSATry and the catchPhis of SSATry) 
+     * are treated as the identity for now: the try-catch statement is not supported by the CPS stage yet, 
+     * an exception escapes an obfuscated method through the entry exception continuation Ctxt.idHandler 
+     * (the identity handler), and no exception handler can observe the renamed variables on the exception path. 
      * */
-    def cpsblk(blks:List[SSABlock], phiK:List[Phi], phiR:List[Phi])(using m:MonadError[CPSState, ErrorM]):SState[State, (List[VarDecl], Exp)] = blks match {
-        case List(SSABlock(lbl, stmts)) => stmts match {
-            case List(SSAIf(e, blksp, blkspp, phi)) => for {
-                (declp, expp)     <- cpsblk(blksp, phi, phiR)
-                (declpp, exppp)   <- cpsblk(blkspp, phi, phiR)
-                exp               <- cpsexp(e)
-                (declppp, expppp) <- cpsk(phiK, lbl)
-                classpf           <- getCtxtClassIdPrefix
-            } yield ((declp ++ declpp ++ declppp, seq(ifelse( exp, expp, exppp, classpf), expppp, classpf)))
-            case List(SSAWhile(phi_pre, e, blks)) => for {
-                lbl2              <- minlabel(phi_pre)
-                (decl, exp)       <- cpsk(phi_pre, lbl2)
-                expp              <- cpsexp(e)
-                (declpp, exppp)   <- cpsblk(blks, phi_pre, phiR)
-                (declppp, expppp) <- cpsk(phiK, lbl)
-                classpf           <- getCtxtClassIdPrefix
-            } yield (decl ++ declpp ++ declppp, seq(exp, loop( expp, exppp, expppp, classpf), classpf))
-            case List(MinSSA.SSAThrow(e)) => for {
-                exp          <- cpsexp(e)
-                xeAsmts      <- cpsphi(phiR,lbl)
-                mods         <- m.pure(List())
-                mkl          <- mkId("mr", lbl)
-                body         <- m.pure(Block((xeAsmts ++ List(Return(Some(MethodInv(MethodCall(Name(List(raiseIdent)), List(exp))))))).map(BlockStmt_(_))))
-                decl         <- m.pure(LocalVars(mods, exceptVoidArrVoidVoidArrVoid, 
-                                        List(VarDecl(VarId(mkl), Some(InitExp(Lambda(LambdaSingleParam(raiseIdent), 
-                                                    LambdaExpression_(Lambda(LambdaSingleParam(kIdent), LambdaBlock(body))))))))))
-            } yield (List(decl), ExpName(Name(List(mkl))))
-            case List(MinSSA.SSAReturn(oe)) => for {
-                ctxtVarPref  <- getCtxtIdPrefix
-                resAsmts     <- oe match {
-                    case Some(e) => for {
-                        exp  <- cpsexp(e)
-                    } yield List(ExpStmt(Assign(NameLhs(Name(ctxtVarPref ++ List(resIdent))), EqualA, exp)))
-                    case None    => m.pure(Nil)
-                }
-                mods         <- m.pure(List())
-                ml           <- mkId("m", lbl)
-                // body         <- m.pure(Block((resAsmts ++ List(Return(Some(MethodInv(MethodCall(Name(List(kIdent)), List())))))).map(BlockStmt_(_))))
-                body         <- m.pure(Block((resAsmts ++ List(Return(Some(MethodInv(PrimaryMethodCall(ExpName(Name(List(kIdent))), Nil, Ident("apply") , List(nullExp))))))).map(BlockStmt_(_))))
-                decl         <- m.pure(LocalVars(mods, exceptVoidArrVoidVoidArrVoid, 
-                                        List(VarDecl(VarId(ml), Some(InitExp(Lambda(LambdaSingleParam(raiseIdent), 
-                                                    LambdaExpression_(Lambda(LambdaSingleParam(kIdent), LambdaBlock(body))))))))))
-            } yield (List(decl), ExpName(Name(List(ml))))
-
-            case List(MinSSA.SSAAssignments(stmts)) => for {
-                stmtsp        <- cpsstmts(stmts) // this should be an identity function
-                mods          <- m.pure(List())
-                ml            <- mkId("m", lbl)
-                // body          <- m.pure(Block((stmtsp ++ List(Return(Some(MethodInv(MethodCall(Name(List(kIdent)), List())))))).map(BlockStmt_(_))))
-                body          <- m.pure(Block((stmtsp ++ List(Return(Some(MethodInv(PrimaryMethodCall(ExpName(Name(List(kIdent))), Nil, Ident("apply") , List(nullExp))))))).map(BlockStmt_(_))))
-                decl          <- m.pure(LocalVars(mods, exceptVoidArrVoidVoidArrVoid, 
-                                        List(VarDecl(VarId(ml), Some(InitExp(Lambda(LambdaSingleParam(raiseIdent), 
-                                                    LambdaExpression_(Lambda(LambdaSingleParam(kIdent), LambdaBlock(body))))))))))
-                (declp, expp) <- cpsk(phiK, lbl)
-                classpf       <- getCtxtClassIdPrefix
-            } yield (List(decl) ++ declp, seq(ExpName(Name(List(ml))), expp, classpf))
-            
-
-            case List(MinSSA.SSATry(blks, phiRp, catchparams, blksp, phiKp)) => for {
-                (decl, exp)       <- cpsblk(blks, phiKp, phiRp)
-                (declp, expp)     <- cpsblk(blksp, phiKp, phiR)
-                mods              <- m.pure(List())
-                params            <- m.pure(List(FormalParam(mods,exceptType,false,VarId(Ident("x")))))
-                stmtsp            <- m.pure(List(ExpStmt(Assign(NameLhs(Name(List(Ident("ex")))), EqualA, ExpName(Name(List(Ident("x"))))))))
-                body              <- m.pure(Block((stmtsp ++ List(Return(Some(expp)))).map(BlockStmt_(_))))
-                exppp             <- m.pure(Lambda(LambdaFormalParams(params), LambdaBlock(body))) 
-                (declppp, expppp) <- cpsk(phiK, lbl)
-                classpf           <- getCtxtClassIdPrefix
-            } yield (decl ++ declp ++ declppp, seq(trycatch(exp, exppp, classpf), expppp, classpf))
-            // todo: more cases here.
-
-            
-        }
-        case SSABlock(lbl, stmts)::blksppp => stmts match {
-            case List(SSAIf(e, blksp, blkspp, phi)) => for {
-                (declp, expp)     <- cpsblk(blksp, phi, phiR)
-                (declpp, exppp)   <- cpsblk(blkspp, phi, phiR)
-                exp               <- cpsexp(e)
-                (declppp, expppp) <- cpsblk(blksppp, phiK, phiR)
-                classpf           <- getCtxtClassIdPrefix
-            } yield ((declp ++ declpp ++ declppp, seq(ifelse( exp, expp, exppp, classpf), expppp, classpf)))
-            case List(SSAWhile(phi_pre, e, blks)) => for {
-                lbl2              <- minlabel(phi_pre)
-                (decl, exp)       <- cpsk(phi_pre, lbl2)
-                expp              <- cpsexp(e)
-                (declpp, exppp)   <- cpsblk(blks, phi_pre, phiR)
-                (declppp, expppp) <- cpsblk(blksppp, phiK, phiR)
-                classpf       <- getCtxtClassIdPrefix
-            } yield (decl ++ declpp ++ declppp, seq(exp, loop( expp, exppp, expppp, classpf), classpf))
-
-
-            case List(MinSSA.SSAAssignments(stmts)) => for {
-                stmtsp        <- cpsstmts(stmts) // this should be an identity function
-                mods          <- m.pure(List())
-                ml            <- mkId("m", lbl)
-                // body          <- m.pure(Block((stmtsp ++ List(Return(Some(MethodInv(MethodCall(Name(List(kIdent)), List())))))).map(BlockStmt_(_))))
-                body         <- m.pure(Block((stmtsp ++ List(Return(Some(MethodInv(PrimaryMethodCall(ExpName(Name(List(kIdent))), Nil, Ident("apply") , List(nullExp))))))).map(BlockStmt_(_))))
-
-                decl          <- m.pure(LocalVars(mods, exceptVoidArrVoidVoidArrVoid, 
-                                        List(VarDecl(VarId(ml), Some(InitExp(Lambda(LambdaSingleParam(raiseIdent), 
-                                                    LambdaExpression_(Lambda(LambdaSingleParam(kIdent), LambdaBlock(body))))))))))
-                (declp, expp) <- cpsblk(blksppp, phiK, phiR)
-                classpf       <- getCtxtClassIdPrefix
-            } yield (List(decl) ++ declp, seq(ExpName(Name(List(ml))), expp, classpf))
-
-
-            case List(MinSSA.SSATry(blks, phiRp, catchparams, blksp, phiKp)) => for {
-                (decl, exp)       <- cpsblk(blks, phiKp, phiRp)
-                (declp, expp)     <- cpsblk(blksp, phiKp, phiR)
-                mods              <- m.pure(List())
-                params            <- m.pure(List(FormalParam(mods,exceptType,false,VarId(Ident("x")))))
-                stmtsp            <- m.pure(List(ExpStmt(Assign(NameLhs(Name(List(exIdent))), EqualA, ExpName(Name(List(Ident("x"))))))))
-                body              <- m.pure(Block((stmtsp ++ List(Return(Some(expp)))).map(BlockStmt_(_))))
-                exppp             <- m.pure(Lambda(LambdaFormalParams(params), LambdaBlock(body))) 
-                (declppp, expppp) <- cpsblk(blksppp, phiK, phiR)
-                classpf       <- getCtxtClassIdPrefix
-            } yield (decl ++ declp ++ declppp, seq(trycatch(exp, exppp, classpf), expppp, classpf))
-
-            // todo: more cases here. try?
-
-        }
+    def cpsblk(blks:List[SSABlock], phiK:List[Phi])(using m:MonadError[CPSState, ErrorM]):SState[State, (List[VarDecl], Exp)] = blks match {
+        case Nil => cpsk(Nil, MinSSA.TBox) // an empty sequence, a nop continuation. 
+        case List(SSABlock(lbl, stmts)) => cpsSBlk(lbl, stmts, phiK)
+        case (SSABlock(lbl, stmts))::rest => for {
+            (declh, eh) <- cpsSBlk(lbl, stmts, Nil)
+            (declt, et) <- cpsblk(rest, phiK)
+            classpf     <- getCtxtClassIdPrefix
+        } yield (declh ++ declt, seq(eh, et, classpf))
     }
+
+    /**
+     * convert the SSA statements of one block.
+     *
+     * @param lbl - the label of the block. when the block is the last one of a sequence of blocks, 
+     *              it labels the exit context of the sequence, which is the context to look up in 
+     *              the rhs of a phi assignment in phiK.
+     * @param stmts - the SSA statements of the block
+     * @param phiK - the normal flow phis to be applied at the exit of the block.
+     * */
+    def cpsSBlk(lbl:Label, stmts:List[SSAStmt], phiK:List[Phi])(using m:MonadError[CPSState, ErrorM]):SState[State, (List[VarDecl], Exp)] = stmts match {
+        case Nil => cpsk(phiK, lbl)
+
+        case (MinSSA.SSAVarDecls(_, _, varDecls)::rest) => 
+            // the variables are declared at the entry of the obfuscated method (see MinSSA.genVarDecls), 
+            // a declaration with an initialiser becomes an assignment here. 
+            val assigns:List[Stmt] = varDecls.flatMap(
+                (vd:obsidian.lang.java.scalangj.Syntax.VarDecl) => vd match {
+                    case obsidian.lang.java.scalangj.Syntax.VarDecl(VarId(id), Some(InitExp(e))) => List(ExpStmt(Assign(NameLhs(Name(List(id))), EqualA, e)))
+                    case obsidian.lang.java.scalangj.Syntax.VarDecl(VarId(_), _)                => Nil
+                    case _                                                                      => Nil // array declaration initialiser, TODO 
+                })
+            if (assigns.isEmpty) { cpsSBlk(lbl, rest, phiK) }
+            else                 { cpsSBlk(lbl, MinSSA.SSAAssignments(assigns)::rest, phiK) }
+
+        case List(MinSSA.SSAEmpty) => cpsk(phiK, lbl) // the end of a sequence of blocks, the normal flow phis are applied here. 
+
+        case List(MinSSA.SSAAssert(e, msg)) => for {
+            e1          <- cpsexp(e)
+            msg1        <- msg.traverse(cpsexp)
+            (decl, exp) <- cpsMethod(lbl, List(Assert(e1, msg1)), phiK)
+        } yield (decl, exp)
+
+        case List(MinSSA.SSAAssignments(stmts)) => for {
+            stmtsp      <- cpsstmts(stmts)
+            (decl, exp) <- cpsMethod(lbl, stmtsp, phiK)
+        } yield (decl, exp)
+
+        case List(MinSSA.SSAExps(stmts)) => for {
+            stmtsp      <- cpsstmts(stmts)
+            (decl, exp) <- cpsMethod(lbl, stmtsp, phiK)
+        } yield (decl, exp)
+
+        case List(MinSSA.SSAThrow(e)) => for {
+            exp     <- cpsexp(e)
+            mods    <- m.pure(List())
+            mkl     <- mkId("mr", lbl)
+            // the exception flow phis are the identity for now, the exception simply escapes through raise. 
+            body    <- m.pure(Block(List(Return(Some(MethodInv(MethodCall(Name(List(raiseIdent, Ident("apply"))), List(exp)))))).map(BlockStmt_(_))))
+            decl    <- m.pure(LocalVars(mods, exceptVoidArrVoidVoidArrVoid, 
+                                    List(VarDecl(VarId(mkl), Some(InitExp(Lambda(LambdaSingleParam(raiseIdent), 
+                                                LambdaExpression_(Lambda(LambdaSingleParam(kIdent), LambdaBlock(body))))))))))
+        } yield (List(decl), ExpName(Name(List(mkl))))
+
+        case List(MinSSA.SSAReturn(oe)) => for {
+            ctxtVarPref  <- getCtxtIdPrefix
+            resAsmts     <- oe match {
+                case Some(e) => for {
+                    exp  <- cpsexp(e)
+                } yield List(ExpStmt(Assign(NameLhs(Name(ctxtVarPref ++ List(resIdent))), EqualA, exp)))
+                case None    => m.pure(Nil)
+            }
+            mods         <- m.pure(List())
+            ml           <- mkId("m", lbl)
+            body         <- m.pure(Block((resAsmts ++ List(Return(Some(MethodInv(PrimaryMethodCall(ExpName(Name(List(kIdent))), Nil, Ident("apply") , List(nullExp))))))).map(BlockStmt_(_))))
+            decl         <- m.pure(LocalVars(mods, exceptVoidArrVoidVoidArrVoid, 
+                                    List(VarDecl(VarId(ml), Some(InitExp(Lambda(LambdaSingleParam(raiseIdent), 
+                                                LambdaExpression_(Lambda(LambdaSingleParam(kIdent), LambdaBlock(body))))))))))
+        } yield (List(decl), ExpName(Name(List(ml))))
+
+        case List(MinSSA.SSAIf(e, thBlks, elBlks, joinPhis, nextBlks, exceptPhis)) => for {
+            // the branches end with SSAEmpty blocks labelled by the exit contexts of the branches, 
+            // the join phis are resolved and applied there. 
+            (declth, eth) <- cpsblk(thBlks, joinPhis)
+            (declel, eel) <- cpsblk(elBlks, joinPhis)
+            // the next blocks are the continuation of the enclosing sequence, they carry the enclosing phis. 
+            (decln, en)   <- cpsblk(nextBlks, phiK)
+            exp           <- cpsexp(e)
+            classpf       <- getCtxtClassIdPrefix
+        } yield (declth ++ declel ++ decln, seq(ifelse(exp, eth, eel, classpf), en, classpf))
+
+        case List(MinSSA.SSAWhile(joinPhis, e, bodyBlks, nextBlks, exceptPhis)) => for {
+            // the loop entry phis, resolved at the entry. TODO: review the context to resolve the phis 
+            // at the loop entry when MinSSA implements the while statement. 
+            preOp   <- joinPhis match {
+                case Nil => m.pure((List():List[VarDecl], None:Option[Exp]))
+                case _   => for {
+                    lbl2        <- minlabel(joinPhis)
+                    (decl, exp) <- cpsk(joinPhis, lbl2)
+                } yield (decl, Some(exp))
+            }
+            // the body ends with an SSAEmpty block labelled by the exit context of the body, 
+            // the back edge phis are resolved and applied there. 
+            (declb, eb) <- cpsblk(bodyBlks, joinPhis)
+            (decln, en) <- cpsblk(nextBlks, phiK)
+            exp         <- cpsexp(e)
+            classpf     <- getCtxtClassIdPrefix
+        } yield preOp match {
+            case (declpre, None)      => (declpre ++ declb ++ decln, loop(exp, eb, en, classpf))
+            case (declpre, Some(ep))  => (declpre ++ declb ++ decln, seq(ep, loop(exp, eb, en, classpf), classpf))
+        }
+
+        case List(MinSSA.SSATry(tryStmts, catchParam, catchPhis, catchStmts, joinPhis, joinStmts, exceptPhis)) =>
+            m.raiseError("SSA to CPS conversion failed, try-catch(-finally) is not supported by the CPS stage yet.")
+
+        case (stmt::rest) => for { // a block with multiple statements (generated by MinSSA.prependVarDecls), chain them. 
+            (declh, eh) <- cpsSBlk(lbl, List(stmt), Nil)
+            (declt, et) <- cpsSBlk(lbl, rest, phiK)
+            classpf     <- getCtxtClassIdPrefix
+        } yield (declh ++ declt, seq(eh, et, classpf))
+
+        case _ => m.raiseError(s"SSA to CPS conversion failed, the SSA block at ${lbl} contains unsupported SSA statements: ${stmts}.")
+    }
+
+    /**
+     * construct a CPS function m_lbl = raise -> k -> { stmts; k.apply(null); }, 
+     * and compose it with the normal flow phi assignments at the exit of the block. 
+     * */
+    def cpsMethod(lbl:Label, stmts:List[Stmt], phiK:List[Phi])(using m:MonadError[CPSState, ErrorM]):SState[State, (List[VarDecl], Exp)] = for {
+        mods          <- m.pure(List())
+        ml            <- mkId("m", lbl)
+        body          <- m.pure(Block((stmts ++ List(Return(Some(MethodInv(PrimaryMethodCall(ExpName(Name(List(kIdent))), Nil, Ident("apply") , List(nullExp))))))).map(BlockStmt_(_))))
+        decl          <- m.pure(LocalVars(mods, exceptVoidArrVoidVoidArrVoid, 
+                                List(VarDecl(VarId(ml), Some(InitExp(Lambda(LambdaSingleParam(raiseIdent), 
+                                            LambdaExpression_(Lambda(LambdaSingleParam(kIdent), LambdaBlock(body))))))))))
+        (declk, ek)   <- cpsk(phiK, lbl)
+        classpf       <- getCtxtClassIdPrefix
+    } yield (List(decl) ++ declk, seq(ExpName(Name(List(ml))), ek, classpf))
 
     /**
       * convert the end of a block into the continuation expression.

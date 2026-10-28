@@ -1610,6 +1610,17 @@ object MinSSA {
         // CtxOrdElse - dual 
         case (TIfJoin, TElse(c)) => -partialCompare(y,x) 
 
+        // CtxOrdJoinNext: the join block precedes the next block. (see FollowIfJoin)
+        case (TIfJoin, TIfNext(_)) => -1.0
+        case (TIfNext(_), TIfJoin) => 1.0
+
+        // CtxOrdInd specialized for TIfNext
+        case (TIfNext(ctx1), TIfNext(ctx2)) => {
+          val daenv = appDec(unTIfNext, aenv)
+          val deenv = appDec(unTIfNext, eenv)
+          partialOrderTCtx(daenv, deenv).partialCompare(ctx1,ctx2)
+        }
+
         // CtxOrdWhileEntry1 
         case (TWhileJoin(0), TWhile(_)) => -1.0 
         case (TWhile(_), TWhileJoin(0)) => 1.0
@@ -1647,6 +1658,10 @@ object MinSSA {
 
         case (TTry(ctx1), TTryNext(ctx2)) => partialCompare(TTry(ctx1), TTryJoin)
         case (TTryNext(ctx1), TTry(ctx2)) => -partialCompare(y,x) 
+
+        // CtxOrdJoinNext: the join block precedes the next block. (see FollowTryJoin)
+        case (TTryJoin, TTryNext(_)) => -1.0
+        case (TTryNext(_), TTryJoin) => 1.0
 
         case (TCatch, TCatchHandle(_)) => -1.0 
         case (TCatchHandle(_), TCatch) => 1.0
@@ -1864,6 +1879,15 @@ object MinSSA {
     */
   def kBlock(vm:VarMap, ctx:TCtx, ctxOk:TCtx, ctxErrs:List[TCtx], blk:Block)(using m:MonadError[SSAState, ErrorM]):SState[State,(List[SSABlock], VarMap, TCtx, List[TCtx])] = blk match {
     case Block(blkStmts) => kblkStmts(vm, ctx, ctxOk, ctxErrs,blkStmts)
+  }
+
+  /**
+    * kStmtBranch - convert a statement in the branch position of a control statement. 
+    * a statement enclosed in a block, i.e. StmtBlock(blk), is converted with kBlock (as the old kstmtBlock did). 
+    * */
+  def kStmtBranch(vm:VarMap, ctx:TCtx, ctxOk:TCtx, ctxErrs:List[TCtx], stmt:Stmt)(using m:MonadError[SSAState, ErrorM]):SState[State,(List[SSABlock], VarMap, TCtx, List[TCtx])] = stmt match {
+    case StmtBlock(blk) => kBlock(vm, ctx, ctxOk, ctxErrs, blk)
+    case _              => kblkStmts(vm, ctx, ctxOk, ctxErrs, List(BlockStmt_(stmt)))
   }
 
 
@@ -2084,13 +2108,13 @@ object MinSSA {
             // process the then statements
             ctx1     = putTCtx(ctx, TThen(TBox))
             _        <- addToAEnv(ctx1)
-            (blks1, vm1, ctxOk1, ctxErrs1)       <- kblkStmts(vm, ctx1, ctxOk, Nil, List(BlockStmt_(then_stmt)))
+            (blks1, vm1, ctxOk1, ctxErrs1)       <- kStmtBranch(vm, ctx1, ctxOk, Nil, then_stmt)
             st1      <- get
             // process the else statements
            
             ctx2     = putTCtx(ctx, TElse(TBox))
             _        <- addToAEnv(ctx2)
-            (blks2, vm2, ctxOk2, ctxErrs2)       <- kblkStmts(vm, ctx2, ctxOk, Nil, List(BlockStmt_(else_stmt)))
+            (blks2, vm2, ctxOk2, ctxErrs2)       <- kStmtBranch(vm, ctx2, ctxOk, Nil, else_stmt)
             st2      <- get
             // resolve the join phi
             ctx_j    = putTCtx(ctx, TIfJoin)
@@ -2099,7 +2123,7 @@ object MinSSA {
             // process the next statements
             ctx3     = putTCtx(ctx, TIfNext(TBox))
             _        <- addToAEnv(ctx3)            
-            (blks3, vm3, ctxOk3, ctxErrs3)       <- kblkStmts(vm, ctx3, ctx_j, Nil, rest)
+            (blks3, vm3, ctxOk3, ctxErrs3)       <- kblkStmts(unionVarMaps(List(vm, vm1, vm2, vm_j)), ctx3, ctx_j, Nil, rest)
             // resolve the except phi
             ctx_e    = putTCtx(ctx, TIfExcept)
             // _        <- addToAEnv(ctx_e) // not an Ok ctx
@@ -2189,7 +2213,16 @@ object MinSSA {
             _      <- addToEEnv(ctxErr)
             ssaBlk = SSABlock(lbl, List(SSAThrow(exp1)))
           } yield (List(ssaBlk), vm, ctxOk, ctxErrs ++ List(ctxErr))
-          // TODO: while, return, homework 5
+
+          /**
+            * ctx, beta, ctxOk, ctxErrs |- return e => return E, vm, ctxOk, ctxErrs (cReturn)
+            * the return statement terminates the normal flow of the enclosing sequence, the rest of the sequence is dead code.
+            */
+          case Return(oexp) => for {
+            exp1   <- oexp.traverse(e => kexp(vm, ctx, e))
+            ssaBlk = SSABlock(lbl, List(SSAReturn(exp1)))
+          } yield (List(ssaBlk), vm, ctxOk, ctxErrs)
+          // TODO: while, homework 5
         } // end of (bstmt, vmOut, ctxOkOut, ctxErrsOut)
       } yield (bstmt, vmOut, ctxOkOut, ctxErrsOut)
 

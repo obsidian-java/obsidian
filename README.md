@@ -113,11 +113,82 @@ sbt publish
 cd ~/obsidian-java/binrepo && git status
 ```
 
+# SSA/CPS Pipeline Update (Oct 2026)
+
+Summary of the recent fix that brings the CPS stage in line with the structured SSA 
+construction (the tree-shaped SSA AST with join/next/except, see ftfjp23-fixed.pdf), 
+and repairs the pipeline blockers that were found while validating it.
+
+## CPS.scala: SSA to CPS conversion rewritten for the new SSA AST
+
+`cpsblk` (and the new helpers `cpsSBlk`, `cpsMethod`) now match the current `MinSSA` case classes:
+
+- `SSAIf(exp, th, el, joinPhis, next, exceptPhis)` translates to `seq(ifelse(θcond, ⟦th⟧, ⟦el⟧), ⟦next⟧)`. 
+  Each branch sequence ends with an `SSAEmpty` block labelled by the branch exit context, 
+  and that label is exactly the key used in the join phi rhs — so join phis are resolved 
+  and emitted at the branch exits via `cpsk`; the `next` blocks carry the enclosing phi.
+- `SSAWhile(joinPhis, exp, body, next, exceptPhis)` translates to the loop entry phis + 
+  `loop(θcond, ⟦body⟧, ⟦next⟧)` (scaffolding; the SSA construction for while is not implemented yet).
+- Added the missing block forms: `SSAEmpty` (terminates every sequence now), `SSAExps`, 
+  `SSAAssert`, in-place `SSAVarDecls` (declarations are hoisted by `genVarDecls`, so an 
+  in-place declaration with an initialiser becomes an assignment), and blocks with multiple 
+  statements (produced by `prependVarDecls`). Unknown forms yield a clean CPSError instead of a MatchError.
+
+The exception continuation is treated as the **identity** for now, while try-catch support 
+is disabled at the CPS stage:
+
+- The `raise -> k -> body` shape of every block function and the `seq`/`ifelse`/`loop` 
+  fixtures are kept unchanged (so that try-catch can be supported later without retyping them).
+- The exception-flow phis (`exceptPhis` / `catchPhis`) are not translated at all, and the 
+  `phiR` accumulation parameter is removed from `cpsblk`. This is observationally safe: 
+  with no in-method handler, no code can observe the renamed variables on the exception path.
+- `SSAThrow` emits `return raise.apply(e)` (this also fixes the latent `raise(e)` 
+  call-convention bug of the previous implementation).
+- At the method boundary the entry exception continuation is `Ctxt.idHandler` (`e -> { return null; }`), 
+  i.e. an exception simply escapes the obfuscated method and is discarded.
+- `SSATry` yields a clean "not supported by the CPS stage yet" error.
+
+## MinSSA.scala: pipeline blockers repaired along the way
+
+1. cIf branches: added `kStmtBranch`, restoring what the old (removed) `kstmtBlock` did — 
+   branch statements enclosed in `StmtBlock(Block(...))` (as produced by Flatten/Desugar) are 
+   converted with `kBlock` instead of failing with "Statement Block should not be handled here".
+2. cIf bug: the continuation (`next`) statements were converted with `beta` instead of the 
+   `beta1 ∪ beta2 ∪ beta_j` prescribed by the rule itself, so variables assigned in the 
+   branches were invisible after the if-else.
+3. CtxOrd gaps: added the missing ordering rules `TIfJoin < TIfNext` (with the `TIfNext` 
+   induction case) and `TTryJoin < TTryNext` to `partialCompare`; `follow` already assumed 
+   this order, without it `Rleq` failed for the statements following a control-flow node.
+4. Implemented the missing cReturn rule. (Flatten appends `return;` to every method, so the 
+   absence of the rule crashed the conversion with a MatchError.)
+
+## Validation
+
+The obfuscation pipeline (Flatten -> Desugar -> MinSSA -> CPS) was run on if-else and 
+throw samples; the generated Java compiles with javac and preserves the semantics 
+(the join phi for the if-merged variable is read correctly; a `throw` unwinds via `raise` 
+to `idHandler` and the method completes, which is the intended identity-exception behaviour).
+
+## Known remaining work
+
+- try-catch SSA construction has open bugs: the catch parameter is not registered in beta by 
+  the cTry rule (`Rleq` fails on `exception_desugared`), and the except phis of cTry are 
+  resolved at `TTryJoin` instead of `TTryExcept`. The CPS stage currently rejects `SSATry` 
+  with an explicit error; the `trycatch` runtime combinator exists in the fixtures but is 
+  not emitted yet.
+- While is not implemented in `kblkStmts` yet (the CPS case above is ready scaffolding).
+- Latent codegen issues in `cpsmethoddecl`: curried lambda parameters shadow the formal 
+  parameters (a Java error), and `return ctxt.res;` is emitted for void methods.
+- The test sources (TestMinSSA etc.) are still written against the old SSA AST and do not 
+  compile.
+
 # TODOS:
 
 1. MinSSA does not handle the following
     1. synchronized method, variable, class, which should be an easy fix. 
-    2. try-catch block, this one is hard.
+    2. try-catch: SSA construction for single-catch try-catch is implemented (see the paper), 
+       but has open bugs (see "Known remaining work" above); the CPS stage rejects try-catch for now.
+2. The CPS stage does not handle while and try-catch yet.
 
 # Documentation
 
